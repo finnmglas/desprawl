@@ -4,22 +4,24 @@ Permanently unfuck large ai-touched typescript projects by scoping and deliverin
 
 ## Quickstart
 
-tbd
+Install desprawl and run it
 
-## Deep docs
+```sh
+pnpm i desprawl
+desprawl
+```
 
-tbd
+it will guide you.
 
 ## Contributing
 
-tbd, see CONTRIBUTING.md
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## Related and details
 
-- tbd
--
--
+- Uses: [npm-packaging](https://www.npmjs.com/), [pnpm-cli](https://pnpm.io/), [ts](https://www.typescriptlang.org/), [git](https://git-scm.com/), [claude](https://claude.ai/new)
+- Influence: code viz [graphify](https://github.com/Graphify-Labs/graphify), [GitNexus](https://github.com/abhigyanpatwari/GitNexus), [codegraph](https://github.com/colbymchenry/codegraph), archi viz [S202](https://github.com/Weigend/S202)
 
 ## License
 
-tbd
+MIT.
