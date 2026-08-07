@@ -6,3 +6,8 @@ node_modules
 
 # data
 workspace
+
+# ai
+memory
+.claude
+CLAUDE.md
