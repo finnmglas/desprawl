@@ -12,7 +12,7 @@ tbd
 
 ## Contributing
 
-tbd
+tbd, see CONTRIBUTING.md
 
 ## Related and details
 
