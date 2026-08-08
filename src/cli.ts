@@ -10,21 +10,40 @@ const { values, positionals } = parseArgs({
   options: {
     json: { type: "boolean", default: false },
     top: { type: "string", default: "10" },
+    digits: { type: "string", default: "3" },
+    raw: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
   allowPositionals: true,
 })
 
 if (values.help) {
-  console.log("desprawl [path] [--top N] [--json]")
+  console.log("desprawl [path] [--top N] [--digits N] [--raw] [--json]")
   process.exit(0)
 }
 
 const num = (n: number): string => n.toLocaleString("en-US")
 const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
-const short = (n: number): string =>
-  n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e4 ? `${Math.round(n / 1e3)}k` : num(n)
+
+const UNITS = ["", "k", "m", "b", "t"]
+
+// digits 2: 1, 10, 0.1k, 1.0k, 10k, 0.1m
+function human(n: number, digits: number): string {
+  const sign = n < 0 ? "-" : ""
+  let v = Math.abs(n)
+  let unit = 0
+  while (v >= 10 ** digits && unit < UNITS.length - 1) {
+    v /= 1000
+    unit++
+  }
+  if (unit === 0) return sign + Math.round(v)
+  const whole = Math.floor(v).toString().length
+  return sign + v.toFixed(Math.max(0, digits - whole)) + UNITS[unit]
+}
+
+// magnitudes scaled, small exact
+const big = values.raw ? num : (v: number) => human(v, Number(values.digits))
 
 function table(rows: string[][]): string {
   const width = rows[0].map((_, i) => Math.max(...rows.map((r) => r[i].length)))
@@ -33,14 +52,14 @@ function table(rows: string[][]): string {
     .join("\n")
 }
 
-// header row joins the table so the widths account for it
+// header row sets widths too
 function buckets(title: string, list: Bucket[], s: Stats): string {
   const row = (b: Bucket): string[] => [
-    b.name, num(b.code), pct(b.code, s.code), num(b.comment), num(b.blank),
-    num(b.files), num(b.chars), num(tokens(b.chars)),
+    b.name, big(b.code), pct(b.code, s.code), big(b.comment), big(b.blank),
+    num(b.files), big(b.chars), big(tokens(b.chars)),
   ]
   return `\n${table([
-    [title, "code", "pct", "comment", "blank", "files", "chars", "~tok"],
+    [title, "loc", "pct", "comment", "blank", "files", "chars", "~tok"],
     ...list.map(row),
     row({ ...s, name: "total" }),
   ])}`
@@ -53,9 +72,9 @@ function report(s: Stats, top: number): string {
 
   const out = [
     `${s.repo}  @${s.head}`,
-    `${num(s.code)} code  ${num(s.comment)} comment (${pct(s.comment, source)} of source)  ` +
-      `${num(s.blank)} blank  ${num(s.files)} files`,
-    `${short(s.chars)} chars  ~${short(tokens(s.chars))} tokens`,
+    `${big(s.code)} loc  ${big(s.comment)} comment (${pct(s.comment, source)} of source)  ` +
+      `${big(s.blank)} blank  ${num(s.files)} files`,
+    `${big(s.chars)} chars  ~${big(tokens(s.chars))} tokens`,
     `${num(s.commits)} commits  ${num(s.contributors.length)} contributors  ` +
       `${day(s.first)} to ${day(s.last)}`,
     buckets("LANGUAGE", s.languages, s),
@@ -66,8 +85,8 @@ function report(s: Stats, top: number): string {
         c.name,
         `${num(c.commits)}c`,
         pct(c.commits, s.commits),
-        `+${num(c.insertions)}`,
-        `-${num(c.deletions)}`,
+        `+${big(c.insertions)}`,
+        `-${big(c.deletions)}`,
         pct(c.insertions + c.deletions, churn),
         `${num(c.files)}f`,
         `${day(c.first)}..${day(c.last)}`,

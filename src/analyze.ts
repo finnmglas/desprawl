@@ -63,7 +63,7 @@ export interface Stats extends Split {
 const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30 })
 
-// hash langs have no block form, so docstrings read as code
+// hash langs: docstrings read as code
 function classify(text: string, lang: string): Split {
   const hash = HASH.has(lang)
   const [open, close] = MARKUP.has(lang) ? ["<!--", "-->"] : ["/*", "*/"]
@@ -121,9 +121,9 @@ function scan(repo: string): Pick<Stats, "languages" | "modules" | "files" | "ch
     try {
       buf = readFileSync(join(repo, path))
     } catch {
-      continue // submodule, broken symlink, or a path deleted since ls-files ran
+      continue // submodule, symlink, raced delete
     }
-    // A NUL byte in the first 8 KB means binary. Counting newlines in a PNG is noise.
+    // NUL in first 8 KB means binary
     if (buf.subarray(0, 8192).includes(0)) continue
 
     const lang = LANGS[ext] ?? ext
