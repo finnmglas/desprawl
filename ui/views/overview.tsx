@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts"
+import { AiCard } from "../components/ai-card.tsx"
 import { Avatar } from "../components/avatar.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { cn } from "../lib/ui.ts"
@@ -287,6 +288,8 @@ export function Overview({
         id={(p) => p.email}
         fold={8}
       />
+
+      <AiCard ai={stats.stack.ai} />
 
       <Onward stats={stats} current="Overview" onTab={onTab} />
     </div>

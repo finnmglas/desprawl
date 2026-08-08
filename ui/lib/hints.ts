@@ -54,4 +54,7 @@ export const HINTS: Record<string, string> = {
   Containers: "infrastructure files in the tree",
   APIs: "checked in request collections and schemas",
   Config: "what the app expects to be given",
+  Assistants: "ai coding tools this repo shows a trace of",
+  Signed: "commits whose author line or trailers name an ai",
+  Rules: "instruction files checked in for those tools",
 }

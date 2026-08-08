@@ -30,6 +30,20 @@ export interface Pinning {
   linked: number
 }
 
+export interface Ai {
+  /** every ai coding tool the repo shows a trace of, from files or from the history */
+  tools: string[]
+  /** the instruction files, as markers, and how many of each the tree holds */
+  files: Record<string, number>
+  /** commits an ai signed, and how many of the newest were read to find them */
+  signed: number
+  scanned: number
+  /** the read hit its cap, so older commits went unseen */
+  capped: boolean
+  /** commits signed, per tool */
+  by: Record<string, number>
+}
+
 export interface Stack {
   /** typescript, javascript, both, or not a node project at all */
   kind: "typescript" | "javascript" | "mixed" | "none"
@@ -80,6 +94,7 @@ export interface Stack {
   apis: string[]
   licenses: string[]
   parts: string[]
+  ai: Ai
 }
 
 /** A dependency name, or a prefix ending in /, mapped to the label it implies. */
@@ -224,6 +239,47 @@ const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "ter
   [/^(.*\/)?tsconfig(\..+)?\.json$/, "typescript", "tsconfig"],
 ]
 
+/** Instruction and config files an ai coding tool leaves behind. */
+// prettier-ignore
+const AGENTS: [RegExp, string][] = [
+  [/^(.*\/)?CLAUDE\.(md|local\.md)$|^(.*\/)?\.claude\//, "Claude Code"],
+  [/^(.*\/)?AGENTS\.md$/, "AGENTS.md"],
+  [/^(.*\/)?\.cursorrules$|^(.*\/)?\.cursor(rules)?\//, "Cursor"],
+  [/^\.github\/copilot-instructions\.md$|^\.github\/instructions\//, "Copilot"],
+  [/^(.*\/)?\.aider(\..+)?$|^(.*\/)?CONVENTIONS\.md$/, "aider"],
+  [/^(.*\/)?\.windsurfrules$|^(.*\/)?\.windsurf\//, "Windsurf"],
+  [/^(.*\/)?\.clinerules(\/.*)?$/, "Cline"],
+  [/^(.*\/)?\.roo(rules|modes)?(\/.*)?$/, "Roo"],
+  [/^(.*\/)?\.continue\//, "Continue"],
+  [/^(.*\/)?GEMINI\.md$|^(.*\/)?\.gemini\//, "Gemini CLI"],
+  [/^(.*\/)?AGENT\.md$|^(.*\/)?\.amp\//, "Amp"],
+  [/^(.*\/)?\.codex\/|^(.*\/)?codex\.md$/i, "Codex"],
+  [/^(.*\/)?\.junie\//, "Junie"],
+  [/^(.*\/)?\.kiro\//, "Kiro"],
+  [/^(.*\/)?\.goosehints$|^(.*\/)?\.goose\//, "Goose"],
+  [/^(.*\/)?\.devin\//, "Devin"],
+  [/^(.*\/)?\.amazonq\//, "Amazon Q"],
+  [/^(.*\/)?\.augment(-guidelines)?(\/.*)?$/, "Augment"],
+  [/^(.*\/)?\.sourcegraph\/|^(.*\/)?\.cody\//, "Cody"],
+  [/^(.*\/)?\.specstory\//, "SpecStory"],
+  [/^(.*\/)?\.?mcp\.json$|^(.*\/)?\.mcp\//, "MCP"],
+  [/^(.*\/)?llms(-full)?\.txt$/, "llms.txt"],
+  [/^(.*\/)?\.ai-?(rules|instructions)(\..+)?$/, "house rules"],
+]
+
+/** What an ai calls itself in a trailer or an author line. */
+// prettier-ignore
+const SIGNERS: [RegExp, string][] = [
+  [/claude/i, "Claude Code"], [/cursor/i, "Cursor"], [/copilot/i, "Copilot"],
+  [/devin/i, "Devin"], [/aider/i, "aider"], [/codex|chatgpt|openai/i, "Codex"],
+  [/gemini|jules/i, "Gemini CLI"], [/windsurf|codeium/i, "Windsurf"], [/cline/i, "Cline"],
+  [/openhands|opendevin/i, "OpenHands"], [/\bamp\b|sourcegraph/i, "Amp"], [/\bcody\b/i, "Cody"],
+  [/coderabbit/i, "CodeRabbit"], [/sweep-ai|sweepai/i, "Sweep"], [/tabnine/i, "Tabnine"],
+  [/amazon ?q|codewhisperer/i, "Amazon Q"], [/roo ?code/i, "Roo"], [/kiro/i, "Kiro"],
+  [/goose/i, "Goose"], [/augment/i, "Augment"], [/factory\.ai|droid/i, "Factory"],
+  [/antigravity/i, "Antigravity"], [/continue\.dev/i, "Continue"], [/junie/i, "Junie"],
+]
+
 const CONFIGS: [RegExp, "linters" | "formatters"][] = [
   [/^(.*\/)?\.eslintrc(\..+)?$/, "linters"],
   [/^(.*\/)?eslint\.config\.[cm]?[jt]s$/, "linters"],
@@ -290,6 +346,44 @@ const label = (table: Table, name: string): string =>
   Object.entries(table).find(([key]) => key.endsWith("/") && name.startsWith(key))?.[1] ??
   ""
 
+/** newest commits only, a signature further back says little about the code now */
+const SIGNED_MAX = 20_000
+
+/**
+ * Who signed the history. Only the author line and the trailers count, so a commit
+ * that merely writes about an assistant is not counted as written by one.
+ */
+/** the tool a trailer names, without its model suffix, so Copilot:Claude reads as Copilot */
+const signer = (line: string): string =>
+  line.replace(/^\s*[a-z-]+-by:\s*/i, "").replace(/^([^\s:]+):\S+/, "$1")
+
+function assisted(repo: string): Pick<Ai, "signed" | "scanned" | "capped" | "by"> {
+  const by: Record<string, number> = {}
+  let log = ""
+  try {
+    log = git(repo, "log", `-${SIGNED_MAX}`, "--format=%an <%ae>%n%B%x00")
+  } catch {
+    return { signed: 0, scanned: 0, capped: false, by } // no commits yet
+  }
+
+  const commits = log.split("\0").filter((c) => c.trim())
+  let signed = 0
+  for (const commit of commits) {
+    const [author = "", ...body] = commit.split("\n")
+    const claims = [
+      // a human called Claude is not a tool, a bot address is
+      /\[bot\]|noreply|users\.noreply/i.test(author) ? author : "",
+      ...body.filter((line) => /^\s*(co-authored-by|assisted-by|generated with)/i.test(line)),
+    ].map(signer)
+    const hits = new Set(
+      SIGNERS.filter(([match]) => claims.some((line) => match.test(line))).map(([, tool]) => tool),
+    )
+    if (hits.size) signed++
+    for (const tool of hits) by[tool] = (by[tool] ?? 0) + 1
+  }
+  return { signed, scanned: commits.length, capped: commits.length >= SIGNED_MAX, by }
+}
+
 export function stack(repo: string): Stack {
   const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
   const found: Record<string, string[]> = {}
@@ -300,6 +394,8 @@ export function stack(repo: string): Stack {
   const env: string[] = []
   const strict = { on: 0, off: 0 }
   const ports: number[] = []
+  const agents: string[] = []
+  const agentFiles: Record<string, number> = {}
 
   const port = (value: number) => {
     if (value > 0 && value < 65536 && !ports.includes(value)) ports.push(value)
@@ -316,6 +412,14 @@ export function stack(repo: string): Stack {
     }
     for (const [match, where] of CONFIGS) {
       if (match.test(path)) add((found[where] ??= []), path.split("/").pop() ?? path)
+    }
+    for (const [match, tool] of AGENTS) {
+      if (!match.test(path)) continue
+      add(agents, tool)
+      // the last matched segment, so a rules folder counts once and nesting collapses
+      const hit = path.match(match)?.[0] ?? path
+      const marker = hit.endsWith("/") ? `${hit.split("/").at(-2)}/` : (hit.split("/").pop() ?? hit)
+      agentFiles[marker] = (agentFiles[marker] ?? 0) + 1
     }
   }
 
@@ -484,6 +588,11 @@ export function stack(repo: string): Stack {
 
   const root = manifests.find((m) => m.path === "package.json")
 
+  // a checked in ruleset and a signed commit are both evidence, one list either way
+  const signatures = assisted(repo)
+  const tools = [...agents]
+  for (const tool of Object.keys(signatures.by)) add(tools, tool)
+
   return {
     kind,
     primary,
@@ -524,5 +633,6 @@ export function stack(repo: string): Stack {
     apis: found.apis ?? [],
     licenses,
     parts,
+    ai: { ...signatures, tools, files: agentFiles },
   }
 }
