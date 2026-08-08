@@ -117,9 +117,15 @@ export interface Stats extends Split {
 // estimate
 export const tokens = (chars: number): number => Math.round(chars / 4)
 
-// stderr piped, not inherited, so git's own wording never lands on top of ours
+// stderr piped, not inherited, so git's own wording never lands on top of ours.
+// quotePath off, or a path with an umlaut arrives escaped and matches nothing
 export const git = (cwd: string, ...args: string[]): string =>
-  execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30, stdio: "pipe" })
+  execFileSync("git", ["-c", "core.quotePath=false", ...args], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 1 << 30,
+    stdio: "pipe",
+  })
 
 // prettier-ignore
 export const blank = (name: string, path = ""): Node => ({

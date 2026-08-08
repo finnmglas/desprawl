@@ -34,7 +34,9 @@ const store = join(config, "desprawl", "prefs.json")
 
 const readPrefs = (): string => {
   try {
-    return readFileSync(store, "utf8")
+    const text = readFileSync(store, "utf8")
+    JSON.parse(text) // catch corruptions
+    return text
   } catch {
     return "{}"
   }
@@ -127,7 +129,11 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
         if (req.method === "GET") return send(200, readPrefs(), "application/json")
         if (req.method === "PUT") {
           let body = ""
-          req.on("data", (chunk) => (body += chunk))
+          // settings are small, catch it
+          req.on("data", (chunk) => {
+            body += chunk
+            if (body.length > 64_000) req.destroy()
+          })
           req.on("end", () => {
             try {
               JSON.parse(body) // never poison the next read

@@ -54,8 +54,11 @@ export function explain(err: unknown): string | null {
     return `needs git, which is not on PATH\n  install: ${install("git")}`
   if (/not a git repository/i.test(text))
     return "not a git repository. Run it inside one, or give it a path"
-  if (/Needed a single revision|unknown revision/i.test(text))
-    return "this repository has no commits yet, so there is nothing to read"
+  // git says unknown revision for both, only the name it could not find separates them
+  if (/Needed a single revision/i.test(text) || /unknown revision.*/i.test(text))
+    return /'HEAD'|Needed a single revision/.test(text)
+      ? "this repository has no commits yet, so there is nothing to read"
+      : "no such commit in this repository"
   // git printed its own reason as it ran, repeating the command adds nothing
   if (/Command failed: git clone/.test(text)) return "could not clone that url, git said why above"
   return null

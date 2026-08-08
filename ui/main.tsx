@@ -203,6 +203,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
 function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")
+  const [waited, setWaited] = useState(0)
   const token = new URLSearchParams(location.search).get("t")
   const live = !window.__DESPRAWL__ && !!token
 
@@ -226,11 +227,21 @@ function Root() {
     if (live) load()
   }, [])
 
+  // large repo passes
+  useEffect(() => {
+    if (stats || error) return
+    const tick = setInterval(() => setWaited((s) => s + 1), 1000)
+    return () => clearInterval(tick)
+  }, [stats, error])
+
   if (error) return <p className="text-destructive p-6 text-sm">Could not load stats: {error}</p>
   if (!stats) {
     return (
       <p className="text-muted-foreground p-6 text-sm">
-        {live ? "Analysing…" : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
+        {live
+          ? `Analysing, ${waited}s so far. Every tracked file is read once, then the history` +
+            (waited > 20 ? ". A repo this size takes a few minutes the first time" : "…")
+          : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
       </p>
     )
   }

@@ -1,6 +1,7 @@
 // owner: finn
 // goal: parts too big to ship up front, asked for once the ui is painted
 
+import { toast } from "../components/toast.tsx"
 import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
@@ -9,15 +10,26 @@ const token = () => new URLSearchParams(location.search).get("t")
 // served mode only, a static file already holds everything
 export const isLive = (): boolean => !!token() && !window.__DESPRAWL__
 
+const complained = new Set<string>()
+const failed = (path: string, why: string): void => {
+  const name = path.split("?")[0]
+  if (complained.has(name)) return
+  complained.add(name)
+  toast(`Could not load ${name.replace("/api/", "")}`, why, "error")
+}
+
 async function ask<T>(path: string, fallback: T): Promise<T> {
   const t = token()
   if (!t) return fallback
   try {
     const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}`)
-    return res.ok ? ((await res.json()) as T) : fallback
-  } catch {
-    return fallback
+    if (res.ok) return (await res.json()) as T
+    const body = (await res.json().catch(() => null)) as { error?: string } | null
+    failed(path, body?.error ?? `${res.status} ${res.statusText}`)
+  } catch (err) {
+    failed(path, err instanceof Error ? err.message : "the server did not answer")
   }
+  return fallback
 }
 
 /** holds a stream open, so the server sees the tab close */

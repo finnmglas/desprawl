@@ -193,6 +193,15 @@ export function Overview({
         ))}
       </div>
 
+      {stats.files === 0 && (
+        <Card>
+          <CardContent className="text-muted-foreground p-6 text-sm">
+            Nothing countable here. Every tracked file is binary, or has neither a known extension
+            nor a name desprawl recognises, so there are no lines to report.
+          </CardContent>
+        </Card>
+      )}
+
       <StackCard stack={stats.stack} />
 
       <Card>
@@ -200,17 +209,19 @@ export function Overview({
           <div className="flex min-w-0 flex-col gap-0.5">
             <CardTitle>Over time</CardTitle>
             <span className="text-muted-foreground text-xs">
-              {zoom
-                ? `zoomed to ${shown[0]?.day} - ${shown.at(-1)?.day}, ${num(shown.length)} of ${num(days.length)} buckets. Double click to reset`
-                : sizing
-                  ? "measuring the size at points across history…"
-                  : all &&
-                      picked.some((k) => k === "commits" || k === "devs") &&
-                      picked.some((k) => k !== "commits" && k !== "devs")
-                    ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
-                    : share
-                      ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
-                      : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
+              {!all && stats.truncated
+                ? "reading every commit date, so the chart can span the whole history…"
+                : zoom
+                  ? `zoomed to ${shown[0]?.day} - ${shown.at(-1)?.day}, ${num(shown.length)} of ${num(days.length)} buckets. Double click to reset`
+                  : sizing
+                    ? "measuring the size at points across history…"
+                    : all &&
+                        picked.some((k) => k === "commits" || k === "devs") &&
+                        picked.some((k) => k !== "commits" && k !== "devs")
+                      ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
+                      : share
+                        ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
+                        : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
             </span>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">

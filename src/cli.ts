@@ -84,6 +84,9 @@ const big = values.raw ? num : (v: number) => human(v, int(values.digits, 3))
 const top = int(values.top, 10)
 const depth = int(values.depth, 1)
 
+// junk or zero means the default, never NaN on git's command line
+const cap = int(values.commits, 0) || undefined
+
 const NAMES = 44
 
 function table(rows: string[][]): string {
@@ -129,6 +132,12 @@ function branch(n: Node, total: number, level = 0): string[][] {
 }
 
 function report(s: Stats): string {
+  if (!s.files)
+    return (
+      `${s.repo}  @${s.head}\n` +
+      "Nothing countable here. Every tracked file is binary, or has neither a known extension " +
+      "nor a name desprawl recognises."
+    )
   const source = s.code + s.comment
   const moved = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const shown = s.contributors.slice(0, top)
@@ -176,16 +185,16 @@ function report(s: Stats): string {
 try {
   // say it here in a sentence, a served failure is a 500 nobody can read
   if (!existsSync(target)) fail(`no such path as ${target}`)
-  git(target, "rev-parse", "--git-dir")
+  git(target, "rev-parse", "HEAD") // --git-dir passes on a repo with no commits
 
   // live analyses per request, so it never needs the report up front
   if (viewing && !values.static)
     console.log(
       "Interface is live, if it doesn't open, click the link:\n\n" +
-        (await serve(target, values.commits ? Number(values.commits) : undefined, values.keep)),
+        (await serve(target, cap, values.keep)),
     )
   else {
-    const stats = analyze(target, values.commits ? Number(values.commits) : undefined)
+    const stats = analyze(target, cap)
     if (viewing) console.log(view(stats))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }

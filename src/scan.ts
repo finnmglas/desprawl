@@ -20,7 +20,34 @@ const LANGS: Record<string, string> = {
   md: "Markdown", sh: "Shell", bash: "Shell", flow: "Flow",
 }
 
-const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby"])
+// named, not extended
+// prettier-ignore
+const NAMES: Record<string, string> = {
+  makefile: "Make", "gnumakefile": "Make", dockerfile: "Docker", containerfile: "Docker",
+  justfile: "just", rakefile: "Ruby", gemfile: "Ruby", brewfile: "Ruby", vagrantfile: "Ruby",
+  jenkinsfile: "Groovy", procfile: "Procfile", cmakelists: "CMake",
+}
+
+// the other way a file says what it is
+const RUNS: Record<string, string> = {
+  sh: "Shell",
+  bash: "Shell",
+  zsh: "Shell",
+  fish: "Shell",
+  python: "Python",
+  python3: "Python",
+  node: "JavaScript",
+  ruby: "Ruby",
+  perl: "Perl",
+}
+
+const shebang = (text: string): string => {
+  const first = text.slice(0, 120)
+  if (!first.startsWith("#!")) return ""
+  return RUNS[first.match(/\b(fish|bash|zsh|sh|python3?|node|ruby|perl)\b/)?.[1] ?? ""] ?? ""
+}
+
+const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby", "Make", "Docker", "just"])
 const MARKUP = new Set(["HTML", "Markdown", "Vue", "Svelte", "xml"])
 
 // tab or 2 spaces
@@ -70,7 +97,6 @@ export function scan(repo: string): Node[] {
     const dot = path.lastIndexOf(".")
     const slash = path.lastIndexOf("/")
     const ext = dot > slash + 1 ? path.slice(dot + 1).toLowerCase() : ""
-    if (!ext) continue
 
     let buf: Buffer
     try {
@@ -81,8 +107,11 @@ export function scan(repo: string): Node[] {
     // NUL in first 8 KB means binary
     if (buf.subarray(0, 8192).includes(0)) continue
 
-    const lang = LANGS[ext] ?? ext
     const text = buf.toString("utf8")
+    const lang = ext
+      ? (LANGS[ext] ?? ext)
+      : (NAMES[path.slice(slash + 1).toLowerCase()] ?? shebang(text))
+    if (!lang) continue
     const split = classify(text, lang)
     files.push({
       ...blank(path.slice(slash + 1), path),
