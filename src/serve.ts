@@ -3,12 +3,37 @@
 
 import { randomBytes } from "node:crypto"
 import { createServer } from "node:http"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
+import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
 import { open, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
-export function serve(repo: string, port = 0): Promise<string> {
+// a fixed port keeps one origin, so the browser keeps theme and locale between runs
+const PORT = 7423
+
+const store = join(
+  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
+  "desprawl",
+  "prefs.json",
+)
+
+const readPrefs = (): string => {
+  try {
+    return readFileSync(store, "utf8")
+  } catch {
+    return "{}"
+  }
+}
+
+const writePrefs = (body: string): void => {
+  mkdirSync(dirname(store), { recursive: true })
+  writeFileSync(store, body)
+}
+
+export function serve(repo: string, port = PORT): Promise<string> {
   // every page in the browser can reach localhost, so the port alone is not a secret
   const token = randomBytes(16).toString("hex")
   const html = shell()
@@ -31,6 +56,25 @@ export function serve(repo: string, port = 0): Promise<string> {
       }
 
       if (url.pathname === "/") return send(200, html, "text/html")
+
+      // preferences live on disk, so they survive a new port and a cleared browser
+      if (url.pathname === "/api/prefs") {
+        if (req.method === "GET") return send(200, readPrefs(), "application/json")
+        if (req.method === "PUT") {
+          let body = ""
+          req.on("data", (chunk) => (body += chunk))
+          req.on("end", () => {
+            try {
+              JSON.parse(body) // refuse anything that would poison the next read
+              writePrefs(body)
+              send(200, body, "application/json")
+            } catch {
+              send(400, "bad json", "text/plain")
+            }
+          })
+          return
+        }
+      }
       if (url.pathname === "/api/stats") {
         try {
           return send(200, JSON.stringify(analyze(repo)), "application/json")
@@ -41,7 +85,11 @@ export function serve(repo: string, port = 0): Promise<string> {
       return send(404, "not found", "text/plain")
     })
 
-    server.on("error", reject)
+    // somebody else already has the friendly port, take any free one
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE" && port === PORT) serve(repo, 0).then(resolve, reject)
+      else reject(err)
+    })
     server.listen(port, HOST, () => {
       const live = `http://${HOST}:${(server.address() as { port: number }).port}/?t=${token}`
       open(live)

@@ -16,10 +16,7 @@ export interface ThemeState {
   setTheme: (theme: Theme) => void
 }
 
-export function useTheme(): ThemeState {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(KEY) as Theme | null) ?? "system",
-  )
+export function useTheme(theme: Theme, setTheme: (theme: Theme) => void): ThemeState {
   const [prefersDark, setPrefersDark] = useState(() => matchMedia(DARK).matches)
 
   useEffect(() => {
@@ -33,7 +30,7 @@ export function useTheme(): ThemeState {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", resolved === "dark")
-    localStorage.setItem(KEY, theme)
+    localStorage.setItem(KEY, theme) // the pre paint script in index.html reads this one
   }, [resolved, theme])
 
   return { theme, resolved, setTheme }

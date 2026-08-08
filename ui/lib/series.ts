@@ -129,7 +129,11 @@ export function rows(stats: Stats, picked: string[], grain: Grain, curve: Curve)
     const row: Row = { day }
     for (const key of picked) {
       const value = raw[key][i]
-      const scaled = share ? (value / peaks[SERIES[key].group]) * 100 : transform(value, curve)
+      // normalise in the curve's own space, or log would have no effect on an overlay
+      const peak = peaks[SERIES[key].group]
+      const scaled = share
+        ? (transform(value, curve) / (transform(peak, curve) || 1)) * 100
+        : transform(value, curve)
       row[key] = SERIES[key].down ? -scaled : scaled
       // the tooltip always tells the truth, whatever the axis is doing
       row[`${key}_raw`] = SERIES[key].down ? -value : value

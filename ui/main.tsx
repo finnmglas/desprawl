@@ -11,7 +11,8 @@ import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
-import { CHOICES, LABELS, setLocale, stored, type Choice } from "./lib/locale.ts"
+import { CHOICES, LABELS, setLocale } from "./lib/locale.ts"
+import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
 import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
@@ -34,9 +35,24 @@ const TABS = ["Overview", "Files", "History"]
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
-  const [scale, setScale] = useState<Scale>("simple")
-  const [curve, setCurve] = useState<Curve>("linear")
-  const [region, setRegion] = useState<Choice>(stored)
+  const [prefs, setPrefs] = useState<Prefs>(readPrefs)
+  const { scale, curve, region } = prefs
+  // one writer, so every setting lands in the same place
+  const change = (next: Partial<Prefs>) => {
+    const merged = { ...prefs, ...next }
+    setPrefs(merged)
+    savePrefs(merged)
+    if (next.region) setLocale(next.region)
+  }
+
+  // the served copy on disk wins, it outlives the port the browser saw it on
+  useEffect(() => {
+    void pullPrefs().then((saved) => {
+      if (!saved) return
+      setPrefs(saved)
+      setLocale(saved.region)
+    })
+  }, [])
   setSimple(scale === "simple") // before the tree below renders
 
   useEffect(() => {
@@ -47,7 +63,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     void loadFaces(stats).then(setFaces)
   }, [stats.repo])
 
-  const themed = useTheme()
+  const themed = useTheme(prefs.theme, (theme) => change({ theme }))
   useThemeHotkey(themed)
 
   const explore = (picked: string) => {
@@ -122,7 +138,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                   grow
                   tabs={SCALES}
                   value={scale}
-                  onChange={(next) => setScale(next as Scale)}
+                  onChange={(next) => change({ scale: next as Scale })}
                 />
               </MenuSection>
               <MenuSection
@@ -133,7 +149,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                   grow
                   tabs={CURVES}
                   value={curve}
-                  onChange={(next) => setCurve(next as Curve)}
+                  onChange={(next) => change({ curve: next as Curve })}
                 />
               </MenuSection>
               <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
@@ -141,11 +157,9 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                   grow
                   tabs={CHOICES.map((c) => LABELS[c])}
                   value={LABELS[region]}
-                  onChange={(next) => {
-                    const picked = CHOICES.find((c) => LABELS[c] === next) ?? "auto"
-                    setLocale(picked)
-                    setRegion(picked)
-                  }}
+                  onChange={(next) =>
+                    change({ region: CHOICES.find((c) => LABELS[c] === next) ?? "auto" })
+                  }
                 />
               </MenuSection>
             </Menu>
