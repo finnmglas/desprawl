@@ -2,14 +2,24 @@
 // goal: mount, ui
 
 import { createRoot } from "react-dom/client"
-import { Button } from "./components/button.tsx"
+import { useEffect, useState } from "react"
+import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
+import { RemoteLink } from "./components/remote-link.tsx"
+import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
+import { CHOICES, LABELS, setLocale } from "./lib/locale.ts"
+import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
+import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
+import { num, setSimple } from "./lib/format.ts"
+import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
+import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
+import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
 
@@ -20,14 +30,44 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Explorer", "History"]
+const TABS = ["Overview", "Files", "History"]
 
-function App({ stats }: { stats: Stats }) {
+function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
+  const [prefs, setPrefs] = useState<Prefs>(readPrefs)
+  const { scale, curve, region } = prefs
+  // one writer for every setting
+  const change = (next: Partial<Prefs>) => {
+    const merged = { ...prefs, ...next }
+    setPrefs(merged)
+    savePrefs(merged)
+    if (next.region) setLocale(next.region)
+  }
+
+  // disk wins, it outlives the port
+  useEffect(() => {
+    void pullPrefs().then((saved) => {
+      if (!saved) return
+      setPrefs(saved)
+      setLocale(saved.region)
+    })
+  }, [])
+  setSimple(scale === "simple") // before the tree below renders
+
+  useEffect(() => {
+    scrollTo({ top: 0 })
+  }, [tab])
+  const [faces, setFaces] = useState<Record<string, string>>({})
+  useEffect(() => {
+    void loadFaces(stats).then(setFaces)
+  }, [stats.repo])
+
+  const themed = useTheme(prefs.theme, (theme) => change({ theme }))
+  useThemeHotkey(themed)
 
   const explore = (picked: string) => {
-    go({ lang: picked, path: [], tab: "Explorer" })
+    go({ lang: picked, path: [], tab: "Files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
 
@@ -38,62 +78,154 @@ function App({ stats }: { stats: Stats }) {
     )
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-4 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <button
-            onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
-            className="hover:text-muted-foreground cursor-pointer font-mono text-lg font-semibold"
-          >
-            {stats.repo}
-          </button>
-          <p className="text-muted-foreground text-xs">
-            @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-            {stats.commits.toLocaleString("en-US")} commits · desprawl {stats.version}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={share}>
-            share
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              download("desprawl.json", JSON.stringify(stats, null, 2), "application/json")
-              toast("desprawl.json", "The whole report, tree and series included")
-            }}
-          >
-            export
-          </Button>
-          <Tabs tabs={TABS} value={tab} onChange={(next) => go({ tab: next })} />
-        </div>
-      </header>
+    <DisplayProvider value={{ scale, curve }}>
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          {/* min-w-0 lets a long path truncate */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex min-w-0 items-center gap-2">
+              {/* folder name is the repo name */}
+              <button
+                onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
+                className="hover:text-muted-foreground cursor-pointer truncate text-lg font-semibold"
+              >
+                {stats.repo.split("/").filter(Boolean).pop()}
+              </button>
+              {stats.remotes.map((remote) => (
+                <RemoteLink key={remote.url} remote={remote} />
+              ))}
+            </div>
+            <button
+              onClick={async () =>
+                toast(
+                  (await copy(stats.repo)) ? "Path copied" : "Copy blocked by the browser",
+                  stats.repo,
+                )
+              }
+              title="Copy the path"
+              className="text-muted-foreground hover:text-foreground max-w-full cursor-pointer truncate text-left font-mono text-xs"
+            >
+              {stats.repo}
+            </button>
+            <p className="text-muted-foreground text-xs">
+              @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
+              {num(stats.commits)} commits · desprawl {stats.version}
+            </p>
+          </div>
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Tabs
+              grow
+              className="sm:w-auto"
+              tabs={TABS}
+              value={tab}
+              onChange={(next) => go({ tab: next })}
+            />
+            <ThemeToggle {...themed} />
+            <Menu>
+              {reload && <MenuItem onClick={reload}>refresh</MenuItem>}
+              <MenuItem onClick={share}>share link</MenuItem>
+              <MenuItem
+                onClick={() => {
+                  download("desprawl.json", JSON.stringify(stats, null, 2), "application/json")
+                  toast("desprawl.json", "The whole report, tree and series included")
+                }}
+              >
+                export json
+              </MenuItem>
+              <div className="bg-border my-1 h-px" />
+              <MenuSection label="Number relation" hint={EXPLAIN[scale]}>
+                <Tabs
+                  grow
+                  tabs={SCALES}
+                  value={scale}
+                  onChange={(next) => change({ scale: next as Scale })}
+                />
+              </MenuSection>
+              <MenuSection
+                label="Bar scale"
+                hint={curve === "log" ? "small values stay visible" : "true proportions"}
+              >
+                <Tabs
+                  grow
+                  tabs={CURVES}
+                  value={curve}
+                  onChange={(next) => change({ curve: next as Curve })}
+                />
+              </MenuSection>
+              <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
+                <Tabs
+                  grow
+                  tabs={CHOICES.map((c) => LABELS[c])}
+                  value={LABELS[region]}
+                  onChange={(next) =>
+                    change({ region: CHOICES.find((c) => LABELS[c] === next) ?? "auto" })
+                  }
+                />
+              </MenuSection>
+            </Menu>
+          </div>
+        </header>
 
-      {tab === "History" ? (
-        <Graph stats={stats} />
-      ) : tab === "Overview" ? (
-        <Overview stats={stats} onLang={explore} />
-      ) : (
-        <Explorer
-          stats={stats}
-          path={path}
-          setPath={(next) => go({ path: next })}
-          lang={lang}
-          setLang={(next) => go({ lang: next })}
-        />
-      )}
-      <Toaster />
-    </div>
+        {tab === "History" ? (
+          <Graph stats={stats} onTab={(next) => go({ tab: next })} faces={faces} />
+        ) : tab === "Overview" ? (
+          <Overview
+            stats={stats}
+            onLang={explore}
+            onTab={(next) => go({ tab: next })}
+            faces={faces}
+          />
+        ) : (
+          <Explorer
+            stats={stats}
+            onTab={(next) => go({ tab: next })}
+            path={path}
+            setPath={(next) => go({ path: next })}
+            lang={lang}
+            setLang={(next) => go({ lang: next })}
+          />
+        )}
+      </div>
+    </DisplayProvider>
   )
 }
 
-const stats = window.__DESPRAWL__
-const root = createRoot(document.getElementById("root")!)
-root.render(
-  stats ? (
-    <App stats={stats} />
-  ) : (
-    <p className="text-muted-foreground p-6 text-sm">No stats inlined. Run `desprawl view`.</p>
-  ),
-)
+// inlined by view --static, fetched when served
+function Root() {
+  const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
+  const [error, setError] = useState("")
+  const token = new URLSearchParams(location.search).get("t")
+  const live = !window.__DESPRAWL__ && !!token
+
+  const load = () => {
+    setError("")
+    fetch(`/api/stats?t=${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`))))
+      .then((next: Stats) => {
+        setStats(next)
+        toast("Reanalysed", next.repo)
+      })
+      .catch((err: Error) => setError(err.message))
+  }
+
+  useEffect(() => {
+    if (live) load()
+  }, [])
+
+  if (error) return <p className="text-destructive p-6 text-sm">Could not load stats: {error}</p>
+  if (!stats) {
+    return (
+      <p className="text-muted-foreground p-6 text-sm">
+        {live ? "Analysing…" : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
+      </p>
+    )
+  }
+  return (
+    <>
+      <App stats={stats} reload={live ? load : undefined} />
+      <Toaster />
+    </>
+  )
+}
+
+createRoot(document.getElementById("root")!).render(<Root />)

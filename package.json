@@ -14,11 +14,12 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "check": "tsc --noEmit && tsc -p ui --noEmit",
+    "check": "prettier --check src ui *.md && tsc --noEmit && tsc -p ui --noEmit",
     "desprawl": "node src/cli.ts",
     "ui": "vite --config ui/vite.config.ts",
     "build": "vite build --config ui/vite.config.ts && tsc -p tsconfig.build.json",
-    "prepack": "pnpm build"
+    "prepack": "pnpm build",
+    "format": "prettier --write src ui *.md"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
@@ -27,6 +28,7 @@
     "@types/react-dom": "19.2.4",
     "@vitejs/plugin-react": "5.2.0",
     "clsx": "2.1.1",
+    "prettier": "^3.9.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "2.15.4",

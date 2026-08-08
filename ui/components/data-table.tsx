@@ -7,6 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { toast } from "./toast.tsx"
 import { copy, delimit, download } from "../lib/export.ts"
+import { backdrop, cycle, pct } from "../lib/format.ts"
+import { useDisplay } from "../lib/display.tsx"
+import type { Sort } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 
 export interface Column<T> {
@@ -17,6 +20,10 @@ export interface Column<T> {
   get: (row: T) => string | number
   /** Render override, defaults to get(). */
   cell?: (row: T) => React.ReactNode
+  /** Suppress backdrop bar on numeric column */
+  flat?: boolean
+  /** Row relative denominator, columns without one stay absolute */
+  ofRow?: (row: T) => number
 }
 
 export interface DataTableProps<T> {
@@ -33,6 +40,8 @@ export interface DataTableProps<T> {
   className?: string
   /** Total row pinned to the bottom. */
   total?: T
+  /** Rows shown, the rest behind a toggle */
+  fold?: number
 }
 
 export function DataTable<T>({
@@ -46,23 +55,73 @@ export function DataTable<T>({
   children,
   className,
   total,
+  fold,
 }: DataTableProps<T>) {
-  const [sort, setSort] = useState<{ key: string; asc: boolean } | null>(null)
+  const { scale, curve } = useDisplay()
+  const [sort, setSort] = useState<Sort | null>(null)
+  const [open, setOpen] = useState(false)
+
+  const sums = useMemo(() => {
+    const found: Record<string, number> = {}
+    for (const col of columns) {
+      if (!col.num) continue
+      let sum = 0
+      for (const row of rows) {
+        const value = col.get(row)
+        if (typeof value === "number") sum += value
+      }
+      found[col.key] = sum
+    }
+    return found
+  }, [columns, rows])
+
+  /** True when the scale turns this column into a share */
+  const shares = (col: Column<T>): boolean =>
+    !!col.num && (scale === "repo" || (scale === "row" && !!col.ofRow))
+
+  /** What the cell means now, sorting and bars read it too */
+  const effective = (col: Column<T>, row: T): number | string => {
+    const value = col.get(row)
+    if (typeof value !== "number" || !shares(col)) return value
+    const over = scale === "repo" ? (sums[col.key] ?? 0) : (col.ofRow?.(row) ?? 0)
+    return over ? value / over : 0
+  }
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const col = columns.find((c) => c.key === sort.key)
     if (!col) return rows
     return [...rows].sort((a, b) => {
-      const [x, y] = [col.get(a), col.get(b)]
-      const cmp = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
+      const [x, y] = [effective(col, a), effective(col, b)]
+      const cmp =
+        typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
     })
-  }, [rows, sort, columns])
+  }, [rows, sort, columns, scale])
+
+  // peaks follow the same values, shares bar against the biggest share
+  const peaks = useMemo(() => {
+    const found: Record<string, number> = {}
+    for (const col of columns) {
+      if (!col.num || col.flat) continue
+      let peak = 0
+      for (const row of rows) {
+        const value = effective(col, row)
+        if (typeof value === "number" && value > peak) peak = value
+      }
+      found[col.key] = peak
+    }
+    return found
+  }, [columns, rows, scale])
+
+  // the fold hides rows, peaks and export still see them all
+  const foldable = fold !== undefined && sorted.length > fold
+  const shown = foldable && !open ? sorted.slice(0, fold) : sorted
+  const hidden = foldable ? sorted.length - fold : 0
 
   const matrix = () => [
     columns.map((c) => c.label),
-    ...sorted.map((row) => columns.map((c) => c.get(row))),
+    ...sorted.map((row) => columns.map((c) => effective(c, row))),
   ]
   const slug = title.toLowerCase().replace(/\W+/g, "-")
 
@@ -109,11 +168,7 @@ export function DataTable<T>({
                 <TH
                   key={col.key}
                   num={col.num}
-                  onClick={() =>
-                    setSort((prev) =>
-                      prev?.key === col.key ? { key: col.key, asc: !prev.asc } : { key: col.key, asc: false },
-                    )
-                  }
+                  onClick={() => setSort(cycle(sort, col.key))}
                   className="hover:text-foreground cursor-pointer select-none"
                 >
                   {col.label}
@@ -123,25 +178,47 @@ export function DataTable<T>({
             </TR>
           </THead>
           <TBody>
-            {sorted.map((row) => (
+            {shown.map((row) => (
               <TR
                 key={id(row)}
                 onClick={() => onRowClick?.(row)}
                 style={rowStyle?.(row)}
                 className={cn(onRowClick && "cursor-pointer")}
               >
-                {columns.map((col) => (
-                  <TD key={col.key} num={col.num}>
-                    {col.cell ? col.cell(row) : col.get(row)}
-                  </TD>
-                ))}
+                {columns.map((col) => {
+                  const value = effective(col, row)
+                  return (
+                    <TD
+                      key={col.key}
+                      num={col.num}
+                      style={
+                        typeof value === "number"
+                          ? backdrop(value, peaks[col.key], "var(--chart-2)", curve)
+                          : undefined
+                      }
+                    >
+                      {shares(col) && typeof value === "number"
+                        ? pct(value, 1)
+                        : col.cell
+                          ? col.cell(row)
+                          : value}
+                    </TD>
+                  )
+                })}
               </TR>
             ))}
+            {foldable && (
+              <TR className="hover:bg-muted/50" onClick={() => setOpen(!open)}>
+                <TD colSpan={columns.length} className="text-muted-foreground cursor-pointer">
+                  {open ? "show fewer" : `show ${hidden} more`}
+                </TD>
+              </TR>
+            )}
             {total && (
               <TR className="bg-muted/40 font-medium">
                 {columns.map((col) => (
                   <TD key={col.key} num={col.num}>
-                    {col.cell ? col.cell(total) : col.get(total)}
+                    {shares(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
                   </TD>
                 ))}
               </TR>

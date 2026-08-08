@@ -33,7 +33,7 @@ export function Toaster({ timeout = 4000 }: { timeout?: number }) {
   }, [timeout])
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2">
+    <div className="fixed right-4 bottom-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2">
       {items.map((item) => (
         <div
           key={item.id}

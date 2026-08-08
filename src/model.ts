@@ -21,7 +21,7 @@ export interface Bucket extends Split {
   name: string
   files: number
   chars: number
-  langs: Record<string, number> // loc per language in this subtree
+  langs: Record<string, number> // loc per language below here
 }
 
 export interface Churn {
@@ -51,13 +51,23 @@ export interface Series {
 export interface Commit {
   hash: string
   parents: string[]
-  author: string
+  insertions: number
+  deletions: number
+  /** Index into contributors, the merged identity */
+  who: number
   date: string
   refs: string // branch and tag decorations
   subject: string
 }
 
-export const LOG_MAX = 500
+export const LOG_MAX = 5000
+
+export interface Remote {
+  name: string
+  /** Browsable https url, ssh and .git resolved */
+  url: string
+  host: "github" | "gitlab" | "bitbucket" | "git"
+}
 
 export interface Contributor {
   name: string
@@ -77,6 +87,9 @@ export interface Stats extends Split {
   commits: number
   contributors: Contributor[]
   log: Commit[]
+  /** Per day, the contributor indices who committed */
+  active: number[][]
+  remotes: Remote[]
   languages: Node[] // folded, so they carry churn too
   tree: Node
   series: Series[]
@@ -94,6 +107,7 @@ export const tokens = (chars: number): number => Math.round(chars / 4)
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30 })
 
+// prettier-ignore
 export const blank = (name: string, path = ""): Node => ({
   name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
   commits: 0, insertions: 0, deletions: 0, last: "", langs: {},
@@ -110,7 +124,8 @@ export const merge = (into: Node, f: Node): void => {
   into.insertions += f.insertions
   into.deletions += f.deletions
   if (f.last > into.last) into.last = f.last
-  for (const [lang, loc] of Object.entries(f.langs)) into.langs[lang] = (into.langs[lang] ?? 0) + loc
+  for (const [lang, loc] of Object.entries(f.langs))
+    into.langs[lang] = (into.langs[lang] ?? 0) + loc
 }
 
 export const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)

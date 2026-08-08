@@ -7,24 +7,29 @@ import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
+import { Onward } from "../components/onward.tsx"
 import { toast } from "../components/toast.tsx"
 import { copy } from "../lib/export.ts"
 import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
+// a row's own lines, the denominator when reading shares within a row
+const lines = (n: Node) => n.code + n.comment + n.blank
+
 const walk = (root: Node, path: string[]): Node =>
   path.reduce<Node>((at, part) => at.children?.find((c) => c.name === part) ?? at, root)
 
 export interface ExplorerProps {
   stats: Stats
+  onTab: (tab: string) => void
   path: string[]
   setPath: (path: string[]) => void
   lang: string
   setLang: (lang: string) => void
 }
 
-export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps) {
+export function Explorer({ stats, onTab, path, setPath, lang, setLang }: ExplorerProps) {
   const [filter, setFilter] = useState("")
 
   const here = useMemo(() => walk(stats.tree, path), [stats.tree, path])
@@ -45,6 +50,7 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
     toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
   }
 
+  // prettier-ignore
   const columns: Column<Node>[] = [
     {
       key: "name",
@@ -59,17 +65,17 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
         </span>
       ),
     },
-    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code) },
+    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code), ofRow: lines },
     { key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) },
-    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment) },
-    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank) },
+    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment), ofRow: lines },
+    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank), ofRow: lines },
     { key: "files", label: "files", num: true, get: (n) => n.files, cell: (n) => num(n.files) },
     { key: "chars", label: "chars", num: true, get: (n) => n.chars, cell: (n) => num(n.chars) },
     { key: "tok", label: "~tok", num: true, get: (n) => tokens(n.chars), cell: (n) => num(tokens(n.chars)) },
     { key: "nest", label: "nest", num: true, get: (n) => Number(nest(n)) },
     { key: "commits", label: "com", num: true, get: (n) => n.commits, cell: (n) => num(n.commits) },
     { key: "churn", label: "churn", num: true, get: (n) => churn(n), cell: (n) => num(churn(n)) },
-    { key: "last", label: "last", num: true, get: (n) => day(n.last) },
+    { key: "last", label: "last", num: true, get: (n) => n.last, cell: (n) => day(n.last), flat: true },
   ]
 
   return (
@@ -88,14 +94,14 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
             </span>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
           {path.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => setPath(path.slice(0, -1))}>
               up
             </Button>
           )}
           <Input
-            className="w-44"
+            className="w-full sm:w-44"
             placeholder="filter"
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}
@@ -145,6 +151,8 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
           onSelect={setLang}
         />
       </div>
+
+      <Onward stats={stats} current="Files" onTab={onTab} />
     </div>
   )
 }

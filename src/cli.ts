@@ -4,7 +4,9 @@
 
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
+import { human } from "./human.ts"
 import { blank, merge, tokens } from "./model.ts"
+import { serve } from "./serve.ts"
 import { view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
@@ -23,6 +25,7 @@ const { values, positionals } = (() => {
         digits: { type: "string", default: "3" },
         depth: { type: "string", default: "1" },
         raw: { type: "boolean", default: false },
+        static: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -33,7 +36,9 @@ const { values, positionals } = (() => {
 })()
 
 if (values.help) {
-  console.log("desprawl [view] [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
+  console.log(
+    "desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]",
+  )
   process.exit(0)
 }
 
@@ -43,22 +48,6 @@ const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()
 const num = (n: number): string => n.toLocaleString("en-US")
 const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
-
-const UNITS = ["", "k", "m", "b", "t"]
-
-// digits 2: 1, 10, 0.1k, 1.0k, 10k, 0.1m
-function human(n: number, digits: number): string {
-  const sign = n < 0 ? "-" : ""
-  let v = Math.abs(n)
-  let unit = 0
-  while (v >= 10 ** digits && unit < UNITS.length - 1) {
-    v /= 1000
-    unit++
-  }
-  if (unit === 0) return sign + Math.round(v)
-  const whole = Math.floor(v).toString().length
-  return sign + v.toFixed(Math.max(0, digits - whole)) + UNITS[unit]
-}
 
 // mean nesting lv
 const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")
@@ -89,6 +78,7 @@ const CHURN = ["com", "churn", "last"]
 
 type Counts = Split & { files: number; chars: number }
 
+// prettier-ignore
 const row = (b: Counts, total: number, label: string, extra: string[] = []): string[] => [
   label, big(b.code), pct(b.code, total), big(b.comment), big(b.blank),
   num(b.files), big(b.chars), big(tokens(b.chars)), nest(b), ...extra,
@@ -161,9 +151,13 @@ function report(s: Stats): string {
 }
 
 try {
-  const stats = analyze(target)
-  if (viewing) console.log(view(stats))
-  else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+  // live analyses per request, so it never needs the report up front
+  if (viewing && !values.static) console.log(await serve(target))
+  else {
+    const stats = analyze(target)
+    if (viewing) console.log(view(stats))
+    else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+  }
 } catch (err) {
   fail(err)
 }

@@ -1,9 +1,18 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>desprawl</title>
+    <script>
+      // before paint, so a stored or system theme never flashes the wrong one
+      try {
+        var t = localStorage.getItem("desprawl-theme") || "system"
+        var dark =
+          t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches)
+        if (dark) document.documentElement.classList.add("dark")
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

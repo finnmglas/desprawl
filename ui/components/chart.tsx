@@ -4,12 +4,27 @@
 
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
+import { num } from "../lib/format.ts"
+import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 
-/** Maps a series key to its label and colour. Colour defaults to --chart-1..5 by order. */
+// key to label and colour, defaults to --chart-1..5 by order
 export type ChartConfig = Record<string, { label: string; color?: string }>
 
-const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
+// log1p keeps zero at zero, a log axis would drop it
+export const transform = (value: number, curve: Curve): number =>
+  curve === "log" ? Math.log1p(value) : value
+
+export const untransform = (value: number, curve: Curve): number =>
+  curve === "log" ? Math.round(Math.expm1(value)) : value
+
+const PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
 export const chartColor = (config: ChartConfig, key: string): string =>
   config[key]?.color ?? PALETTE[Object.keys(config).indexOf(key) % PALETTE.length]
@@ -36,22 +51,24 @@ export function ChartContainer({
   )
 }
 
-// must be recharts' own Tooltip, it matches children by type
+// recharts matches children by type, this must be its own
 export const ChartTooltip = Tooltip
 
 export const CURSOR = { stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4" }
 
-// recharts injects active/payload/label, hence the loose types
+// recharts injects these
 export function ChartTooltipContent({
   config,
   active,
   payload,
   label,
+  curve = "linear",
 }: {
   config: ChartConfig
   active?: boolean
   payload?: any[]
   label?: React.ReactNode
+  curve?: Curve
 }) {
   if (!active || !payload?.length) return null
   return (
@@ -66,7 +83,9 @@ export function ChartTooltipContent({
           <span className="text-muted-foreground">
             {config[item.dataKey]?.label ?? item.dataKey}
           </span>
-          <span className="ml-auto font-medium">{item.value?.toLocaleString("en-US")}</span>
+          <span className="ml-auto font-medium">
+            {num(item.payload?.[`${item.dataKey}_raw`] ?? untransform(item.value, curve))}
+          </span>
         </div>
       ))}
     </div>

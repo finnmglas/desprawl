@@ -4,7 +4,13 @@
 export const delimit = (rows: (string | number)[][], sep: string): string =>
   rows
     .map((row) =>
-      row.map((cell) => (sep === "," && /[",\n]/.test(String(cell)) ? `"${String(cell).replaceAll('"', '""')}"` : cell)).join(sep),
+      row
+        .map((cell) =>
+          sep === "," && /[",\n]/.test(String(cell))
+            ? `"${String(cell).replaceAll('"', '""')}"`
+            : cell,
+        )
+        .join(sep),
     )
     .join("\n")
 

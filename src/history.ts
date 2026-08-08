@@ -18,6 +18,15 @@ function target(path: string): string {
 
 const DAY = 86_400_000
 
+// every day first to last, the axis the series uses
+function days(first: string, last: string): string[] {
+  const out: string[] = []
+  for (let t = Date.parse(first.slice(0, 10)); t <= Date.parse(last.slice(0, 10)); t += DAY) {
+    out.push(new Date(t).toISOString().slice(0, 10))
+  }
+  return out
+}
+
 function spread(byDay: Map<string, number[]>, first: string, last: string): Series[] {
   const [start, end] = [first.slice(0, 10), last.slice(0, 10)]
   const data: number[][] = [[], [], []]
@@ -25,6 +34,7 @@ function spread(byDay: Map<string, number[]>, first: string, last: string): Seri
     const day = byDay.get(new Date(t).toISOString().slice(0, 10)) ?? [0, 0, 0]
     data.forEach((series, i) => series.push(day[i]))
   }
+  // prettier-ignore
   return ["commits", "insertions", "deletions"].map((metric, i) => ({
     metric, start, end, granularity: "1d", data: data[i],
   }))
@@ -42,7 +52,9 @@ export function history(repo: string) {
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
   const byPath = new Map<string, Churn>()
   const byDay = new Map<string, number[]>()
+  const whoByDay = new Map<string, Set<string>>()
   const history: Commit[] = []
+  const byCommit: string[] = [] // identity key per commit, resolved once sorted
   let commits = 0
   let first = ""
   let last = ""
@@ -57,18 +69,23 @@ export function history(repo: string) {
     if (!last) last = date // log is newest first
     first = date
 
+    const size: Commit = {
+      hash,
+      parents: parents ? parents.split(" ").filter(Boolean) : [],
+      insertions: 0,
+      deletions: 0,
+      who: 0,
+      date,
+      refs: refs ?? "",
+      subject: subject ?? "",
+    }
+    const key = (email || name).toLowerCase()
     if (history.length < LOG_MAX) {
-      history.push({
-        hash,
-        parents: parents ? parents.split(" ").filter(Boolean) : [],
-        author: name,
-        date,
-        refs: refs ?? "",
-        subject: subject ?? "",
-      })
+      history.push(size)
+      byCommit.push(key)
     }
 
-    const key = (email || name).toLowerCase()
+    // prettier-ignore
     const c = by.get(key) ?? {
       name, email, commits: 0, insertions: 0, deletions: 0, files: 0, first: date, last: date,
       paths: new Set<string>(), names: new Map<string, number>(),
@@ -77,8 +94,12 @@ export function history(repo: string) {
     c.names.set(name, (c.names.get(name) ?? 0) + 1)
     c.first = date
 
-    const day = byDay.get(date.slice(0, 10)) ?? [0, 0, 0]
+    const stamp = date.slice(0, 10)
+    const day = byDay.get(stamp) ?? [0, 0, 0]
     day[0]++
+    const who = whoByDay.get(stamp) ?? new Set<string>()
+    who.add(key)
+    whoByDay.set(stamp, who)
     for (const line of rest) {
       if (!line) continue
       const [added, deleted, raw] = line.split("\t")
@@ -90,6 +111,8 @@ export function history(repo: string) {
 
       c.insertions += ins
       c.deletions += del
+      size.insertions += ins
+      size.deletions += del
       c.paths.add(path)
       day[1] += ins
       day[2] += del
@@ -114,5 +137,24 @@ export function history(repo: string) {
     }))
     .sort((a, b) => b.commits - a.commits)
 
-  return { commits, contributors, log: history, first, last, byPath, series: spread(byDay, first, last) }
+  // indices need the final order
+  const order = new Map(contributors.map((c, i) => [(c.email || c.name).toLowerCase(), i]))
+  history.forEach((commit, i) => {
+    commit.who = order.get(byCommit[i]) ?? 0
+  })
+
+  const active = days(first, last).map((stamp) =>
+    [...(whoByDay.get(stamp) ?? [])].map((key) => order.get(key) ?? 0),
+  )
+
+  return {
+    commits,
+    contributors,
+    log: history,
+    active,
+    first,
+    last,
+    byPath,
+    series: spread(byDay, first, last),
+  }
 }

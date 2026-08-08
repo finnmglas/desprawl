@@ -4,7 +4,36 @@
 import { history } from "./history.ts"
 import { VERSION, fold, git, grow } from "./model.ts"
 import { scan } from "./scan.ts"
-import type { Stats } from "./model.ts"
+import type { Remote, Stats } from "./model.ts"
+
+const HOSTS: [string, Remote["host"]][] = [
+  ["github.", "github"],
+  ["gitlab.", "gitlab"],
+  ["bitbucket.", "bitbucket"],
+]
+
+// git@host:o/r.git and ssh://git@host/o/r both become https://host/o/r
+function browsable(raw: string): string {
+  const url = raw
+    .replace(/^ssh:\/\/git@/, "https://")
+    .replace(/^git@([^:]+):/, "https://$1/")
+    .replace(/^git:\/\//, "https://")
+    .replace(/\.git$/, "")
+  return url.startsWith("http") ? url : ""
+}
+
+function remotes(repo: string): Remote[] {
+  const found = new Map<string, Remote>()
+  for (const line of git(repo, "remote", "-v").split("\n")) {
+    const [name, rest] = line.split("\t")
+    if (!rest) continue
+    const url = browsable(rest.split(" ")[0])
+    if (!url || found.has(url)) continue
+    const host = HOSTS.find(([match]) => url.includes(match))?.[1] ?? "git"
+    found.set(url, { name, url, host })
+  }
+  return [...found.values()]
+}
 
 export function analyze(repo: string): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
@@ -23,6 +52,7 @@ export function analyze(repo: string): Stats {
     ...hist,
     languages: fold(files, (f) => f.lang ?? ""),
     tree,
+    remotes: remotes(root),
     ...totals,
   }
 }
