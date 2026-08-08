@@ -30,7 +30,7 @@ export function useTheme(theme: Theme, setTheme: (theme: Theme) => void): ThemeS
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", resolved === "dark")
-    localStorage.setItem(KEY, theme) // the pre paint script in index.html reads this one
+    localStorage.setItem(KEY, theme) // index.html reads this before paint
   }, [resolved, theme])
 
   return { theme, resolved, setTheme }
@@ -42,14 +42,14 @@ const typing = (target: EventTarget | null): boolean => {
   return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
 }
 
-/** Ctrl shift d flips light and dark, never while somebody is typing. */
+// ctrl shift d, never while typing
 export function useThemeHotkey({ resolved, setTheme }: ThemeState): void {
   useEffect(() => {
     let latched = false
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey) return
-      // code is the physical key, key is what the layout produced, either alone misses someone
+      // code is physical, key is the layout, either alone misses someone
       if (event.code !== "KeyD" && event.key.toLowerCase() !== "d") return
       if (typing(event.target)) return
       event.preventDefault()

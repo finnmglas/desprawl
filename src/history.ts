@@ -18,7 +18,7 @@ function target(path: string): string {
 
 const DAY = 86_400_000
 
-/** Every day from first to last, the same dense axis the series uses. */
+// every day first to last, the axis the series uses
 function days(first: string, last: string): string[] {
   const out: string[] = []
   for (let t = Date.parse(first.slice(0, 10)); t <= Date.parse(last.slice(0, 10)); t += DAY) {
@@ -54,7 +54,7 @@ export function history(repo: string) {
   const byDay = new Map<string, number[]>()
   const whoByDay = new Map<string, Set<string>>()
   const history: Commit[] = []
-  const byCommit: string[] = [] // the identity key per logged commit, resolved once sorted
+  const byCommit: string[] = [] // identity key per commit, resolved once sorted
   let commits = 0
   let first = ""
   let last = ""
@@ -137,7 +137,7 @@ export function history(repo: string) {
     }))
     .sort((a, b) => b.commits - a.commits)
 
-  // indices only mean anything once contributors are in their final order
+  // indices need the final order
   const order = new Map(contributors.map((c, i) => [(c.email || c.name).toLowerCase(), i]))
   history.forEach((commit, i) => {
     commit.who = order.get(byCommit[i]) ?? 0

@@ -37,7 +37,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const { scale, curve, region } = prefs
-  // one writer, so every setting lands in the same place
+  // one writer for every setting
   const change = (next: Partial<Prefs>) => {
     const merged = { ...prefs, ...next }
     setPrefs(merged)
@@ -45,7 +45,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     if (next.region) setLocale(next.region)
   }
 
-  // the served copy on disk wins, it outlives the port the browser saw it on
+  // disk wins, it outlives the port
   useEffect(() => {
     void pullPrefs().then((saved) => {
       if (!saved) return
@@ -81,10 +81,10 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     <DisplayProvider value={{ scale, curve }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          {/* min-w-0 lets a long path truncate instead of pushing the controls off */}
+          {/* min-w-0 lets a long path truncate */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-2">
-              {/* the folder name is the repo's name, the path belongs underneath */}
+              {/* folder name is the repo name */}
               <button
                 onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
                 className="hover:text-muted-foreground cursor-pointer truncate text-lg font-semibold"
@@ -190,7 +190,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   )
 }
 
-// inlined by `desprawl view`, fetched from `desprawl serve`, nothing otherwise
+// inlined by view --static, fetched when served
 function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")

@@ -8,10 +8,10 @@ import { num } from "../lib/format.ts"
 import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 
-/** Maps a series key to its label and colour. Colour defaults to --chart-1..5 by order. */
+// key to label and colour, defaults to --chart-1..5 by order
 export type ChartConfig = Record<string, { label: string; color?: string }>
 
-// zeros survive log1p, so a quiet day still plots at zero instead of vanishing
+// log1p keeps zero at zero, a log axis would drop it
 export const transform = (value: number, curve: Curve): number =>
   curve === "log" ? Math.log1p(value) : value
 
@@ -51,12 +51,12 @@ export function ChartContainer({
   )
 }
 
-// must be recharts' own Tooltip, it matches children by type
+// recharts matches children by type, this must be its own
 export const ChartTooltip = Tooltip
 
 export const CURSOR = { stroke: "var(--muted-foreground)", strokeWidth: 1, strokeDasharray: "4 4" }
 
-// recharts injects active/payload/label, hence the loose types
+// recharts injects these
 export function ChartTooltipContent({
   config,
   active,

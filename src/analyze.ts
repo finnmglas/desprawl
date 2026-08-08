@@ -12,7 +12,7 @@ const HOSTS: [string, Remote["host"]][] = [
   ["bitbucket.", "bitbucket"],
 ]
 
-/** git@host:owner/repo.git and ssh://git@host/owner/repo both become https://host/owner/repo */
+// git@host:o/r.git and ssh://git@host/o/r both become https://host/o/r
 function browsable(raw: string): string {
   const url = raw
     .replace(/^ssh:\/\/git@/, "https://")

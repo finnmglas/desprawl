@@ -22,7 +22,7 @@ export interface Column<T> {
   cell?: (row: T) => React.ReactNode
   /** Suppress backdrop bar on numeric column */
   flat?: boolean
-  /** Denominator for the row relative scale. Columns without one stay absolute. */
+  /** Row relative denominator, columns without one stay absolute */
   ofRow?: (row: T) => number
 }
 
@@ -40,7 +40,7 @@ export interface DataTableProps<T> {
   className?: string
   /** Total row pinned to the bottom. */
   total?: T
-  /** Show this many rows, the rest behind a toggle above the total. */
+  /** Rows shown, the rest behind a toggle */
   fold?: number
 }
 
@@ -75,11 +75,11 @@ export function DataTable<T>({
     return found
   }, [columns, rows])
 
-  /** True when the picked scale turns this column into a share. Simple and abs never do. */
+  /** True when the scale turns this column into a share */
   const shares = (col: Column<T>): boolean =>
     !!col.num && (scale === "repo" || (scale === "row" && !!col.ofRow))
 
-  /** What the cell means right now. Sorting, bars and export all read this. */
+  /** What the cell means now, sorting and bars read it too */
   const effective = (col: Column<T>, row: T): number | string => {
     const value = col.get(row)
     if (typeof value !== "number" || !shares(col)) return value
@@ -99,7 +99,7 @@ export function DataTable<T>({
     })
   }, [rows, sort, columns, scale])
 
-  // peaks follow the same values, so a share column bars against the biggest share
+  // peaks follow the same values, shares bar against the biggest share
   const peaks = useMemo(() => {
     const found: Record<string, number> = {}
     for (const col of columns) {
@@ -114,7 +114,7 @@ export function DataTable<T>({
     return found
   }, [columns, rows, scale])
 
-  // the fold hides rows from the eye only, peaks, sums and the export still see them all
+  // the fold hides rows, peaks and export still see them all
   const foldable = fold !== undefined && sorted.length > fold
   const shown = foldable && !open ? sorted.slice(0, fold) : sorted
   const hidden = foldable ? sorted.length - fold : 0

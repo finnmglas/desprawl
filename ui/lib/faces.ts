@@ -7,17 +7,13 @@ const PAGES = 3 // 300 commits is enough to name everyone who still shows in the
 const SEARCHES = 6 // the search api allows ten a minute unauthenticated, so stay well under
 const KEY = "desprawl-faces"
 
-/** Kept per email rather than per repo, so a public repo teaches us faces a private one cannot. */
+// per email, not per repo, so a public repo teaches a private one
 type Faces = Record<string, string>
 
 const remember = (faces: Faces): void => localStorage.setItem(KEY, JSON.stringify(faces))
 const recall = (): Faces => JSON.parse(localStorage.getItem(KEY) ?? "{}") as Faces
 
-/**
- * The commits endpoint pairs a commit email with a github account and needs no token, but only
- * for a public repo. A private one answers 404, so anyone still unknown is looked up by email,
- * a few at a time. Misses are remembered as empty, which is why nothing here retries forever.
- */
+// commits names emails on public repos, search covers the rest, empty means asked and missing
 export async function loadFaces(stats: Stats): Promise<Faces> {
   const faces = recall()
   const remote = stats.remotes.find((r) => r.host === "github")
@@ -29,7 +25,7 @@ export async function loadFaces(stats: Stats): Promise<Faces> {
         const res = await fetch(
           `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100&page=${page}`,
         )
-        if (!res.ok) break // private, rate limited or offline, the search below still tries
+        if (!res.ok) break // private or rate limited, search still tries
         const commits = (await res.json()) as {
           commit?: { author?: { email?: string } }
           author?: { avatar_url?: string }
@@ -42,7 +38,7 @@ export async function loadFaces(stats: Stats): Promise<Faces> {
       }
     }
 
-    // whoever the repo could not name, asked for directly, biggest contributors first
+    // whoever the repo could not name
     const missing = stats.contributors
       .map((c) => c.email.toLowerCase())
       .filter((email) => faces[email] === undefined && !email.endsWith("users.noreply.github.com"))
@@ -54,7 +50,7 @@ export async function loadFaces(stats: Stats): Promise<Faces> {
       )
       if (!res.ok) break
       const found = (await res.json()) as { items?: { avatar_url?: string }[] }
-      faces[email] = found.items?.[0]?.avatar_url ?? "" // empty means asked and answered no
+      faces[email] = found.items?.[0]?.avatar_url ?? ""
     }
   } catch {
     return faces

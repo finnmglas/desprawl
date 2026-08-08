@@ -21,7 +21,7 @@ export interface Bucket extends Split {
   name: string
   files: number
   chars: number
-  langs: Record<string, number> // loc per language in this subtree
+  langs: Record<string, number> // loc per language below here
 }
 
 export interface Churn {
@@ -53,7 +53,7 @@ export interface Commit {
   parents: string[]
   insertions: number
   deletions: number
-  /** Index into contributors, so a commit carries the merged identity, not a raw name. */
+  /** Index into contributors, the merged identity */
   who: number
   date: string
   refs: string // branch and tag decorations
@@ -64,7 +64,7 @@ export const LOG_MAX = 5000
 
 export interface Remote {
   name: string
-  /** Browsable https url, ssh and .git forms already resolved. */
+  /** Browsable https url, ssh and .git resolved */
   url: string
   host: "github" | "gitlab" | "bitbucket" | "git"
 }
@@ -87,7 +87,7 @@ export interface Stats extends Split {
   commits: number
   contributors: Contributor[]
   log: Commit[]
-  /** Per day, the contributor indices who committed. Lets the ui count distinct devs per bucket. */
+  /** Per day, the contributor indices who committed */
   active: number[][]
   remotes: Remote[]
   languages: Node[] // folded, so they carry churn too

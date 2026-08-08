@@ -11,7 +11,7 @@ export interface MenuProps {
   /** Defaults to an ellipsis. */
   trigger?: React.ReactNode
   title?: string
-  /** Return true to swallow the click, so a modified click can act instead of opening. */
+  /** Return true to swallow the click */
   onTriggerClick?: (event: React.MouseEvent) => boolean
 }
 
@@ -59,7 +59,7 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
   )
 }
 
-/** A row that holds a control, so clicking inside it does not close the menu. */
+// holds a control, clicking inside does not close
 export function MenuSection({
   label,
   hint,

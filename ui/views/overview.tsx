@@ -81,7 +81,7 @@ export function Overview({
 }) {
   const { curve } = useDisplay()
   const [grain, setGrain] = useState<Grain>(() => defaultGrain(stats.first, stats.last))
-  // changes over net lines is the pair that shows how a repo actually grew
+  // the pair that shows how a repo grew
   const [picked, setPicked] = useState<string[]>(["changes", "lines"])
   const series = expand(picked)
   const days = useMemo(() => rows(stats, series, grain, curve), [stats, picked, grain, curve])
@@ -95,7 +95,7 @@ export function Overview({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {/* each card opens the tab that breaks it down */}
+        {/* each card opens its tab */}
         {[
           {
             label: "Lines of code",
@@ -170,7 +170,7 @@ export function Overview({
                 cursor={CURSOR}
                 content={<ChartTooltipContent config={config} curve={curve} />}
               />
-              {/* moved lines are bars, everything else a line, so an overlay stays readable */}
+              {/* moved lines as bars, the rest as areas */}
               {series.map((key) =>
                 SERIES[key].group === "changes" || sparse ? (
                   <Bar
@@ -198,7 +198,7 @@ export function Overview({
             </ComposedChart>
           </ChartContainer>
 
-          {/* the legend is the control, overlaying two series is where patterns show */}
+          {/* the legend is the control */}
           <div className="mt-3 flex flex-wrap gap-1.5">
             {GROUPS.map((group) => {
               const on = picked.includes(group.key)

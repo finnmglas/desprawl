@@ -11,7 +11,7 @@ import { open, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
-// a fixed port keeps one origin, so the browser keeps theme and locale between runs
+// fixed port, one origin, so the browser keeps its storage
 const PORT = 7423
 
 const store = join(
@@ -57,7 +57,7 @@ export function serve(repo: string, port = PORT): Promise<string> {
 
       if (url.pathname === "/") return send(200, html, "text/html")
 
-      // preferences live on disk, so they survive a new port and a cleared browser
+      // on disk, so a new port keeps them
       if (url.pathname === "/api/prefs") {
         if (req.method === "GET") return send(200, readPrefs(), "application/json")
         if (req.method === "PUT") {
@@ -65,7 +65,7 @@ export function serve(repo: string, port = PORT): Promise<string> {
           req.on("data", (chunk) => (body += chunk))
           req.on("end", () => {
             try {
-              JSON.parse(body) // refuse anything that would poison the next read
+              JSON.parse(body) // never poison the next read
               writePrefs(body)
               send(200, body, "application/json")
             } catch {
@@ -85,7 +85,7 @@ export function serve(repo: string, port = PORT): Promise<string> {
       return send(404, "not found", "text/plain")
     })
 
-    // somebody else already has the friendly port, take any free one
+    // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && port === PORT) serve(repo, 0).then(resolve, reject)
       else reject(err)

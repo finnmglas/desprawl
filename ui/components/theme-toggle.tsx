@@ -18,7 +18,7 @@ const Moon = () => (
   </svg>
 )
 
-/** Plain click opens the menu, ctrl click skips it and flips, ctrl shift d does it from anywhere. */
+// ctrl click flips without opening
 export function ThemeToggle({ theme, resolved, setTheme }: ThemeState) {
   const [flip, setFlip] = useState(0)
 

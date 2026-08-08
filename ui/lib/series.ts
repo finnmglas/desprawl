@@ -10,7 +10,7 @@ export interface Spec {
   label: string
   color: string
   about: string
-  /** sum adds the bucket's days, last takes its final value, distinct unions the people. */
+  /** sum adds days, last takes the final value, distinct unions people */
   how: "sum" | "last" | "distinct"
   /** Series sharing a group share one peak, so their relative sizes stay true. */
   group: string
@@ -18,11 +18,11 @@ export interface Spec {
   down?: boolean
 }
 
-// added and removed mean the same thing wherever they appear, so the colours live here
+// one definition, the tables use these too
 export const ADDED = "#22c55e"
 export const REMOVED = "var(--destructive)"
 
-// the token palette is five blues, so these are picked to stay apart from each other
+// the token palette is five blues, these stay apart
 export const SERIES: Record<string, Spec> = {
   commits: {
     label: "commits",
@@ -62,7 +62,7 @@ export const SERIES: Record<string, Spec> = {
   },
 }
 
-/** What the legend offers. added and removed are one choice, they are the same unit. */
+// added and removed are one choice, same unit
 export const GROUPS: { key: string; label: string; series: string[]; about: string }[] = [
   { key: "commits", label: "commits", series: ["commits"], about: SERIES.commits.about },
   {
@@ -83,7 +83,7 @@ export interface Row {
   [key: string]: string | number
 }
 
-/** Daily values per series, before any bucketing. */
+// daily, before bucketing
 function daily(stats: Stats, key: string): number[] {
   const at = (name: string) => stats.series.find((s) => s.metric === name)?.data ?? []
   if (key === "added") return at("insertions")
@@ -101,7 +101,7 @@ export function rows(stats: Stats, picked: string[], grain: Grain, curve: Curve)
   if (!commits || !picked.length) return []
 
   const groups = spans(commits.data.length, commits.start, grain)
-  // more than one series means the magnitudes differ, so each is drawn against its own peak
+  // magnitudes differ, so each group is drawn against its own peak
   const share = new Set(picked.map((k) => SERIES[k].group)).size > 1
 
   const raw: Record<string, number[]> = {}
@@ -118,7 +118,7 @@ export function rows(stats: Stats, picked: string[], grain: Grain, curve: Curve)
     })
   }
 
-  // one peak per group, so added and removed keep their true ratio to each other
+  // one peak per group, so added and removed keep their ratio
   const peaks: Record<string, number> = {}
   for (const key of picked) {
     const group = SERIES[key].group
@@ -129,7 +129,7 @@ export function rows(stats: Stats, picked: string[], grain: Grain, curve: Curve)
     const row: Row = { day }
     for (const key of picked) {
       const value = raw[key][i]
-      // normalise in the curve's own space, or log would have no effect on an overlay
+      // normalise in the curve's space, or log does nothing here
       const peak = peaks[SERIES[key].group]
       const scaled = share
         ? (transform(value, curve) / (transform(peak, curve) || 1)) * 100

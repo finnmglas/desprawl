@@ -60,15 +60,15 @@ const PAD = 10
 interface Placed {
   commit: Commit
   lane: number
-  /** Lanes waiting on something else, drawn through the whole row. */
+  /** drawn through the row */
   active: number[]
-  /** lane -> lane edges leaving this row downward, into the next row's top. */
+  /** edges down into the next row */
   edges: { from: number; to: number }[]
-  /** A child above already drew into this lane, so it needs an upper half. */
+  /** a child drew in from above */
   linked: boolean
 }
 
-/** Assign each commit a lane, newest first, reusing a lane once its child is drawn. */
+// lanes, newest first, reused once the child is drawn
 function place(log: Commit[]): Placed[] {
   const heads: (string | null)[] = [] // lane -> hash it is waiting for
   const rows: Placed[] = []
@@ -94,7 +94,7 @@ function place(log: Commit[]): Placed[] {
 
     heads[lane] = null
     commit.parents.forEach((parent, i) => {
-      // a parent another lane already waits for joins that lane, it must not be claimed twice
+      // a parent another lane waits for joins that lane, never claimed twice
       const waiting = heads.indexOf(parent)
       let to: number
       if (waiting !== -1) to = waiting

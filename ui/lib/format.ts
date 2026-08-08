@@ -17,7 +17,7 @@ export const num = (n: number) => (abbreviate ? human(n, 3) : n.toLocaleString(l
 export const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
 
 export const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
-// tables sort on the raw iso, this is only what the reader sees
+// tables sort on raw iso, this is display only
 export const day = (iso: string) => {
   const date = iso.slice(0, 10)
   if (!date) return "-"
@@ -27,7 +27,7 @@ export const tokens = (chars: number) => Math.round(chars / 4)
 export const nest = (s: Split) => (s.code ? (s.indent / s.code).toFixed(1) : "0.0")
 export const churn = (n: Node) => n.insertions + n.deletions
 
-// excel style conditional formatting, a cell against the biggest in its column
+// excel style, a cell against its column's biggest
 export function backdrop(
   value: number,
   peak: number,
@@ -35,7 +35,7 @@ export function backdrop(
   curve: Curve = "linear",
 ): React.CSSProperties | undefined {
   if (!peak || !Number.isFinite(value) || value <= 0) return undefined
-  // log lifts the small values so a skewed column stays readable
+  // log lifts small values in a skewed column
   const share = curve === "log" ? Math.log1p(value) / Math.log1p(peak) : value / peak
   const width = Math.min(100, share * 100)
   const tint = `color-mix(in oklch, ${color} 22%, transparent)`
@@ -47,7 +47,7 @@ export interface Sort {
   asc: boolean
 }
 
-// third click clears rather than toggling forever
+// third click clears
 export const cycle = (sort: Sort | null, key: string): Sort | null =>
   sort?.key !== key ? { key, asc: false } : sort.asc ? null : { key, asc: true }
 
@@ -67,7 +67,7 @@ function label(date: Date, grain: Grain): string {
   return monday.toISOString().slice(0, 10)
 }
 
-/** Day buckets on a young repo, months once the history is long. */
+// days when young, months once long
 export function defaultGrain(first: string, last: string): Grain {
   const days = (Date.parse(last.slice(0, 10)) - Date.parse(first.slice(0, 10))) / DAY_MS + 1
   if (days < 14) return "day"
@@ -75,7 +75,7 @@ export function defaultGrain(first: string, last: string): Grain {
   return "week"
 }
 
-/** The day indices behind each bucket, so a metric can sum, take the last, or union them. */
+// the day indices per bucket, to sum, take the last or union
 export function spans(
   length: number,
   start: string,

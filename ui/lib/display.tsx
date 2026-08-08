@@ -3,7 +3,7 @@
 
 import { createContext, useContext } from "react"
 
-/** simple abbreviates, abs shows counts, repo divides by the column total, row by the row's own lines. */
+/** simple abbreviates, repo divides by the column total, row by the row's own lines */
 export type Scale = "simple" | "abs" | "repo" | "row"
 export type Curve = "linear" | "log"
 

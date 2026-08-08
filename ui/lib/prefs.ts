@@ -17,7 +17,7 @@ export const FALLBACK: Prefs = { theme: "system", scale: "simple", curve: "linea
 const KEY = "desprawl-prefs"
 const token = () => new URLSearchParams(location.search).get("t")
 
-/** localStorage is per origin and the port moves, so the served copy on disk is the real one. */
+// localStorage is per origin and the port moves, disk is the real one
 export function readPrefs(): Prefs {
   try {
     return { ...FALLBACK, ...(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>) }
@@ -28,7 +28,7 @@ export function readPrefs(): Prefs {
 
 export async function pullPrefs(): Promise<Prefs | null> {
   const t = token()
-  if (!t) return null // a standalone file has nowhere to pull from
+  if (!t) return null // a static file has nowhere to ask
   try {
     const res = await fetch(`/api/prefs?t=${t}`)
     if (!res.ok) return null

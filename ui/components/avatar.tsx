@@ -4,10 +4,7 @@
 import { useState } from "react"
 import { cn } from "../lib/ui.ts"
 
-/**
- * A github noreply address carries the numeric user id, which addresses the avatar directly.
- * No api call and no guessing, so it is the only source trusted here.
- */
+// a noreply address carries the user id, which addresses the avatar directly
 export function faceOf(email: string): string {
   const noreply = /^(?:(\d+)\+)?([^@]+)@users\.noreply\.github\.com$/i.exec(email)
   if (!noreply) return ""
@@ -33,7 +30,7 @@ export function Avatar({
 }: {
   name: string
   email: string
-  /** Resolved by github, wins over anything the address alone can tell us. */
+  /** Resolved by github, wins over the address */
   found?: string
   className?: string
 }) {
