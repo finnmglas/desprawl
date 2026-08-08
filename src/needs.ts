@@ -56,5 +56,7 @@ export function explain(err: unknown): string | null {
     return "not a git repository. Run it inside one, or give it a path"
   if (/Needed a single revision|unknown revision/i.test(text))
     return "this repository has no commits yet, so there is nothing to read"
+  // git printed its own reason as it ran, repeating the command adds nothing
+  if (/Command failed: git clone/.test(text)) return "could not clone that url, git said why above"
   return null
 }

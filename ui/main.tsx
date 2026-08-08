@@ -209,8 +209,13 @@ function Root() {
   const load = () => {
     setError("")
     fetch(`/api/stats?t=${token}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`))))
-      .then((next: Stats) => {
+      // server explains itself in body, status code alone says nothing
+      .then(async (r) => {
+        const body = await r.json().catch(() => null)
+        if (r.ok) return body as Stats
+        throw new Error(body?.error ?? `${r.status} ${r.statusText}`)
+      })
+      .then((next) => {
         setStats(next)
         toast("Reanalysed", next.repo)
       })

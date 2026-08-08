@@ -2,11 +2,13 @@
 // owner: finn
 // goal: render stats
 
+import { existsSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { human } from "./human.ts"
-import { blank, merge, tokens } from "./model.ts"
+import { blank, git, merge, tokens } from "./model.ts"
 import { explain, needs } from "./needs.ts"
+import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
 import { view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
@@ -41,7 +43,7 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [cli|view] [path] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    "desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
   )
   process.exit(0)
 }
@@ -52,7 +54,16 @@ if (missing) fail(missing)
 
 // a first positional is the command only when it names one, otherwise it is the path
 const command = ["cli", "view"].includes(positionals[0] ?? "") ? positionals[0] : ""
-const target = (command ? positionals[1] : positionals[0]) ?? process.cwd()
+const asked = (command ? positionals[1] : positionals[0]) ?? process.cwd()
+
+// a url is fetched to disk first, everything below only ever sees a path
+const target = (() => {
+  try {
+    return isUrl(asked) ? local(asked) : asked
+  } catch (err) {
+    return fail(err)
+  }
+})()
 
 // the explorer is the default surface, the terminal report is asked for by name or by --json
 const viewing = command !== "cli" && !values.json
@@ -163,6 +174,10 @@ function report(s: Stats): string {
 }
 
 try {
+  // say it here in a sentence, a served failure is a 500 nobody can read
+  if (!existsSync(target)) fail(`no such path as ${target}`)
+  git(target, "rev-parse", "--git-dir")
+
   // live analyses per request, so it never needs the report up front
   if (viewing && !values.static)
     console.log(

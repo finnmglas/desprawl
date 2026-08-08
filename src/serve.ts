@@ -12,6 +12,7 @@ import { bytesAt, count, detail, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
+import { explain } from "./needs.ts"
 import { open, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
@@ -191,7 +192,9 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
           return send(200, JSON.stringify(allTime), "application/json")
         }
       } catch (err) {
-        return send(500, JSON.stringify({ error: String(err) }), "application/json")
+        // words, because this lands in front of a person
+        const said = explain(err) ?? (err instanceof Error ? err.message.trim() : String(err))
+        return send(500, JSON.stringify({ error: said }), "application/json")
       }
       return send(404, "not found", "text/plain")
     })
