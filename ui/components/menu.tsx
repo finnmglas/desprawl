@@ -50,11 +50,30 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="bg-card absolute right-0 z-40 mt-1 flex w-44 flex-col rounded-md border p-1 shadow-md"
+          className="bg-card absolute right-0 z-40 mt-1 flex w-56 flex-col rounded-md border p-1 shadow-md"
         >
           {children}
         </div>
       )}
+    </div>
+  )
+}
+
+/** A row that holds a control, so clicking inside it does not close the menu. */
+export function MenuSection({
+  label,
+  hint,
+  children,
+}: {
+  label: string
+  hint?: string
+  children: React.ReactNode
+}) {
+  return (
+    <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-1 px-2 py-1.5">
+      <span className="text-xs font-medium">{label}</span>
+      {children}
+      {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
     </div>
   )
 }

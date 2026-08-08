@@ -4,14 +4,17 @@
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
 import { DisplayControls } from "./components/display-controls.tsx"
-import { Menu, MenuItem } from "./components/menu.tsx"
+import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
+import { CHOICES, LABELS, setLocale, stored, type Choice } from "./lib/locale.ts"
+import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
+import { num } from "./lib/format.ts"
 import { DisplayProvider, type Curve, type Scale } from "./lib/display.tsx"
 import { useView } from "./lib/hash.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
@@ -32,6 +35,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
   const [scale, setScale] = useState<Scale>("abs")
   const [curve, setCurve] = useState<Curve>("linear")
+  const [region, setRegion] = useState<Choice>(stored)
   const themed = useTheme()
   useThemeHotkey(themed)
 
@@ -64,7 +68,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
             </button>
             <p className="text-muted-foreground text-xs">
               @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-              {stats.commits.toLocaleString("en-US")} commits · desprawl {stats.version}
+              {stats.commits.toLocaleString(locale())} commits · desprawl {stats.version}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -81,6 +85,18 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               >
                 export json
               </MenuItem>
+              <div className="bg-border my-1 h-px" />
+              <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
+                <Tabs
+                  tabs={CHOICES.map((c) => LABELS[c])}
+                  value={LABELS[region]}
+                  onChange={(next) => {
+                    const picked = CHOICES.find((c) => LABELS[c] === next) ?? "auto"
+                    setLocale(picked)
+                    setRegion(picked)
+                  }}
+                />
+              </MenuSection>
             </Menu>
           </div>
         </header>

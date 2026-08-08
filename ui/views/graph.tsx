@@ -7,6 +7,7 @@ import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { Input } from "../components/input.tsx"
 import { toast } from "../components/toast.tsx"
+import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day } from "../lib/format.ts"
@@ -148,8 +149,8 @@ export function Graph({ stats }: { stats: Stats }) {
           <span className="text-muted-foreground text-xs">
             {shown.length !== stats.log.length && `${shown.length} of `}
             {stats.log.length < stats.commits
-              ? `latest ${stats.log.length} of ${stats.commits.toLocaleString("en-US")} commits`
-              : `all ${stats.commits.toLocaleString("en-US")} commits`}
+              ? `latest ${stats.log.length} of ${stats.commits.toLocaleString(locale())} commits`
+              : `all ${stats.commits.toLocaleString(locale())} commits`}
             {!railed && " · sorted, so the branch rails are hidden"}
           </span>
         </div>
@@ -273,13 +274,13 @@ export function Graph({ stats }: { stats: Stats }) {
                   className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
                   style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
                 >
-                  +{commit.insertions.toLocaleString("en-US")}
+                  +{commit.insertions.toLocaleString(locale())}
                 </span>
                 <span
                   className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
                   style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
                 >
-                  -{commit.deletions.toLocaleString("en-US")}
+                  -{commit.deletions.toLocaleString(locale())}
                 </span>
                 <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
                 <span className="text-muted-foreground text-right text-xs tabular-nums">

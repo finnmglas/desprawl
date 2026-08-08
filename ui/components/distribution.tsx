@@ -2,6 +2,7 @@
 // goal: language bar + pickable list
 
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { locale } from "../lib/locale.ts"
 import { cn } from "../lib/ui.ts"
 
 const COLORS = [
@@ -62,7 +63,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
                 <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color(i) }} />
                 <span className="truncate">{lang}</span>
                 <span className="text-muted-foreground ml-auto tabular-nums">
-                  {loc.toLocaleString("en-US")}
+                  {loc.toLocaleString(locale())}
                 </span>
                 <span className="text-muted-foreground w-12 text-right tabular-nums">
                   {((loc / (total || 1)) * 100).toFixed(1)}%

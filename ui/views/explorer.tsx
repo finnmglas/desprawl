@@ -73,7 +73,7 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
     { key: "nest", label: "nest", num: true, get: (n) => Number(nest(n)) },
     { key: "commits", label: "com", num: true, get: (n) => n.commits, cell: (n) => num(n.commits) },
     { key: "churn", label: "churn", num: true, get: (n) => churn(n), cell: (n) => num(churn(n)) },
-    { key: "last", label: "last", num: true, get: (n) => day(n.last) },
+    { key: "last", label: "last", num: true, get: (n) => n.last, cell: (n) => day(n.last), flat: true },
   ]
 
   return (

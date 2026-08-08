@@ -37,7 +37,7 @@ const LANGS: Column<Node>[] = [
   { key: "nest", label: "nest", num: true, get: (l) => Number(nest(l)) },
   { key: "commits", label: "com", num: true, get: (l) => l.commits, cell: (l) => num(l.commits) },
   { key: "churn", label: "churn", num: true, get: (l) => churn(l), cell: (l) => num(churn(l)) },
-  { key: "last", label: "last", num: true, get: (l) => day(l.last) },
+  { key: "last", label: "last", num: true, get: (l) => l.last, cell: (l) => day(l.last), flat: true },
 ]
 
 // prettier-ignore
@@ -56,8 +56,8 @@ const people = (commits: number, moved: number): Column<Contributor>[] => [
   },
   { key: "churn", label: "churn", num: true, get: (p) => p.insertions + p.deletions, cell: (p) => pct(p.insertions + p.deletions, moved) },
   { key: "files", label: "files", num: true, get: (p) => p.files, cell: (p) => num(p.files) },
-  { key: "first", label: "first", num: true, get: (p) => day(p.first) },
-  { key: "last", label: "last", num: true, get: (p) => day(p.last) },
+  { key: "first", label: "first", num: true, get: (p) => p.first, cell: (p) => day(p.first), flat: true },
+  { key: "last", label: "last", num: true, get: (p) => p.last, cell: (p) => day(p.last), flat: true },
 ]
 
 export function Overview({
