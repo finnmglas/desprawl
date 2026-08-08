@@ -5,7 +5,17 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "./button.tsx"
 import { cn } from "../lib/ui.ts"
 
-export function Menu({ children, className }: { children: React.ReactNode; className?: string }) {
+export interface MenuProps {
+  children: React.ReactNode
+  className?: string
+  /** Defaults to an ellipsis. */
+  trigger?: React.ReactNode
+  title?: string
+  /** Return true to swallow the click, so a modified click can act instead of opening. */
+  onTriggerClick?: (event: React.MouseEvent) => boolean
+}
+
+export function Menu({ children, className, trigger, title, onTriggerClick }: MenuProps) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
@@ -26,8 +36,16 @@ export function Menu({ children, className }: { children: React.ReactNode; class
 
   return (
     <div ref={box} className={cn("relative", className)}>
-      <Button variant="outline" size="icon" onClick={() => setOpen(!open)} title="More">
-        ⋯
+      <Button
+        variant="outline"
+        size="icon"
+        title={title ?? "More"}
+        onClick={(event) => {
+          if (onTriggerClick?.(event)) return
+          setOpen(!open)
+        }}
+      >
+        {trigger ?? "⋯"}
       </Button>
       {open && (
         <div

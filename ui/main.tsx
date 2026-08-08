@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
 import { DisplayControls } from "./components/display-controls.tsx"
 import { Menu, MenuItem } from "./components/menu.tsx"
+import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
@@ -13,6 +14,7 @@ import { Overview } from "./views/overview.tsx"
 import { copy, download } from "./lib/export.ts"
 import { DisplayProvider, type Curve, type Scale } from "./lib/display.tsx"
 import { useView } from "./lib/hash.ts"
+import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
 
@@ -30,6 +32,8 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
   const [scale, setScale] = useState<Scale>("abs")
   const [curve, setCurve] = useState<Curve>("linear")
+  const themed = useTheme()
+  useThemeHotkey(themed)
 
   const explore = (picked: string) => {
     go({ lang: picked, path: [], tab: "Explorer" })
@@ -65,6 +69,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Tabs tabs={TABS} value={tab} onChange={(next) => go({ tab: next })} />
+            <ThemeToggle {...themed} />
             <Menu>
               {reload && <MenuItem onClick={reload}>refresh</MenuItem>}
               <MenuItem onClick={share}>share link</MenuItem>
