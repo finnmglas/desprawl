@@ -16,6 +16,7 @@ import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
 import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
+import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
@@ -41,6 +42,11 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   useEffect(() => {
     scrollTo({ top: 0 })
   }, [tab])
+  const [faces, setFaces] = useState<Record<string, string>>({})
+  useEffect(() => {
+    void loadFaces(stats).then(setFaces)
+  }, [stats.repo])
+
   const themed = useTheme()
   useThemeHotkey(themed)
 
@@ -147,9 +153,14 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         </header>
 
         {tab === "History" ? (
-          <Graph stats={stats} onTab={(next) => go({ tab: next })} />
+          <Graph stats={stats} onTab={(next) => go({ tab: next })} faces={faces} />
         ) : tab === "Overview" ? (
-          <Overview stats={stats} onLang={explore} onTab={(next) => go({ tab: next })} />
+          <Overview
+            stats={stats}
+            onLang={explore}
+            onTab={(next) => go({ tab: next })}
+            faces={faces}
+          />
         ) : (
           <Explorer
             stats={stats}

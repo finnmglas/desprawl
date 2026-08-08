@@ -54,6 +54,7 @@ export function history(repo: string) {
   const byDay = new Map<string, number[]>()
   const whoByDay = new Map<string, Set<string>>()
   const history: Commit[] = []
+  const byCommit: string[] = [] // the identity key per logged commit, resolved once sorted
   let commits = 0
   let first = ""
   let last = ""
@@ -73,14 +74,17 @@ export function history(repo: string) {
       parents: parents ? parents.split(" ").filter(Boolean) : [],
       insertions: 0,
       deletions: 0,
-      author: name,
+      who: 0,
       date,
       refs: refs ?? "",
       subject: subject ?? "",
     }
-    if (history.length < LOG_MAX) history.push(size)
-
     const key = (email || name).toLowerCase()
+    if (history.length < LOG_MAX) {
+      history.push(size)
+      byCommit.push(key)
+    }
+
     // prettier-ignore
     const c = by.get(key) ?? {
       name, email, commits: 0, insertions: 0, deletions: 0, files: 0, first: date, last: date,
@@ -135,6 +139,10 @@ export function history(repo: string) {
 
   // indices only mean anything once contributors are in their final order
   const order = new Map(contributors.map((c, i) => [(c.email || c.name).toLowerCase(), i]))
+  history.forEach((commit, i) => {
+    commit.who = order.get(byCommit[i]) ?? 0
+  })
+
   const active = days(first, last).map((stamp) =>
     [...(whoByDay.get(stamp) ?? [])].map((key) => order.get(key) ?? 0),
   )

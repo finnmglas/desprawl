@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts"
+import { Avatar } from "../components/avatar.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { cn } from "../lib/ui.ts"
 import {
@@ -40,8 +41,16 @@ const LANGS: Column<Node>[] = [
 ]
 
 // prettier-ignore
-const people = (commits: number, moved: number): Column<Contributor>[] => [
-  { key: "name", label: "Name", get: (p) => p.name },
+const people = (commits: number, moved: number, faces: Record<string, string>): Column<Contributor>[] => [
+  {
+    key: "name", label: "Name", get: (p) => p.name,
+    cell: (p) => (
+      <span className="flex min-w-0 items-center gap-2">
+        <Avatar name={p.name} email={p.email} found={faces[p.email.toLowerCase()]} />
+        <span className="truncate">{p.name}</span>
+      </span>
+    ),
+  },
   { key: "email", label: "Email", get: (p) => p.email },
   { key: "commits", label: "com", num: true, get: (p) => p.commits, cell: (p) => num(p.commits) },
   { key: "pct", label: "pct", num: true, get: (p) => p.commits / (commits || 1), cell: (p) => pct(p.commits, commits) },
@@ -63,10 +72,12 @@ export function Overview({
   stats,
   onLang,
   onTab,
+  faces,
 }: {
   stats: Stats
   onLang: (lang: string) => void
   onTab: (tab: string) => void
+  faces: Record<string, string>
 }) {
   const { curve } = useDisplay()
   const [grain, setGrain] = useState<Grain>(() => defaultGrain(stats.first, stats.last))
@@ -237,7 +248,7 @@ export function Overview({
       <DataTable
         title="Contributors"
         hint={`${stats.contributors.length} identities, merged by mailmap email`}
-        columns={people(stats.commits, moved)}
+        columns={people(stats.commits, moved, faces)}
         rows={stats.contributors}
         id={(p) => p.email}
       />

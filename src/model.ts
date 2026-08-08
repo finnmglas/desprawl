@@ -53,7 +53,8 @@ export interface Commit {
   parents: string[]
   insertions: number
   deletions: number
-  author: string
+  /** Index into contributors, so a commit carries the merged identity, not a raw name. */
+  who: number
   date: string
   refs: string // branch and tag decorations
   subject: string

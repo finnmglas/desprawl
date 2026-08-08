@@ -2,6 +2,7 @@
 // goal: commit list with the branch rails drawn beside it
 
 import { useMemo, useState } from "react"
+import { Avatar } from "../components/avatar.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
@@ -36,7 +37,7 @@ const SORTS: Record<string, (a: Numbered, b: Numbered) => number> = {
   subject: (a, b) => a.subject.localeCompare(b.subject),
   added: (a, b) => a.insertions - b.insertions,
   removed: (a, b) => a.deletions - b.deletions,
-  author: (a, b) => a.author.localeCompare(b.author),
+  author: (a, b) => a.who - b.who,
   date: (a, b) => a.date.localeCompare(b.date),
   hash: (a, b) => a.hash.localeCompare(b.hash),
 }
@@ -110,7 +111,16 @@ function place(log: Commit[]): Placed[] {
 
 const x = (lane: number) => PAD + lane * GAP
 
-export function Graph({ stats, onTab }: { stats: Stats; onTab: (tab: string) => void }) {
+export function Graph({
+  stats,
+  onTab,
+  faces,
+}: {
+  stats: Stats
+  onTab: (tab: string) => void
+  faces: Record<string, string>
+}) {
+  const who = (c: Commit) => stats.contributors[c.who] ?? { name: "", email: "" }
   const { curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
   const [filter, setFilter] = useState("")
@@ -124,7 +134,9 @@ export function Graph({ stats, onTab }: { stats: Stats; onTab: (tab: string) => 
     const needle = filter.toLowerCase()
     const kept = needle
       ? numbered.filter((c) =>
-          `${c.subject} ${c.author} ${c.hash} ${c.refs}`.toLowerCase().includes(needle),
+          `${c.subject} ${stats.contributors[c.who]?.name ?? ""} ${c.hash} ${c.refs}`
+            .toLowerCase()
+            .includes(needle),
         )
       : numbered
     if (!sort) return kept
@@ -285,7 +297,15 @@ export function Graph({ stats, onTab }: { stats: Stats; onTab: (tab: string) => 
                   >
                     -{num(commit.deletions)}
                   </span>
-                  <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
+                  <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
+                    <Avatar
+                      name={who(commit).name}
+                      email={who(commit).email}
+                      found={faces[who(commit).email.toLowerCase()]}
+                      className="size-5 text-[9px]"
+                    />
+                    <span className="truncate">{who(commit).name}</span>
+                  </span>
                   <span className="text-muted-foreground text-right text-xs tabular-nums">
                     {day(commit.date)}
                   </span>
