@@ -7,17 +7,29 @@ import { analyze } from "./analyze.ts"
 import { blank, merge, tokens } from "./model.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
-const { values, positionals } = parseArgs({
-  options: {
-    json: { type: "boolean", default: false },
-    top: { type: "string", default: "10" },
-    digits: { type: "string", default: "3" },
-    depth: { type: "string", default: "1" },
-    raw: { type: "boolean", default: false },
-    help: { type: "boolean", short: "h", default: false },
-  },
-  allowPositionals: true,
-})
+const fail = (err: unknown): never => {
+  console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
+  return process.exit(1)
+}
+
+// parseArgs throws on a malformed flag
+const { values, positionals } = (() => {
+  try {
+    return parseArgs({
+      options: {
+        json: { type: "boolean", default: false },
+        top: { type: "string", default: "10" },
+        digits: { type: "string", default: "3" },
+        depth: { type: "string", default: "1" },
+        raw: { type: "boolean", default: false },
+        help: { type: "boolean", short: "h", default: false },
+      },
+      allowPositionals: true,
+    })
+  } catch (err) {
+    return fail(err)
+  }
+})()
 
 if (values.help) {
   console.log("desprawl [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
@@ -47,10 +59,14 @@ function human(n: number, digits: number): string {
 // mean nesting lv
 const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")
 
+// junk falls back, never NaN
+const int = (v: string | undefined, fallback: number): number =>
+  Number(v) >= 1 ? Math.floor(Number(v)) : fallback
+
 // magnitudes scaled, small exact
-const big = values.raw ? num : (v: number) => human(v, Number(values.digits))
-const top = Number(values.top)
-const depth = Number(values.depth)
+const big = values.raw ? num : (v: number) => human(v, int(values.digits, 3))
+const top = int(values.top, 10)
+const depth = int(values.depth, 1)
 
 const NAMES = 44
 
@@ -144,6 +160,5 @@ try {
   const stats = analyze(positionals[0] ?? process.cwd())
   console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
 } catch (err) {
-  console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
-  process.exit(1)
+  fail(err)
 }
