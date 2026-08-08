@@ -4,7 +4,13 @@ Unfuck large typescript projects by scoping and delivering cleanup work.
 
 ## Quickstart
 
-Run it in any git repo, without installing
+Run it in any git repo, without installing, and the explorer opens in your browser
+
+```sh
+npx desprawl
+```
+
+or soon (1 day cooldown sadly)
 
 ```sh
 pnpm dlx desprawl
@@ -17,7 +23,7 @@ pnpm add -g desprawl
 desprawl
 ```
 
-just use it or see [REFERENCE.md](REFERENCE.md)
+`desprawl cli` prints the report in the terminal instead. See [REFERENCE.md](REFERENCE.md)
 
 ## Contributing
 

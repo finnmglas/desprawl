@@ -40,7 +40,7 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    "desprawl [cli|view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
   )
   process.exit(0)
 }
@@ -49,8 +49,12 @@ if (values.help) {
 const missing = needs()
 if (missing) fail(missing)
 
-const viewing = positionals[0] === "view"
-const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()
+// a first positional is the command only when it names one, otherwise it is the path
+const command = ["cli", "view"].includes(positionals[0] ?? "") ? positionals[0] : ""
+const target = (command ? positionals[1] : positionals[0]) ?? process.cwd()
+
+// the explorer is the default surface, the terminal report is asked for by name or by --json
+const viewing = command !== "cli" && !values.json
 
 const num = (n: number): string => n.toLocaleString("en-US")
 const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
