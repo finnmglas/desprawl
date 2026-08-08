@@ -25,12 +25,20 @@ export interface Split {
   code: number
   comment: number
   blank: number
+  indent: number // nesting lv++
 }
 
 export interface Bucket extends Split {
   name: string
   files: number
   chars: number
+}
+
+// tree node
+export interface Node extends Bucket {
+  path: string
+  lang?: string
+  children?: Node[] // null on files
 }
 
 // estimate
@@ -53,7 +61,7 @@ export interface Stats extends Split {
   commits: number
   contributors: Contributor[]
   languages: Bucket[]
-  modules: Bucket[]
+  tree: Node
   files: number
   chars: number
   first: string
@@ -63,12 +71,23 @@ export interface Stats extends Split {
 const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30 })
 
+// tab or 2 spaces
+function nesting(raw: string): number {
+  let width = 0
+  for (const ch of raw) {
+    if (ch === " ") width += 1
+    else if (ch === "\t") width += 2
+    else break
+  }
+  return width >> 1
+}
+
 // hash langs: docstrings read as code
 function classify(text: string, lang: string): Split {
   const hash = HASH.has(lang)
   const [open, close] = MARKUP.has(lang) ? ["<!--", "-->"] : ["/*", "*/"]
   const solo = hash ? "#" : "//"
-  const split: Split = { code: 0, comment: 0, blank: 0 }
+  const split: Split = { code: 0, comment: 0, blank: 0, indent: 0 }
   let inBlock = false
 
   for (const raw of text.split("\n")) {
@@ -85,33 +104,76 @@ function classify(text: string, lang: string): Split {
       inBlock = !line.includes(close)
     } else {
       split.code++
+      split.indent += nesting(raw)
     }
   }
   return split
 }
 
-const add = (into: Map<string, Bucket>, name: string, s: Split, chars: number): void => {
-  const b = into.get(name) ?? { name, files: 0, chars: 0, code: 0, comment: 0, blank: 0 }
-  b.files++
-  b.chars += chars
-  b.code += s.code
-  b.comment += s.comment
-  b.blank += s.blank
-  into.set(name, b)
+export const blank = (name: string, path = ""): Node =>
+  ({ name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0 })
+
+export const merge = (into: Node, f: Node): void => {
+  into.files++
+  into.chars += f.chars
+  into.code += f.code
+  into.comment += f.comment
+  into.blank += f.blank
+  into.indent += f.indent
 }
 
-const rank = (m: Map<string, Bucket>): Bucket[] => [...m.values()].sort((a, b) => b.code - a.code)
+const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)
+
+function fold(files: Node[], key: (f: Node) => string): Bucket[] {
+  const by = new Map<string, Bucket>()
+  for (const f of files) {
+    const name = key(f)
+    const b = by.get(name) ?? blank(name)
+    merge(b as Node, f)
+    by.set(name, b)
+  }
+  return rank([...by.values()])
+}
+
+function grow(files: Node[]): Node {
+  const root = blank("")
+  const dirs = new Map<string, Node>([["", root]])
+
+  for (const f of files) {
+    merge(root, f)
+    const parts = f.path.split("/")
+    let at = root
+    for (const [i, part] of parts.entries()) {
+      at.children ??= []
+      if (i === parts.length - 1) {
+        at.children.push(f)
+        break
+      }
+      const path = parts.slice(0, i + 1).join("/")
+      let next = dirs.get(path)
+      if (!next) {
+        next = blank(part, path)
+        dirs.set(path, next)
+        at.children.push(next)
+      }
+      merge(next, f)
+      at = next
+    }
+  }
+  const sort = (n: Node): void => {
+    if (!n.children) return
+    rank(n.children)
+    n.children.forEach(sort)
+  }
+  sort(root)
+  return root
+}
 
 // tracked only
-function scan(repo: string): Pick<Stats, "languages" | "modules" | "files" | "chars" | keyof Split> {
-  const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
-  const languages = new Map<string, Bucket>()
-  const modules = new Map<string, Bucket>()
-  const total: Split = { code: 0, comment: 0, blank: 0 }
-  let files = 0
-  let chars = 0
+function scan(repo: string): Node[] {
+  const files: Node[] = []
 
-  for (const path of paths) {
+  for (const path of git(repo, "ls-files", "-z").split("\0").filter(Boolean)) {
     const dot = path.lastIndexOf(".")
     const slash = path.lastIndexOf("/")
     const ext = dot > slash + 1 ? path.slice(dot + 1).toLowerCase() : ""
@@ -128,17 +190,12 @@ function scan(repo: string): Pick<Stats, "languages" | "modules" | "files" | "ch
 
     const lang = LANGS[ext] ?? ext
     const text = buf.toString("utf8")
-    const s = classify(text, lang)
-    add(languages, lang, s, text.length)
-    add(modules, slash === -1 ? "(root)" : path.slice(0, path.indexOf("/")), s, text.length)
-    total.code += s.code
-    total.comment += s.comment
-    total.blank += s.blank
-    chars += text.length
-    files++
+    files.push({
+      name: path.slice(slash + 1), path, lang, files: 1, chars: text.length,
+      ...classify(text, lang),
+    })
   }
-
-  return { languages: rank(languages), modules: rank(modules), files, chars, ...total }
+  return files
 }
 
 // authors, output, loc, ...
@@ -194,5 +251,19 @@ function history(repo: string): Pick<Stats, "commits" | "contributors" | "first"
 export function analyze(repo: string): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
-  return { repo: root, head, ...history(root), ...scan(root) }
+  const files = scan(root)
+  const tree = grow(files)
+  return {
+    repo: root,
+    head,
+    ...history(root),
+    languages: fold(files, (f) => f.lang ?? ""),
+    tree,
+    files: tree.files,
+    chars: tree.chars,
+    code: tree.code,
+    comment: tree.comment,
+    blank: tree.blank,
+    indent: tree.indent,
+  }
 }

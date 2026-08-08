@@ -3,14 +3,15 @@
 // goal: render stats
 
 import { parseArgs } from "node:util"
-import { analyze, tokens } from "./analyze.ts"
-import type { Bucket, Stats } from "./analyze.ts"
+import { analyze, blank, merge, tokens } from "./analyze.ts"
+import type { Bucket, Node, Split, Stats } from "./analyze.ts"
 
 const { values, positionals } = parseArgs({
   options: {
     json: { type: "boolean", default: false },
     top: { type: "string", default: "10" },
     digits: { type: "string", default: "3" },
+    depth: { type: "string", default: "1" },
     raw: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -18,7 +19,7 @@ const { values, positionals } = parseArgs({
 })
 
 if (values.help) {
-  console.log("desprawl [path] [--top N] [--digits N] [--raw] [--json]")
+  console.log("desprawl [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
   process.exit(0)
 }
 
@@ -42,30 +43,56 @@ function human(n: number, digits: number): string {
   return sign + v.toFixed(Math.max(0, digits - whole)) + UNITS[unit]
 }
 
+// mean nesting lv
+const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")
+
 // magnitudes scaled, small exact
 const big = values.raw ? num : (v: number) => human(v, Number(values.digits))
 
+const NAMES = 44
+
 function table(rows: string[][]): string {
   const width = rows[0].map((_, i) => Math.max(...rows.map((r) => r[i].length)))
+  width[0] = Math.min(width[0], NAMES)
+  const name = (c: string): string =>
+    c.length > NAMES ? `${c.slice(0, NAMES - 1)}…` : c.padEnd(width[0])
   return rows
-    .map((r) => r.map((c, i) => (i === 0 ? c.padEnd(width[i]) : c.padStart(width[i]))).join("  "))
+    .map((r) => r.map((c, i) => (i === 0 ? name(c) : c.padStart(width[i]))).join("  "))
     .join("\n")
 }
 
-// header row sets widths too
+const HEAD = ["loc", "pct", "comment", "blank", "files", "chars", "~tok", "nest"]
+
+type Counts = Split & { files: number; chars: number }
+
+const row = (b: Counts, s: Stats, label: string): string[] => [
+  label, big(b.code), pct(b.code, s.code), big(b.comment), big(b.blank),
+  num(b.files), big(b.chars), big(tokens(b.chars)), nest(b),
+]
+
+// header sets widths
 function buckets(title: string, list: Bucket[], s: Stats): string {
-  const row = (b: Bucket): string[] => [
-    b.name, big(b.code), pct(b.code, s.code), big(b.comment), big(b.blank),
-    num(b.files), big(b.chars), big(tokens(b.chars)),
-  ]
-  return `\n${table([
-    [title, "loc", "pct", "comment", "blank", "files", "chars", "~tok"],
-    ...list.map(row),
-    row({ ...s, name: "total" }),
-  ])}`
+  const rows = list.map((b) => row(b, s, b.name))
+  return `\n${table([[title, ...HEAD], ...rows, row(s, s, "total")])}`
 }
 
-function report(s: Stats, top: number): string {
+// loose top-level files roll into (root)
+function branch(n: Node, s: Stats, depth: number, level = 0): string[][] {
+  const kids = n.children ?? []
+  const dirs = level ? kids : kids.filter((c) => c.children)
+  const loose = level ? [] : kids.filter((c) => !c.children)
+  const roll = blank("(root)")
+  loose.forEach((f) => merge(roll, f))
+
+  return [...dirs, ...(loose.length ? [roll] : [])]
+    .sort((a, b) => b.code - a.code)
+    .flatMap((c) => [
+      row(c, s, "  ".repeat(level) + c.name + (c.children ? "/" : "")),
+      ...(level + 1 < depth ? branch(c, s, depth, level + 1) : []),
+    ])
+}
+
+function report(s: Stats, top: number, depth: number): string {
   const source = s.code + s.comment
   const churn = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const shown = s.contributors.slice(0, top)
@@ -78,7 +105,7 @@ function report(s: Stats, top: number): string {
     `${num(s.commits)} commits  ${num(s.contributors.length)} contributors  ` +
       `${day(s.first)} to ${day(s.last)}`,
     buckets("LANGUAGE", s.languages, s),
-    buckets("MODULE", s.modules, s),
+    `\n${table([["TREE", ...HEAD], ...branch(s.tree, s, depth), row(s, s, "total")])}`,
     `\nCONTRIBUTORS (top ${shown.length})`,
     table(
       shown.map((c) => [
@@ -102,7 +129,11 @@ function report(s: Stats, top: number): string {
 
 try {
   const stats = analyze(positionals[0] ?? process.cwd())
-  console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats, Number(values.top)))
+  console.log(
+    values.json
+      ? JSON.stringify(stats, null, 2)
+      : report(stats, Number(values.top), Number(values.depth)),
+  )
 } catch (err) {
   console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
   process.exit(1)
