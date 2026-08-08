@@ -125,11 +125,11 @@ export const merge = (into: Node, f: Node): void => {
 const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)
 
 function fold(files: Node[], key: (f: Node) => string): Bucket[] {
-  const by = new Map<string, Bucket>()
+  const by = new Map<string, Node>()
   for (const f of files) {
     const name = key(f)
     const b = by.get(name) ?? blank(name)
-    merge(b as Node, f)
+    merge(b, f)
     by.set(name, b)
   }
   return rank([...by.values()])
@@ -253,17 +253,13 @@ export function analyze(repo: string): Stats {
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
   const files = scan(root)
   const tree = grow(files)
+  const { name, path, lang, children, ...totals } = tree
   return {
     repo: root,
     head,
     ...history(root),
     languages: fold(files, (f) => f.lang ?? ""),
     tree,
-    files: tree.files,
-    chars: tree.chars,
-    code: tree.code,
-    comment: tree.comment,
-    blank: tree.blank,
-    indent: tree.indent,
+    ...totals,
   }
 }

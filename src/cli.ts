@@ -4,7 +4,7 @@
 
 import { parseArgs } from "node:util"
 import { analyze, blank, merge, tokens } from "./analyze.ts"
-import type { Bucket, Node, Split, Stats } from "./analyze.ts"
+import type { Node, Split, Stats } from "./analyze.ts"
 
 const { values, positionals } = parseArgs({
   options: {
@@ -48,6 +48,8 @@ const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0
 
 // magnitudes scaled, small exact
 const big = values.raw ? num : (v: number) => human(v, Number(values.digits))
+const top = Number(values.top)
+const depth = Number(values.depth)
 
 const NAMES = 44
 
@@ -65,34 +67,31 @@ const HEAD = ["loc", "pct", "comment", "blank", "files", "chars", "~tok", "nest"
 
 type Counts = Split & { files: number; chars: number }
 
-const row = (b: Counts, s: Stats, label: string): string[] => [
-  label, big(b.code), pct(b.code, s.code), big(b.comment), big(b.blank),
+const row = (b: Counts, total: number, label: string): string[] => [
+  label, big(b.code), pct(b.code, total), big(b.comment), big(b.blank),
   num(b.files), big(b.chars), big(tokens(b.chars)), nest(b),
 ]
 
 // header sets widths
-function buckets(title: string, list: Bucket[], s: Stats): string {
-  const rows = list.map((b) => row(b, s, b.name))
-  return `\n${table([[title, ...HEAD], ...rows, row(s, s, "total")])}`
-}
+const section = (title: string, rows: string[][], s: Stats): string =>
+  `\n${table([[title, ...HEAD], ...rows, row(s, s.code, "total")])}`
 
 // loose top-level files roll into (root)
-function branch(n: Node, s: Stats, depth: number, level = 0): string[][] {
+function branch(n: Node, total: number, level = 0): string[][] {
   const kids = n.children ?? []
-  const dirs = level ? kids : kids.filter((c) => c.children)
   const loose = level ? [] : kids.filter((c) => !c.children)
   const roll = blank("(root)")
   loose.forEach((f) => merge(roll, f))
 
-  return [...dirs, ...(loose.length ? [roll] : [])]
+  return [...(level ? kids : kids.filter((c) => c.children)), ...(loose.length ? [roll] : [])]
     .sort((a, b) => b.code - a.code)
     .flatMap((c) => [
-      row(c, s, "  ".repeat(level) + c.name + (c.children ? "/" : "")),
-      ...(level + 1 < depth ? branch(c, s, depth, level + 1) : []),
+      row(c, total, "  ".repeat(level) + c.name + (c.children ? "/" : "")),
+      ...(level + 1 < depth ? branch(c, total, level + 1) : []),
     ])
 }
 
-function report(s: Stats, top: number, depth: number): string {
+function report(s: Stats): string {
   const source = s.code + s.comment
   const churn = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const shown = s.contributors.slice(0, top)
@@ -104,8 +103,8 @@ function report(s: Stats, top: number, depth: number): string {
     `${big(s.chars)} chars  ~${big(tokens(s.chars))} tokens`,
     `${num(s.commits)} commits  ${num(s.contributors.length)} contributors  ` +
       `${day(s.first)} to ${day(s.last)}`,
-    buckets("LANGUAGE", s.languages, s),
-    `\n${table([["TREE", ...HEAD], ...branch(s.tree, s, depth), row(s, s, "total")])}`,
+    section("LANGUAGE", s.languages.map((b) => row(b, s.code, b.name)), s),
+    section("TREE", branch(s.tree, s.code), s),
     `\nCONTRIBUTORS (top ${shown.length})`,
     table(
       shown.map((c) => [
@@ -129,11 +128,7 @@ function report(s: Stats, top: number, depth: number): string {
 
 try {
   const stats = analyze(positionals[0] ?? process.cwd())
-  console.log(
-    values.json
-      ? JSON.stringify(stats, null, 2)
-      : report(stats, Number(values.top), Number(values.depth)),
-  )
+  console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
 } catch (err) {
   console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
   process.exit(1)
