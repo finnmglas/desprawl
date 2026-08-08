@@ -16,6 +16,7 @@ import type { Contributor, Node, Stats } from "../../src/model.ts"
 
 const CONFIG = { commits: { label: "Commits" } }
 
+// prettier-ignore
 const LANGS: Column<Node>[] = [
   { key: "name", label: "Language", get: (l) => l.name },
   { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code) },
@@ -30,6 +31,7 @@ const LANGS: Column<Node>[] = [
   { key: "last", label: "last", num: true, get: (l) => day(l.last) },
 ]
 
+// prettier-ignore
 const people = (commits: number, moved: number): Column<Contributor>[] => [
   { key: "name", label: "Name", get: (p) => p.name },
   { key: "email", label: "Email", get: (p) => p.email },
@@ -130,7 +132,6 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
         rows={stats.contributors}
         id={(p) => p.email}
       />
-
     </div>
   )
 }

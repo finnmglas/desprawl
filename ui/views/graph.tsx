@@ -11,6 +11,7 @@ import { day } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Commit, Stats } from "../../src/model.ts"
 
+// prettier-ignore
 const LANES = [
   "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)",
   "#f97316", "#a855f7", "#22c55e", "#ef4444", "#14b8a6",
@@ -63,7 +64,8 @@ function place(log: Commit[]): Placed[] {
       const waiting = heads.indexOf(parent)
       let to: number
       if (waiting !== -1) to = waiting
-      else if (i === 0) to = ((heads[lane] = parent), lane) // first parent keeps this lane
+      else if (i === 0)
+        to = ((heads[lane] = parent), lane) // first parent keeps this lane
       else to = claim(parent)
       edges.push({ from: lane, to })
     })
@@ -77,7 +79,10 @@ const x = (lane: number) => PAD + lane * GAP
 
 export function Graph({ stats }: { stats: Stats }) {
   const rows = useMemo(() => place(stats.log), [stats.log])
-  const lanes = Math.max(1, ...rows.map((r) => Math.max(r.lane, ...r.active, ...r.edges.map((e) => e.to)) + 1))
+  const lanes = Math.max(
+    1,
+    ...rows.map((r) => Math.max(r.lane, ...r.active, ...r.edges.map((e) => e.to)) + 1),
+  )
   const width = PAD * 2 + lanes * GAP
 
   return (

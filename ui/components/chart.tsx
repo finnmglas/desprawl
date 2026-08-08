@@ -9,7 +9,13 @@ import { cn } from "../lib/ui.ts"
 /** Maps a series key to its label and colour. Colour defaults to --chart-1..5 by order. */
 export type ChartConfig = Record<string, { label: string; color?: string }>
 
-const PALETTE = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"]
+const PALETTE = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]
 
 export const chartColor = (config: ChartConfig, key: string): string =>
   config[key]?.color ?? PALETTE[Object.keys(config).indexOf(key) % PALETTE.length]

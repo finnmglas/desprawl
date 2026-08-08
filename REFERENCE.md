@@ -2,7 +2,7 @@
 
 Details on `desprawl` usage.
 
-##  Showcase
+## Showcase
 
 Analyzes only git-tracked files.
 
@@ -35,22 +35,22 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]
 ```
 
-| | |
-| --- | --- |
-| `desprawl` | report on the current directory |
-| `desprawl ../other-repo` | report on another repo |
-| `desprawl view` | open the explorer live, reanalysing on demand |
+|                          |                                                 |
+| ------------------------ | ----------------------------------------------- |
+| `desprawl`               | report on the current directory                 |
+| `desprawl ../other-repo` | report on another repo                          |
+| `desprawl view`          | open the explorer live, reanalysing on demand   |
 | `desprawl view --static` | open it as one self contained html file instead |
-| `desprawl --json` | whole report, tree + time series |
+| `desprawl --json`        | whole report, tree + time series                |
 
-| flag | |
-| --- | --- |
-| `--depth N` | how deep the tree goes, default 1 |
-| `--top N` | contributors shown, default 10 |
+| flag         |                                                                     |
+| ------------ | ------------------------------------------------------------------- |
+| `--depth N`  | how deep the tree goes, default 1                                   |
+| `--top N`    | contributors shown, default 10                                      |
 | `--digits N` | significant digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
-| `--static` | with `view`, write a standalone file rather than serving |
-| `--raw` | exact numbers instead of scaled ones |
-| `--json` | machine readable, every number exact |
+| `--static`   | with `view`, write a standalone file rather than serving            |
+| `--raw`      | exact numbers instead of scaled ones                                |
+| `--json`     | machine readable, every number exact                                |
 
 `desprawl view` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1` on a random port, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost.
 

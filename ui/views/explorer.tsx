@@ -45,6 +45,7 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
     toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
   }
 
+  // prettier-ignore
   const columns: Column<Node>[] = [
     {
       key: "name",

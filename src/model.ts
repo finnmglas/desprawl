@@ -94,6 +94,7 @@ export const tokens = (chars: number): number => Math.round(chars / 4)
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30 })
 
+// prettier-ignore
 export const blank = (name: string, path = ""): Node => ({
   name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
   commits: 0, insertions: 0, deletions: 0, last: "", langs: {},
@@ -110,7 +111,8 @@ export const merge = (into: Node, f: Node): void => {
   into.insertions += f.insertions
   into.deletions += f.deletions
   if (f.last > into.last) into.last = f.last
-  for (const [lang, loc] of Object.entries(f.langs)) into.langs[lang] = (into.langs[lang] ?? 0) + loc
+  for (const [lang, loc] of Object.entries(f.langs))
+    into.langs[lang] = (into.langs[lang] ?? 0) + loc
 }
 
 export const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)

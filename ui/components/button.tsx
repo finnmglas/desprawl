@@ -29,8 +29,7 @@ export const buttonVariants = variants(
 )
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   /** Render the child element instead of a `button`, forwarding all props to it. */
   asChild?: boolean
 }

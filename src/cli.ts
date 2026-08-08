@@ -35,7 +35,9 @@ const { values, positionals } = (() => {
 })()
 
 if (values.help) {
-  console.log("desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]")
+  console.log(
+    "desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]",
+  )
   process.exit(0)
 }
 
@@ -91,6 +93,7 @@ const CHURN = ["com", "churn", "last"]
 
 type Counts = Split & { files: number; chars: number }
 
+// prettier-ignore
 const row = (b: Counts, total: number, label: string, extra: string[] = []): string[] => [
   label, big(b.code), pct(b.code, total), big(b.comment), big(b.blank),
   num(b.files), big(b.chars), big(tokens(b.chars)), nest(b), ...extra,

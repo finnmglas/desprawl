@@ -25,6 +25,7 @@ function spread(byDay: Map<string, number[]>, first: string, last: string): Seri
     const day = byDay.get(new Date(t).toISOString().slice(0, 10)) ?? [0, 0, 0]
     data.forEach((series, i) => series.push(day[i]))
   }
+  // prettier-ignore
   return ["commits", "insertions", "deletions"].map((metric, i) => ({
     metric, start, end, granularity: "1d", data: data[i],
   }))
@@ -69,6 +70,7 @@ export function history(repo: string) {
     }
 
     const key = (email || name).toLowerCase()
+    // prettier-ignore
     const c = by.get(key) ?? {
       name, email, commits: 0, insertions: 0, deletions: 0, files: 0, first: date, last: date,
       paths: new Set<string>(), names: new Map<string, number>(),
@@ -114,5 +116,13 @@ export function history(repo: string) {
     }))
     .sort((a, b) => b.commits - a.commits)
 
-  return { commits, contributors, log: history, first, last, byPath, series: spread(byDay, first, last) }
+  return {
+    commits,
+    contributors,
+    log: history,
+    first,
+    last,
+    byPath,
+    series: spread(byDay, first, last),
+  }
 }

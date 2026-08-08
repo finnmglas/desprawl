@@ -9,6 +9,7 @@ import type { Node, Split } from "./model.ts"
 const ts = "TypeScript"
 const js = "JavaScript"
 
+// prettier-ignore
 const LANGS: Record<string, string> = {
   ts, tsx: ts, mts: ts, cts: ts,
   js: js, jsx: js, mjs: js, cjs: js,
@@ -84,8 +85,12 @@ export function scan(repo: string): Node[] {
     const text = buf.toString("utf8")
     const split = classify(text, lang)
     files.push({
-      ...blank(path.slice(slash + 1), path), lang, files: 1, chars: text.length,
-      ...split, langs: { [lang]: split.code },
+      ...blank(path.slice(slash + 1), path),
+      lang,
+      files: 1,
+      chars: text.length,
+      ...split,
+      langs: { [lang]: split.code },
     })
   }
   return files

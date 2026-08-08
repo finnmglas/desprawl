@@ -15,7 +15,9 @@ export interface TabsProps {
 
 export function Tabs({ tabs, value, onChange, className }: TabsProps) {
   return (
-    <div className={cn("bg-muted text-muted-foreground inline-flex gap-1 rounded-lg p-1", className)}>
+    <div
+      className={cn("bg-muted text-muted-foreground inline-flex gap-1 rounded-lg p-1", className)}
+    >
       {tabs.map((tab) => (
         <button
           key={tab}

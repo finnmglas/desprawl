@@ -55,7 +55,8 @@ export function DataTable<T>({
     if (!col) return rows
     return [...rows].sort((a, b) => {
       const [x, y] = [col.get(a), col.get(b)]
-      const cmp = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
+      const cmp =
+        typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
     })
   }, [rows, sort, columns])
@@ -111,7 +112,9 @@ export function DataTable<T>({
                   num={col.num}
                   onClick={() =>
                     setSort((prev) =>
-                      prev?.key === col.key ? { key: col.key, asc: !prev.asc } : { key: col.key, asc: false },
+                      prev?.key === col.key
+                        ? { key: col.key, asc: !prev.asc }
+                        : { key: col.key, asc: false },
                     )
                   }
                   className="hover:text-foreground cursor-pointer select-none"

@@ -18,7 +18,6 @@ export type VariantProps<F extends (...args: never[]) => string> = Omit<
   "class"
 >
 
-
 // cva, minus compound variants we do not use
 export function variants<V extends Variants>(
   base: string,
