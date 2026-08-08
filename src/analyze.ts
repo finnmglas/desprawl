@@ -4,6 +4,7 @@
 import { history } from "./history.ts"
 import { VERSION, fold, git, grow } from "./model.ts"
 import { scan } from "./scan.ts"
+import { stack } from "./stack.ts"
 import type { Remote, Stats } from "./model.ts"
 
 const HOSTS: [string, Remote["host"]][] = [
@@ -53,6 +54,7 @@ export function analyze(repo: string, cap?: number): Stats {
     head,
     ...hist,
     languages: fold(files, (f) => f.lang ?? ""),
+    stack: stack(root),
     tree,
     remotes: remotes(root),
     ...totals,

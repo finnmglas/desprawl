@@ -8,8 +8,8 @@ import { DataTable, type Column } from "../components/data-table.tsx"
 import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
 import { Onward } from "../components/onward.tsx"
+import { CopyButton } from "../components/copy-button.tsx"
 import { toast } from "../components/toast.tsx"
-import { copy } from "../lib/export.ts"
 import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
 import { filesIn } from "../lib/live.ts"
 import { cn } from "../lib/ui.ts"
@@ -68,6 +68,7 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
     {
       key: "name",
       label: `${num(here.files)} files`,
+      hint: "everything under this folder, click one to descend",
       get: (n) => (n.children ? `${n.name}/` : n.name),
       cell: (n) => (
         <span className="flex items-center gap-2">
@@ -148,20 +149,12 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
               : undefined
           }
         >
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () =>
-              toast(
-                (await copy(JSON.stringify(here, null, 2)))
-                  ? `Copied ${path.join("/") || "/"} as json`
-                  : "Copy blocked by the browser",
-                `${num(here.files)} files, with every child`,
-              )
-            }
-          >
-            json
-          </Button>
+          <CopyButton
+            label="json"
+            text={() => JSON.stringify(here, null, 2)}
+            message={`Copied ${path.join("/") || "/"} as json`}
+            note={`${num(here.files)} files, with every child`}
+          />
         </DataTable>
 
         <Distribution

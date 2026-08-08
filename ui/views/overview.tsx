@@ -2,8 +2,10 @@
 // goal: show data
 
 import { useEffect, useMemo, useState } from "react"
-import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts"
+import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, XAxis, YAxis } from "recharts"
+import { AiCard } from "../components/ai-card.tsx"
 import { Avatar } from "../components/avatar.tsx"
+import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { cn } from "../lib/ui.ts"
 import {
@@ -15,6 +17,7 @@ import {
 } from "../components/chart.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { Onward } from "../components/onward.tsx"
+import { StackCard } from "../components/stack-card.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, churn, day, defaultGrain, nest, num, pct, plural, tokens } from "../lib/format.ts"
@@ -107,9 +110,36 @@ export function Overview({
     () => rows(stats, series, grain, curve, all),
     [stats, picked, grain, curve, all],
   )
+
+  // dragging across the chart zooms the chart, every other view stays where it was
+  const [zoom, setZoom] = useState<[string, string] | null>(null)
+  const [drag, setDrag] = useState<[string, string] | null>(null)
+  // a bucket label only means something within one granularity
+  useEffect(() => setZoom(null), [grain, all])
+
+  const shown = useMemo(() => {
+    if (!zoom) return days
+    const [from, to] = zoom.map((label) => days.findIndex((d) => d.day === label))
+    if (from < 0 || to < 0) return days
+    return days.slice(Math.min(from, to), Math.max(from, to) + 1)
+  }, [days, zoom])
+
+  const select = {
+    onMouseDown: (e: { activeLabel?: string }) =>
+      e?.activeLabel && setDrag([e.activeLabel, e.activeLabel]),
+    onMouseMove: (e: { activeLabel?: string }) =>
+      drag && e?.activeLabel && setDrag([drag[0], e.activeLabel]),
+    // a click is not a range
+    onMouseUp: () => {
+      if (drag && drag[0] !== drag[1]) setZoom(drag)
+      setDrag(null)
+    },
+    onMouseLeave: () => setDrag(null),
+    onDoubleClick: () => setZoom(null),
+  }
   const config = Object.fromEntries(series.map((k) => [k, SERIES[k]]))
   const share = picked.length > 1
-  const sparse = days.length <= 14
+  const sparse = shown.length <= 14
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1
@@ -163,29 +193,38 @@ export function Overview({
         ))}
       </div>
 
+      <StackCard stack={stats.stack} />
+
       <Card>
         <CardHeader className="flex-row flex-wrap items-center gap-2">
           <div className="flex min-w-0 flex-col gap-0.5">
             <CardTitle>Over time</CardTitle>
             <span className="text-muted-foreground text-xs">
-              {sizing
-                ? "measuring the size at points across history…"
-                : all &&
-                    picked.some((k) => k === "commits" || k === "devs") &&
-                    picked.some((k) => k !== "commits" && k !== "devs")
-                  ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
-                  : share
-                    ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
-                    : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
+              {zoom
+                ? `zoomed to ${shown[0]?.day} - ${shown.at(-1)?.day}, ${num(shown.length)} of ${num(days.length)} buckets. Double click to reset`
+                : sizing
+                  ? "measuring the size at points across history…"
+                  : all &&
+                      picked.some((k) => k === "commits" || k === "devs") &&
+                      picked.some((k) => k !== "commits" && k !== "devs")
+                    ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
+                    : share
+                      ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
+                      : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
             </span>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {zoom && (
+              <Button variant="outline" size="sm" onClick={() => setZoom(null)}>
+                reset zoom
+              </Button>
+            )}
             <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />
           </div>
         </CardHeader>
         <CardContent>
-          <ChartContainer config={config}>
-            <ComposedChart data={days} stackOffset="sign">
+          <ChartContainer config={config} className="select-none">
+            <ComposedChart data={shown} stackOffset="sign" {...select}>
               <CartesianGrid vertical={false} />
               <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={32} />
               <YAxis
@@ -224,6 +263,16 @@ export function Overview({
                     isAnimationActive={false}
                   />
                 ),
+              )}
+              {drag && (
+                <ReferenceArea
+                  x1={drag[0]}
+                  x2={drag[1]}
+                  fill="var(--foreground)"
+                  fillOpacity={0.06}
+                  strokeOpacity={0.2}
+                  isAnimationActive={false}
+                />
               )}
             </ComposedChart>
           </ChartContainer>
@@ -284,6 +333,8 @@ export function Overview({
         id={(p) => p.email}
         fold={8}
       />
+
+      <AiCard ai={stats.stack.ai} />
 
       <Onward stats={stats} current="Overview" onTab={onTab} />
     </div>
