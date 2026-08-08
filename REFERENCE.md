@@ -11,6 +11,8 @@ Analyzes only git-tracked files.
 - **nest**, mean indentation depth of code lines
 - **com, churn, last**, commits + lines moved per folder
 - **contributors**, merged by email (with renames followed)
+- **project metadata**, the stack read off manifests and marker files: language, packages and pinning, frameworks, what it connects to, build, ci and containers
+- **assistance**, which ai coding tools left a trace, from checked in rules and from commit signatures
 
 ```
 /home/you/desprawl  @3982e3d
@@ -32,7 +34,7 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 ## CLI reference
 
 ```sh
-desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]
+desprawl [view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
 |                          |                                                 |
@@ -43,16 +45,17 @@ desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--
 | `desprawl view --static` | open it as one self contained html file instead |
 | `desprawl --json`        | whole report, tree + time series                |
 
-| flag         |                                                                     |
-| ------------ | ------------------------------------------------------------------- |
-| `--depth N`  | how deep the tree goes, default 1                                   |
-| `--top N`    | contributors shown, default 10                                      |
-| `--digits N` | significant digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
-| `--static`   | with `view`, write a standalone file rather than serving            |
-| `--raw`      | exact numbers instead of scaled ones                                |
-| `--json`     | machine readable, every number exact                                |
+| flag          |                                                                     |
+| ------------- | ------------------------------------------------------------------- |
+| `--depth N`   | how deep the tree goes, default 1                                   |
+| `--top N`     | contributors shown, default 10                                      |
+| `--commits N` | commits read from the log, default 10,000                           |
+| `--digits N`  | significant digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
+| `--static`    | with `view`, write a standalone file rather than serving            |
+| `--raw`       | exact numbers instead of scaled ones                                |
+| `--json`      | machine readable, every number exact                                |
 
-`desprawl view` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1` on a random port, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost.
+`desprawl view` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1:7423`, falling back to a free port when that one is taken, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost. One fixed origin means the browser keeps your display settings between runs.
 
 `desprawl view --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
 
