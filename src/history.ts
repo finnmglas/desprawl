@@ -21,6 +21,12 @@ const DAY = 86_400_000
 // before git existed, so older means a broken clock
 const EARLIEST = 631_152_000
 
+// the window a real commit date falls in, five kernel commits sit outside it
+const sane = (iso: string): boolean => {
+  const at = Date.parse(iso)
+  return at >= EARLIEST * 1000 && at <= Date.now() + DAY
+}
+
 // every day first to last, the axis the series uses
 function days(first: string, last: string): string[] {
   const out: string[] = []
@@ -222,6 +228,9 @@ export function history(repo: string, cap = COMMIT_MAX) {
   let commits = 0
   let first = ""
   let last = ""
+  // every date unbelievable is still better than no dates at all
+  let oldest = ""
+  let newest = ""
 
   for (const chunk of log.split("\x01")) {
     if (!chunk.trim()) continue
@@ -230,8 +239,13 @@ export function history(repo: string, cap = COMMIT_MAX) {
     if (!name) continue
 
     commits++
-    if (!last) last = date // log is newest first
-    first = date
+    // min and max, not first and last seen, so one wrong clock cannot invert the range
+    if (sane(date)) {
+      if (!first || Date.parse(date) < Date.parse(first)) first = date
+      if (!last || Date.parse(date) > Date.parse(last)) last = date
+    }
+    if (!oldest || Date.parse(date) < Date.parse(oldest)) oldest = date
+    if (!newest || Date.parse(date) > Date.parse(newest)) newest = date
 
     const size: Commit = {
       hash,
@@ -291,6 +305,10 @@ export function history(repo: string, cap = COMMIT_MAX) {
     byDay.set(date.slice(0, 10), day)
     by.set(key, c)
   }
+
+  // a repo where every clock is wrong still gets a range, just an odd one
+  if (!first) first = oldest
+  if (!last) last = newest
 
   const contributors = [...by.values()]
     .map(({ paths, names, ...c }) => ({

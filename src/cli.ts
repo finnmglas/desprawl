@@ -185,7 +185,9 @@ function report(s: Stats): string {
 try {
   // say it here in a sentence, a served failure is a 500 nobody can read
   if (!existsSync(target)) fail(`no such path as ${target}`)
-  git(target, "rev-parse", "HEAD") // --git-dir passes on a repo with no commits
+  // --git-dir passes on a bare repo and on one with no commits, these do not
+  git(target, "rev-parse", "--show-toplevel")
+  git(target, "rev-parse", "HEAD")
 
   // live analyses per request, so it never needs the report up front
   if (viewing && !values.static)

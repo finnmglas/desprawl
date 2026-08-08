@@ -18,9 +18,22 @@ const failed = (path: string, why: string): void => {
   toast(`Could not load ${name.replace("/api/", "")}`, why, "error")
 }
 
+// slowness freezes
+let inflight = 0
+const watching = new Set<(busy: number) => void>()
+export const onBusy = (fn: (busy: number) => void): (() => void) => {
+  watching.add(fn)
+  return () => void watching.delete(fn)
+}
+const busy = (step: number) => {
+  inflight += step
+  watching.forEach((fn) => fn(inflight))
+}
+
 async function ask<T>(path: string, fallback: T): Promise<T> {
   const t = token()
   if (!t) return fallback
+  busy(1)
   try {
     const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}`)
     if (res.ok) return (await res.json()) as T
@@ -28,6 +41,8 @@ async function ask<T>(path: string, fallback: T): Promise<T> {
     failed(path, body?.error ?? `${res.status} ${res.statusText}`)
   } catch (err) {
     failed(path, err instanceof Error ? err.message : "the server did not answer")
+  } finally {
+    busy(-1)
   }
   return fallback
 }

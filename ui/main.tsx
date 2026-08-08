@@ -19,7 +19,7 @@ import { num, setSimple } from "./lib/format.ts"
 import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
-import { attach } from "./lib/live.ts"
+import { attach, onBusy } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
@@ -37,6 +37,8 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
+  const [busy, setBusy] = useState(0)
+  useEffect(() => onBusy(setBusy), [])
   const { scale, curve, region } = prefs
   // one writer for every setting
   const change = (next: Partial<Prefs>) => {
@@ -111,6 +113,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
             <p className="text-muted-foreground text-xs">
               @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
               {num(stats.commits)} commits · desprawl {stats.version}
+              {busy > 0 && <span className="text-foreground"> · working…</span>}
             </p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">

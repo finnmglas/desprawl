@@ -132,7 +132,10 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
           // settings are small, catch it
           req.on("data", (chunk) => {
             body += chunk
-            if (body.length > 64_000) req.destroy()
+            if (body.length > 64_000) {
+              send(413, "settings are smaller than this", "text/plain")
+              req.destroy()
+            }
           })
           req.on("end", () => {
             try {
@@ -160,7 +163,10 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
         if (url.pathname === "/api/files") {
           const at = url.searchParams.get("path") ?? ""
           const node = find(load(false).tree, at.split("/").filter(Boolean))
-          const files = (node?.children ?? []).filter((c) => !c.children)
+          // an empty list would read as an empty folder, which is a different thing
+          if (!node)
+            return send(404, JSON.stringify({ error: `no folder at ${at}` }), "application/json")
+          const files = (node.children ?? []).filter((c) => !c.children)
           return send(200, JSON.stringify(files), "application/json")
         }
 

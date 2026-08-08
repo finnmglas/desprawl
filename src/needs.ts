@@ -52,6 +52,8 @@ export function explain(err: unknown): string | null {
   const text = err instanceof Error ? err.message : String(err)
   if ((err as NodeJS.ErrnoException)?.code === "ENOENT")
     return `needs git, which is not on PATH\n  install: ${install("git")}`
+  if (/must be run in a work tree|this operation must be run/i.test(text))
+    return "this is a bare repository, and desprawl reads files from a working tree"
   if (/not a git repository/i.test(text))
     return "not a git repository. Run it inside one, or give it a path"
   // git says unknown revision for both, only the name it could not find separates them
@@ -61,5 +63,8 @@ export function explain(err: unknown): string | null {
       : "no such commit in this repository"
   // git printed its own reason as it ran, repeating the command adds nothing
   if (/Command failed: git clone/.test(text)) return "could not clone that url, git said why above"
+  // anything else from git: keep its words, drop the command line we built
+  const said = text.match(/^fatal: (.+)$/m)?.[1]
+  if (said) return said
   return null
 }

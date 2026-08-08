@@ -293,6 +293,10 @@ const CONFIGS: [RegExp, "linters" | "formatters"][] = [
   [/^(.*\/)?dprint\.jsonc?$/, "formatters"],
 ]
 
+// copies of other people's code, and build output. Neither describes this project
+const VENDORED =
+  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|Godeps|Pods|Carthage|\.yarn|\.pnp|\.gradle|\.tox|\.venv|venv|site-packages|__pycache__|dist|build|out|target|coverage|\.next|\.nuxt|\.output|__fixtures__|fixtures)\/|(^|\/)wwwroot\/lib\//
+
 const read = (repo: string, path: string): string => {
   try {
     return readFileSync(join(repo, path), "utf8")
@@ -402,6 +406,7 @@ export function stack(repo: string): Stack {
   }
 
   for (const path of paths) {
+    if (VENDORED.test(path)) continue
     for (const [match, where, name] of FILES) {
       if (!match.test(path)) continue
       if (where === "docker") counts.dockerfiles++
@@ -424,6 +429,7 @@ export function stack(repo: string): Stack {
   }
 
   for (const path of paths) {
+    if (VENDORED.test(path)) continue
     // strictness is the single most useful thing a tsconfig says about a codebase
     if (/^(.*\/)?tsconfig(\..+)?\.json$/.test(path)) {
       const text = read(repo, path)
@@ -443,7 +449,7 @@ export function stack(repo: string): Stack {
 
   // every manifest, wherever it sits, so a monorepo is read whole
   const manifests = paths
-    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !p.includes("node_modules/"))
+    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !VENDORED.test(p))
     .map((p) => manifest(repo, p))
     .filter((m): m is Manifest => !!m)
 
