@@ -51,13 +51,15 @@ export interface Series {
 export interface Commit {
   hash: string
   parents: string[]
+  insertions: number
+  deletions: number
   author: string
   date: string
   refs: string // branch and tag decorations
   subject: string
 }
 
-export const LOG_MAX = 500
+export const LOG_MAX = 5000
 
 export interface Contributor {
   name: string

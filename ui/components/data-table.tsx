@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { toast } from "./toast.tsx"
 import { copy, delimit, download } from "../lib/export.ts"
+import { backdrop, cycle } from "../lib/format.ts"
+import type { Sort } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 
 export interface Column<T> {
@@ -17,6 +19,8 @@ export interface Column<T> {
   get: (row: T) => string | number
   /** Render override, defaults to get(). */
   cell?: (row: T) => React.ReactNode
+  /** Suppress backdrop bar on numeric column */
+  flat?: boolean
 }
 
 export interface DataTableProps<T> {
@@ -47,7 +51,7 @@ export function DataTable<T>({
   className,
   total,
 }: DataTableProps<T>) {
-  const [sort, setSort] = useState<{ key: string; asc: boolean } | null>(null)
+  const [sort, setSort] = useState<Sort | null>(null)
 
   const sorted = useMemo(() => {
     if (!sort) return rows
@@ -60,6 +64,20 @@ export function DataTable<T>({
       return sort.asc ? cmp : -cmp
     })
   }, [rows, sort, columns])
+
+  const peaks = useMemo(() => {
+    const found: Record<string, number> = {}
+    for (const col of columns) {
+      if (!col.num || col.flat) continue
+      let peak = 0
+      for (const row of rows) {
+        const value = col.get(row)
+        if (typeof value === "number" && value > peak) peak = value
+      }
+      found[col.key] = peak
+    }
+    return found
+  }, [columns, rows])
 
   const matrix = () => [
     columns.map((c) => c.label),
@@ -110,13 +128,7 @@ export function DataTable<T>({
                 <TH
                   key={col.key}
                   num={col.num}
-                  onClick={() =>
-                    setSort((prev) =>
-                      prev?.key === col.key
-                        ? { key: col.key, asc: !prev.asc }
-                        : { key: col.key, asc: false },
-                    )
-                  }
+                  onClick={() => setSort(cycle(sort, col.key))}
                   className="hover:text-foreground cursor-pointer select-none"
                 >
                   {col.label}
@@ -133,11 +145,20 @@ export function DataTable<T>({
                 style={rowStyle?.(row)}
                 className={cn(onRowClick && "cursor-pointer")}
               >
-                {columns.map((col) => (
-                  <TD key={col.key} num={col.num}>
-                    {col.cell ? col.cell(row) : col.get(row)}
-                  </TD>
-                ))}
+                {columns.map((col) => {
+                  const value = col.get(row)
+                  return (
+                    <TD
+                      key={col.key}
+                      num={col.num}
+                      style={
+                        typeof value === "number" ? backdrop(value, peaks[col.key]) : undefined
+                      }
+                    >
+                      {col.cell ? col.cell(row) : value}
+                    </TD>
+                  )
+                })}
               </TR>
             ))}
             {total && (

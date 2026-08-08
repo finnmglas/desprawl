@@ -1,14 +1,16 @@
 // owner: finn
 // goal: commit list with the branch rails drawn beside it
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
+import { Input } from "../components/input.tsx"
 import { toast } from "../components/toast.tsx"
 import { copy } from "../lib/export.ts"
-import { day } from "../lib/format.ts"
+import { backdrop, cycle, day } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
+import type { Sort } from "../lib/format.ts"
 import type { Commit, Stats } from "../../src/model.ts"
 
 // prettier-ignore
@@ -18,6 +20,33 @@ const LANES = [
 ]
 
 const color = (lane: number) => LANES[lane % LANES.length]
+
+// number, subject, added, removed, author, date, hash
+const COLS = "3.5rem minmax(0,1fr) 6rem 6rem 9rem 5.5rem 4.5rem"
+
+type Numbered = Commit & { n: number }
+
+// sort, filter reorder
+const SORTS: Record<string, (a: Numbered, b: Numbered) => number> = {
+  "#": (a, b) => a.n - b.n,
+  subject: (a, b) => a.subject.localeCompare(b.subject),
+  added: (a, b) => a.insertions - b.insertions,
+  removed: (a, b) => a.deletions - b.deletions,
+  author: (a, b) => a.author.localeCompare(b.author),
+  date: (a, b) => a.date.localeCompare(b.date),
+  hash: (a, b) => a.hash.localeCompare(b.hash),
+}
+
+// alignment match
+const HEADS: { key: string; right?: boolean }[] = [
+  { key: "#", right: true },
+  { key: "subject" },
+  { key: "added", right: true },
+  { key: "removed", right: true },
+  { key: "author" },
+  { key: "date", right: true },
+  { key: "hash", right: true },
+]
 
 const ROW = 34
 const GAP = 14
@@ -78,12 +107,36 @@ function place(log: Commit[]): Placed[] {
 const x = (lane: number) => PAD + lane * GAP
 
 export function Graph({ stats }: { stats: Stats }) {
-  const rows = useMemo(() => place(stats.log), [stats.log])
-  const lanes = Math.max(
-    1,
-    ...rows.map((r) => Math.max(r.lane, ...r.active, ...r.edges.map((e) => e.to)) + 1),
+  const [sort, setSort] = useState<Sort | null>(null)
+  const [filter, setFilter] = useState("")
+
+  const numbered = useMemo<Numbered[]>(
+    () => stats.log.map((c, i) => ({ ...c, n: stats.commits - i })),
+    [stats],
   )
-  const width = PAD * 2 + lanes * GAP
+
+  const shown = useMemo(() => {
+    const needle = filter.toLowerCase()
+    const kept = needle
+      ? numbered.filter((c) =>
+          `${c.subject} ${c.author} ${c.hash} ${c.refs}`.toLowerCase().includes(needle),
+        )
+      : numbered
+    if (!sort) return kept
+    const cmp = SORTS[sort.key]
+    return [...kept].sort((a, b) => (sort.asc ? cmp(a, b) : -cmp(a, b)))
+  }, [numbered, filter, sort])
+
+  const railed = !sort && !filter
+  const rows = useMemo(() => (railed ? place(shown) : []), [shown, railed])
+  const peak = Math.max(1, ...stats.log.map((c) => c.insertions + c.deletions))
+  const lanes = railed
+    ? Math.max(
+        1,
+        ...rows.map((r) => Math.max(r.lane, ...r.active, ...r.edges.map((e) => e.to)) + 1),
+      )
+    : 0
+  const width = railed ? PAD * 2 + lanes * GAP : 0
 
   return (
     <Card>
@@ -91,103 +144,158 @@ export function Graph({ stats }: { stats: Stats }) {
         <div className="flex flex-col gap-0.5">
           <CardTitle>History</CardTitle>
           <span className="text-muted-foreground text-xs">
+            {shown.length !== stats.log.length && `${shown.length} of `}
             {stats.log.length < stats.commits
               ? `latest ${stats.log.length} of ${stats.commits.toLocaleString("en-US")} commits`
               : `all ${stats.commits.toLocaleString("en-US")} commits`}
+            {!railed && " · sorted, so the branch rails are hidden"}
           </span>
+        </div>
+        <div className="ml-auto flex items-center gap-2">
+          {!railed && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSort(null)
+                setFilter("")
+              }}
+            >
+              reset
+            </Button>
+          )}
+          <Input
+            className="w-52"
+            placeholder="filter subject, author, hash"
+            value={filter}
+            onChange={(e) => setFilter(e.currentTarget.value)}
+          />
         </div>
       </CardHeader>
       <CardContent className="p-0 pt-2">
+        <div
+          style={{ paddingLeft: width, gridTemplateColumns: COLS }}
+          className="text-muted-foreground grid gap-3 border-b pr-3 pb-1 text-xs"
+        >
+          {HEADS.map((head) => (
+            <button
+              key={head.key}
+              onClick={() => setSort(cycle(sort, head.key))}
+              className={cn(
+                "hover:text-foreground cursor-pointer truncate",
+                head.right ? "text-right" : "text-left",
+              )}
+            >
+              {head.key}
+              {sort?.key === head.key && (sort.asc ? " ↑" : " ↓")}
+            </button>
+          ))}
+        </div>
         <div className="relative flex">
-          <svg width={width} height={rows.length * ROW} className="shrink-0">
-            {rows.map((row, i) => {
-              const y = i * ROW + ROW / 2
-              return (
-                <g key={row.commit.hash} strokeWidth={2} fill="none">
-                  {/* lanes waiting on a commit further down, full height */}
-                  {row.active.map((lane) => (
-                    <line
-                      key={lane}
-                      x1={x(lane)}
-                      y1={y - ROW / 2}
-                      x2={x(lane)}
-                      y2={y + ROW / 2}
-                      stroke={color(lane)}
+          {railed && (
+            <svg width={width} height={rows.length * ROW} className="shrink-0">
+              {rows.map((row, i) => {
+                const y = i * ROW + ROW / 2
+                return (
+                  <g key={row.commit.hash} strokeWidth={2} fill="none">
+
+                    {row.active.map((lane) => (
+                      <line
+                        key={lane}
+                        x1={x(lane)}
+                        y1={y - ROW / 2}
+                        x2={x(lane)}
+                        y2={y + ROW / 2}
+                        stroke={color(lane)}
+                      />
+                    ))}
+
+                    {row.linked && (
+                      <line
+                        x1={x(row.lane)}
+                        y1={y - ROW / 2}
+                        x2={x(row.lane)}
+                        y2={y}
+                        stroke={color(row.lane)}
+                      />
+                    )}
+
+                    {row.edges.map((edge) => (
+                      <path
+                        key={`${edge.from}-${edge.to}`}
+                        d={
+                          edge.from === edge.to
+                            ? `M${x(edge.from)},${y} L${x(edge.to)},${y + ROW / 2}`
+                            : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 2}`
+                        }
+                        stroke={color(edge.to)}
+                      />
+                    ))}
+                    <circle
+                      cx={x(row.lane)}
+                      cy={y}
+                      r={row.commit.parents.length > 1 ? 4.5 : 3.5}
+                      fill={color(row.lane)}
+                      stroke="var(--background)"
                     />
-                  ))}
-                  {/* upper half, meeting whatever drew into this lane from above */}
-                  {row.linked && (
-                    <line
-                      x1={x(row.lane)}
-                      y1={y - ROW / 2}
-                      x2={x(row.lane)}
-                      y2={y}
-                      stroke={color(row.lane)}
-                    />
-                  )}
-                  {/* lower half, stopping exactly where the next row's top begins */}
-                  {row.edges.map((edge) => (
-                    <path
-                      key={`${edge.from}-${edge.to}`}
-                      d={
-                        edge.from === edge.to
-                          ? `M${x(edge.from)},${y} L${x(edge.to)},${y + ROW / 2}`
-                          : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 2}`
-                      }
-                      stroke={color(edge.to)}
-                    />
-                  ))}
-                  <circle
-                    cx={x(row.lane)}
-                    cy={y}
-                    r={row.commit.parents.length > 1 ? 4.5 : 3.5}
-                    fill={color(row.lane)}
-                    stroke="var(--background)"
-                  />
-                </g>
-              )
-            })}
-          </svg>
+                  </g>
+                )
+              })}
+            </svg>
+          )}
 
           <div className="min-w-0 flex-1">
-            {rows.map((row) => (
+            {shown.map((commit) => (
               <div
-                key={row.commit.hash}
-                style={{ height: ROW }}
-                className="hover:bg-muted/50 flex min-w-0 items-center gap-2 pr-3 text-sm"
+                key={commit.hash}
+                style={{ height: ROW, gridTemplateColumns: COLS }}
+                className="hover:bg-muted/50 grid items-center gap-3 pr-3 text-sm"
               >
-                <span className="truncate">{row.commit.subject}</span>
-                {row.commit.refs && (
-                  <span className="flex shrink-0 gap-1">
-                    {row.commit.refs.split(", ").map((ref) => (
+                <span className="text-muted-foreground text-right text-xs tabular-nums">
+                  #{commit.n}
+                </span>
+
+                <span className="flex min-w-0 items-center gap-2">
+                  <span className="truncate">{commit.subject}</span>
+                  {commit.refs &&
+                    commit.refs.split(", ").map((ref) => (
                       <Badge
                         key={ref}
                         variant={ref.startsWith("HEAD") ? "default" : "secondary"}
-                        className="max-w-48 truncate"
+                        className="max-w-40 shrink-0 truncate"
                       >
                         {ref.replace("HEAD -> ", "")}
                       </Badge>
                     ))}
-                  </span>
-                )}
-                <span className="text-muted-foreground ml-auto shrink-0 text-xs">
-                  {row.commit.author}
                 </span>
-                <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
-                  {day(row.commit.date)}
+                <span
+                  className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
+                  style={backdrop(commit.insertions, peak, "var(--chart-2)")}
+                >
+                  +{commit.insertions.toLocaleString("en-US")}
+                </span>
+                <span
+                  className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
+                  style={backdrop(commit.deletions, peak, "var(--destructive)")}
+                >
+                  -{commit.deletions.toLocaleString("en-US")}
+                </span>
+                <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
+                <span className="text-muted-foreground text-right text-xs tabular-nums">
+                  {day(commit.date)}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className={cn("shrink-0 font-mono text-xs")}
+                  className={cn("justify-end px-0 font-mono text-xs")}
                   onClick={async () =>
                     toast(
-                      (await copy(row.commit.hash)) ? `Copied ${row.commit.hash}` : "Copy blocked",
-                      row.commit.subject,
+                      (await copy(commit.hash)) ? `Copied ${commit.hash}` : "Copy blocked",
+                      commit.subject,
                     )
                   }
                 >
-                  {row.commit.hash}
+                  {commit.hash}
                 </Button>
               </div>
             ))}

@@ -58,16 +58,17 @@ export function history(repo: string) {
     if (!last) last = date // log is newest first
     first = date
 
-    if (history.length < LOG_MAX) {
-      history.push({
-        hash,
-        parents: parents ? parents.split(" ").filter(Boolean) : [],
-        author: name,
-        date,
-        refs: refs ?? "",
-        subject: subject ?? "",
-      })
+    const size: Commit = {
+      hash,
+      parents: parents ? parents.split(" ").filter(Boolean) : [],
+      insertions: 0,
+      deletions: 0,
+      author: name,
+      date,
+      refs: refs ?? "",
+      subject: subject ?? "",
     }
+    if (history.length < LOG_MAX) history.push(size)
 
     const key = (email || name).toLowerCase()
     // prettier-ignore
@@ -92,6 +93,8 @@ export function history(repo: string) {
 
       c.insertions += ins
       c.deletions += del
+      size.insertions += ins
+      size.deletions += del
       c.paths.add(path)
       day[1] += ins
       day[2] += del
