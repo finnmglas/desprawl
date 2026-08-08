@@ -18,11 +18,13 @@ const HOST = "127.0.0.1"
 // fixed port, one origin, so the browser keeps its storage
 const PORT = 7423
 
-const store = join(
-  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-  "desprawl",
-  "prefs.json",
-)
+// where each platform keeps small config of its own
+const config =
+  process.platform === "win32"
+    ? (process.env.APPDATA ?? homedir())
+    : process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+
+const store = join(config, "desprawl", "prefs.json")
 
 const readPrefs = (): string => {
   try {

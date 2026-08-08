@@ -13,13 +13,17 @@ const LINUX: [string, string][] = [
   ["zypper", "sudo zypper install"], ["apk", "sudo apk add"], ["brew", "brew install"],
 ]
 
+const WINGET: Record<string, string> = { git: "Git.Git", node: "OpenJS.NodeJS" }
+
 const onPath = (bin: string): boolean =>
   (process.env.PATH ?? "").split(delimiter).some((dir) => existsSync(join(dir, bin + EXE)))
 
 /** What to type to get a missing binary, on whatever machine this is */
 function install(tool: string): string {
-  if (process.platform === "darwin") return `brew install ${tool}`
-  if (process.platform === "win32") return `winget install ${tool}`
+  // the tools ship with the xcode command line tools, brew only if it is already there
+  if (process.platform === "darwin")
+    return onPath("brew") ? `brew install ${tool}` : "xcode-select --install"
+  if (process.platform === "win32") return `winget install --id ${WINGET[tool] ?? tool}`
   const manager = LINUX.find(([bin]) => onPath(bin))
   return manager ? `${manager[1]} ${tool}` : `install ${tool} with your package manager`
 }

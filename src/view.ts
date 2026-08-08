@@ -7,11 +7,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Stats } from "./model.ts"
 
-const OPEN: Record<string, string> = { darwin: "open", win32: "start" }
-
 export function open(target: string): void {
-  const opener = OPEN[process.platform] ?? "xdg-open"
-  spawn(opener, [target], { detached: true, stdio: "ignore" }).unref()
+  // windows has no opener binary, its start is a shell builtin, and the "" is the window title
+  const [command, args] =
+    process.platform === "win32"
+      ? ["cmd", ["/c", "start", "", target]]
+      : [process.platform === "darwin" ? "open" : "xdg-open", [target]]
+
+  const child = spawn(command, args, { detached: true, stdio: "ignore", windowsHide: true })
+  // a headless box has no opener, and the url was printed anyway
+  child.on("error", () => {})
+  child.unref()
 }
 
 export function shell(): string {
