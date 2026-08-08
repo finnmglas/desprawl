@@ -4,10 +4,18 @@
 
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
+import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 
 /** Maps a series key to its label and colour. Colour defaults to --chart-1..5 by order. */
 export type ChartConfig = Record<string, { label: string; color?: string }>
+
+// zeros survive log1p, so a quiet day still plots at zero instead of vanishing
+export const transform = (value: number, curve: Curve): number =>
+  curve === "log" ? Math.log1p(value) : value
+
+export const untransform = (value: number, curve: Curve): number =>
+  curve === "log" ? Math.round(Math.expm1(value)) : value
 
 const PALETTE = [
   "var(--chart-1)",
@@ -53,11 +61,13 @@ export function ChartTooltipContent({
   active,
   payload,
   label,
+  curve = "linear",
 }: {
   config: ChartConfig
   active?: boolean
   payload?: any[]
   label?: React.ReactNode
+  curve?: Curve
 }) {
   if (!active || !payload?.length) return null
   return (
@@ -72,7 +82,9 @@ export function ChartTooltipContent({
           <span className="text-muted-foreground">
             {config[item.dataKey]?.label ?? item.dataKey}
           </span>
-          <span className="ml-auto font-medium">{item.value?.toLocaleString("en-US")}</span>
+          <span className="ml-auto font-medium">
+            {untransform(item.value, curve).toLocaleString("en-US")}
+          </span>
         </div>
       ))}
     </div>

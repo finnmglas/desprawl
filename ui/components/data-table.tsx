@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { toast } from "./toast.tsx"
 import { copy, delimit, download } from "../lib/export.ts"
-import { backdrop, cycle } from "../lib/format.ts"
+import { backdrop, cycle, pct } from "../lib/format.ts"
+import { useDisplay } from "../lib/display.tsx"
 import type { Sort } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 
@@ -21,6 +22,8 @@ export interface Column<T> {
   cell?: (row: T) => React.ReactNode
   /** Suppress backdrop bar on numeric column */
   flat?: boolean
+  /** Denominator for the row relative scale. Columns without one stay absolute. */
+  ofRow?: (row: T) => number
 }
 
 export interface DataTableProps<T> {
@@ -51,37 +54,65 @@ export function DataTable<T>({
   className,
   total,
 }: DataTableProps<T>) {
+  const { scale, curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
+
+  const sums = useMemo(() => {
+    const found: Record<string, number> = {}
+    for (const col of columns) {
+      if (!col.num) continue
+      let sum = 0
+      for (const row of rows) {
+        const value = col.get(row)
+        if (typeof value === "number") sum += value
+      }
+      found[col.key] = sum
+    }
+    return found
+  }, [columns, rows])
+
+  /** True when the picked scale turns this column into a share. */
+  const shares = (col: Column<T>): boolean =>
+    scale !== "abs" && !!col.num && (scale === "repo" || !!col.ofRow)
+
+  /** What the cell means right now. Sorting, bars and export all read this. */
+  const effective = (col: Column<T>, row: T): number | string => {
+    const value = col.get(row)
+    if (typeof value !== "number" || !shares(col)) return value
+    const over = scale === "repo" ? (sums[col.key] ?? 0) : (col.ofRow?.(row) ?? 0)
+    return over ? value / over : 0
+  }
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const col = columns.find((c) => c.key === sort.key)
     if (!col) return rows
     return [...rows].sort((a, b) => {
-      const [x, y] = [col.get(a), col.get(b)]
+      const [x, y] = [effective(col, a), effective(col, b)]
       const cmp =
         typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
     })
-  }, [rows, sort, columns])
+  }, [rows, sort, columns, scale])
 
+  // peaks follow the same values, so a share column bars against the biggest share
   const peaks = useMemo(() => {
     const found: Record<string, number> = {}
     for (const col of columns) {
       if (!col.num || col.flat) continue
       let peak = 0
       for (const row of rows) {
-        const value = col.get(row)
+        const value = effective(col, row)
         if (typeof value === "number" && value > peak) peak = value
       }
       found[col.key] = peak
     }
     return found
-  }, [columns, rows])
+  }, [columns, rows, scale])
 
   const matrix = () => [
     columns.map((c) => c.label),
-    ...sorted.map((row) => columns.map((c) => c.get(row))),
+    ...sorted.map((row) => columns.map((c) => effective(c, row))),
   ]
   const slug = title.toLowerCase().replace(/\W+/g, "-")
 
@@ -146,16 +177,22 @@ export function DataTable<T>({
                 className={cn(onRowClick && "cursor-pointer")}
               >
                 {columns.map((col) => {
-                  const value = col.get(row)
+                  const value = effective(col, row)
                   return (
                     <TD
                       key={col.key}
                       num={col.num}
                       style={
-                        typeof value === "number" ? backdrop(value, peaks[col.key]) : undefined
+                        typeof value === "number"
+                          ? backdrop(value, peaks[col.key], "var(--chart-2)", curve)
+                          : undefined
                       }
                     >
-                      {col.cell ? col.cell(row) : value}
+                      {shares(col) && typeof value === "number"
+                        ? pct(value, 1)
+                        : col.cell
+                          ? col.cell(row)
+                          : value}
                     </TD>
                   )
                 })}
@@ -165,7 +202,7 @@ export function DataTable<T>({
               <TR className="bg-muted/40 font-medium">
                 {columns.map((col) => (
                   <TD key={col.key} num={col.num}>
-                    {col.cell ? col.cell(total) : col.get(total)}
+                    {shares(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
                   </TD>
                 ))}
               </TR>

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx
 import { Input } from "../components/input.tsx"
 import { toast } from "../components/toast.tsx"
 import { copy } from "../lib/export.ts"
+import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
@@ -107,6 +108,7 @@ function place(log: Commit[]): Placed[] {
 const x = (lane: number) => PAD + lane * GAP
 
 export function Graph({ stats }: { stats: Stats }) {
+  const { curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
   const [filter, setFilter] = useState("")
 
@@ -198,7 +200,6 @@ export function Graph({ stats }: { stats: Stats }) {
                 const y = i * ROW + ROW / 2
                 return (
                   <g key={row.commit.hash} strokeWidth={2} fill="none">
-
                     {row.active.map((lane) => (
                       <line
                         key={lane}
@@ -270,13 +271,13 @@ export function Graph({ stats }: { stats: Stats }) {
                 </span>
                 <span
                   className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
-                  style={backdrop(commit.insertions, peak, "var(--chart-2)")}
+                  style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
                 >
                   +{commit.insertions.toLocaleString("en-US")}
                 </span>
                 <span
                   className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
-                  style={backdrop(commit.deletions, peak, "var(--destructive)")}
+                  style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
                 >
                   -{commit.deletions.toLocaleString("en-US")}
                 </span>

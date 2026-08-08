@@ -1,7 +1,8 @@
 // owner: finn
 // goal: show data
 
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis } from "recharts"
+import { useMemo, useState } from "react"
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import {
   CURSOR,
@@ -9,19 +10,27 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   chartColor,
+  transform,
+  untransform,
 } from "../components/chart.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
-import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
+import { Tabs } from "../components/tabs.tsx"
+import { useDisplay } from "../lib/display.tsx"
+import { GRAINS, bucket, churn, day, nest, num, pct, tokens } from "../lib/format.ts"
+import type { Grain } from "../lib/format.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
 
-const CONFIG = { commits: { label: "Commits" } }
+// a row's own lines, the denominator when reading shares within a row
+const lines = (n: Node) => n.code + n.comment + n.blank
+
+const CONFIG = { plot: { label: "Commits" } }
 
 // prettier-ignore
 const LANGS: Column<Node>[] = [
   { key: "name", label: "Language", get: (l) => l.name },
-  { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code) },
-  { key: "comment", label: "comment", num: true, get: (l) => l.comment, cell: (l) => num(l.comment) },
-  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank) },
+  { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code), ofRow: lines },
+  { key: "comment", label: "comment", num: true, get: (l) => l.comment, cell: (l) => num(l.comment), ofRow: lines },
+  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank), ofRow: lines },
   { key: "files", label: "files", num: true, get: (l) => l.files, cell: (l) => num(l.files) },
   { key: "chars", label: "chars", num: true, get: (l) => l.chars, cell: (l) => num(l.chars) },
   { key: "tok", label: "~tok", num: true, get: (l) => tokens(l.chars), cell: (l) => num(tokens(l.chars)) },
@@ -51,13 +60,30 @@ const people = (commits: number, moved: number): Column<Contributor>[] => [
   { key: "last", label: "last", num: true, get: (p) => day(p.last) },
 ]
 
-export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: string) => void }) {
+export function Overview({
+  stats,
+  onLang,
+  controls,
+}: {
+  stats: Stats
+  onLang: (lang: string) => void
+  controls?: React.ReactNode
+}) {
+  const { curve } = useDisplay()
+  const [grain, setGrain] = useState<Grain>("day")
   const commits = stats.series.find((s) => s.metric === "commits")
-  const days = commits?.data.map((v, i) => ({
-    day: new Date(Date.parse(commits.start) + i * 86_400_000).toISOString().slice(0, 10),
-    commits: v,
-  }))
-  const sparse = (days?.length ?? 0) <= 14
+  // bucket first, then transform, so log applies to the shown total
+  const days = useMemo(
+    () =>
+      commits
+        ? bucket(commits.data, commits.start, grain).map(([day, v]) => ({
+            day,
+            plot: transform(v, curve),
+          }))
+        : [],
+    [commits, grain, curve],
+  )
+  const sparse = days.length <= 14
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
 
@@ -83,8 +109,14 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex-row items-center gap-2">
           <CardTitle>Commits over time</CardTitle>
+          <Tabs
+            className="ml-auto"
+            tabs={GRAINS}
+            value={grain}
+            onChange={(next) => setGrain(next as Grain)}
+          />
         </CardHeader>
         <CardContent>
           <ChartContainer config={CONFIG}>
@@ -93,19 +125,37 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
               <BarChart data={days}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={16} />
-                <ChartTooltip cursor={false} content={<ChartTooltipContent config={CONFIG} />} />
-                <Bar dataKey="commits" fill={chartColor(CONFIG, "commits")} radius={2} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={36}
+                  tickFormatter={(v: number) => String(untransform(v, curve))}
+                />
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent config={CONFIG} curve={curve} />}
+                />
+                <Bar dataKey="plot" fill={chartColor(CONFIG, "plot")} radius={2} />
               </BarChart>
             ) : (
               <AreaChart data={days}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={48} />
-                <ChartTooltip cursor={CURSOR} content={<ChartTooltipContent config={CONFIG} />} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={36}
+                  tickFormatter={(v: number) => String(untransform(v, curve))}
+                />
+                <ChartTooltip
+                  cursor={CURSOR}
+                  content={<ChartTooltipContent config={CONFIG} curve={curve} />}
+                />
                 <Area
-                  dataKey="commits"
+                  dataKey="plot"
                   type="monotone"
-                  stroke={chartColor(CONFIG, "commits")}
-                  fill={chartColor(CONFIG, "commits")}
+                  stroke={chartColor(CONFIG, "plot")}
+                  fill={chartColor(CONFIG, "plot")}
                   fillOpacity={0.15}
                   activeDot={{ r: 3, strokeWidth: 0 }}
                 />
@@ -114,6 +164,8 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
           </ChartContainer>
         </CardContent>
       </Card>
+
+      {controls}
 
       <DataTable
         title="Languages"

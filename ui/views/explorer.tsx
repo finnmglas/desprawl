@@ -13,6 +13,9 @@ import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
+// a row's own lines, the denominator when reading shares within a row
+const lines = (n: Node) => n.code + n.comment + n.blank
+
 const walk = (root: Node, path: string[]): Node =>
   path.reduce<Node>((at, part) => at.children?.find((c) => c.name === part) ?? at, root)
 
@@ -60,10 +63,10 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
         </span>
       ),
     },
-    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code) },
+    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code), ofRow: lines },
     { key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) },
-    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment) },
-    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank) },
+    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment), ofRow: lines },
+    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank), ofRow: lines },
     { key: "files", label: "files", num: true, get: (n) => n.files, cell: (n) => num(n.files) },
     { key: "chars", label: "chars", num: true, get: (n) => n.chars, cell: (n) => num(n.chars) },
     { key: "tok", label: "~tok", num: true, get: (n) => tokens(n.chars), cell: (n) => num(tokens(n.chars)) },
