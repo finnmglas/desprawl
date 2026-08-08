@@ -92,14 +92,14 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
             </span>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
           {path.length > 0 && (
             <Button variant="outline" size="sm" onClick={() => setPath(path.slice(0, -1))}>
               up
             </Button>
           )}
           <Input
-            className="w-44"
+            className="w-full sm:w-44"
             placeholder="filter"
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}

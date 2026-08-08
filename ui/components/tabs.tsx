@@ -11,12 +11,18 @@ export interface TabsProps {
   value: string
   onChange: (tab: string) => void
   className?: string
+  /** Share the full width instead of hugging the labels. */
+  grow?: boolean
 }
 
-export function Tabs({ tabs, value, onChange, className }: TabsProps) {
+export function Tabs({ tabs, value, onChange, className, grow }: TabsProps) {
   return (
     <div
-      className={cn("bg-muted text-muted-foreground inline-flex gap-1 rounded-lg p-1", className)}
+      className={cn(
+        "bg-muted text-muted-foreground inline-flex gap-1 rounded-lg p-1",
+        grow && "flex w-full",
+        className,
+      )}
     >
       {tabs.map((tab) => (
         <button
@@ -24,6 +30,7 @@ export function Tabs({ tabs, value, onChange, className }: TabsProps) {
           onClick={() => onChange(tab)}
           className={cn(
             "cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors",
+            grow && "flex-1",
             tab === value ? "bg-background text-foreground shadow-xs" : "hover:text-foreground",
           )}
         >

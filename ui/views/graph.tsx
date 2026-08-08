@@ -154,7 +154,7 @@ export function Graph({ stats }: { stats: Stats }) {
             {!railed && " · sorted, so the branch rails are hidden"}
           </span>
         </div>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
           {!railed && (
             <Button
               variant="outline"
@@ -168,17 +168,17 @@ export function Graph({ stats }: { stats: Stats }) {
             </Button>
           )}
           <Input
-            className="w-52"
+            className="w-full sm:w-52"
             placeholder="filter subject, author, hash"
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}
           />
         </div>
       </CardHeader>
-      <CardContent className="p-0 pt-2">
+      <CardContent className="overflow-x-auto p-0 pt-2">
         <div
           style={{ paddingLeft: width, gridTemplateColumns: COLS }}
-          className="text-muted-foreground grid gap-3 border-b pr-3 pb-1 text-xs"
+          className="text-muted-foreground grid min-w-[52rem] gap-3 border-b pr-3 pb-1 text-xs"
         >
           {HEADS.map((head) => (
             <button
@@ -194,7 +194,7 @@ export function Graph({ stats }: { stats: Stats }) {
             </button>
           ))}
         </div>
-        <div className="relative flex">
+        <div className="flex min-w-[52rem]">
           {railed && (
             <svg width={width} height={rows.length * ROW} className="shrink-0">
               {rows.map((row, i) => {

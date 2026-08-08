@@ -57,12 +57,13 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
 
   return (
     <DisplayProvider value={{ scale, curve }}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 p-6">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
+          {/* min-w-0 lets a long repo path truncate instead of pushing the controls off */}
+          <div className="min-w-0 flex-1">
             <button
               onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
-              className="hover:text-muted-foreground cursor-pointer font-mono text-lg font-semibold"
+              className="hover:text-muted-foreground block max-w-full cursor-pointer truncate font-mono text-lg font-semibold"
             >
               {stats.repo}
             </button>
@@ -71,8 +72,14 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               {stats.commits.toLocaleString(locale())} commits · desprawl {stats.version}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Tabs tabs={TABS} value={tab} onChange={(next) => go({ tab: next })} />
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Tabs
+              grow
+              className="sm:w-auto"
+              tabs={TABS}
+              value={tab}
+              onChange={(next) => go({ tab: next })}
+            />
             <ThemeToggle {...themed} />
             <Menu>
               {reload && <MenuItem onClick={reload}>refresh</MenuItem>}

@@ -89,7 +89,7 @@ export function Overview({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {[
           ["Lines of code", num(stats.code), `${num(stats.files)} files`],
           ["Comments", num(stats.comment), `${pct(stats.comment, source)} of source`],
@@ -109,7 +109,7 @@ export function Overview({
       </div>
 
       <Card>
-        <CardHeader className="flex-row items-center gap-2">
+        <CardHeader className="flex-row flex-wrap items-center gap-2">
           <CardTitle>Commits over time</CardTitle>
           <Tabs
             className="ml-auto"
