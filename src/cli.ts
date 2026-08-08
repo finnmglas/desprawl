@@ -6,12 +6,14 @@ import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { human } from "./human.ts"
 import { blank, merge, tokens } from "./model.ts"
+import { explain, needs } from "./needs.ts"
 import { serve } from "./serve.ts"
 import { view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
-  console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
+  const said = typeof err === "string" ? err : explain(err)
+  console.error(`desprawl: ${said ?? (err instanceof Error ? err.message.trim() : err)}`)
   return process.exit(1)
 }
 
@@ -42,6 +44,10 @@ if (values.help) {
   )
   process.exit(0)
 }
+
+// git and node are the only things a user has to bring
+const missing = needs()
+if (missing) fail(missing)
 
 const viewing = positionals[0] === "view"
 const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()

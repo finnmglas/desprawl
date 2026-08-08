@@ -4,15 +4,16 @@ Unfuck large typescript projects by scoping and delivering cleanup work.
 
 ## Quickstart
 
-Install desprawl
+Run it in any git repo, without installing
 
 ```sh
-pnpm i desprawl
+pnpm dlx desprawl
 ```
 
-and run it in your repo
+or install it once and keep it
 
 ```sh
+pnpm add -g desprawl
 desprawl
 ```
 
