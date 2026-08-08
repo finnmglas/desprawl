@@ -2,26 +2,16 @@
 // goal: what this repo is, at a glance
 
 import { Badge } from "./badge.tsx"
-import { Button } from "./button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { CopyButton } from "./copy-button.tsx"
 import { Tip } from "./tip.tsx"
-import { toast } from "./toast.tsx"
-import { copy } from "../lib/export.ts"
 import { num } from "../lib/format.ts"
+import { HINTS } from "../lib/hints.ts"
 import { NOTES } from "../../src/notes.ts"
 import type { Stack } from "../../src/stack.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
 type Section = { title: string; rows: [string, Items][] }
-
-const HINTS: Record<string, string> = {
-  Strict: "off allows implicit any",
-  Pinning: "a range installs whatever ships next",
-  Modules: "from the package type and extensions",
-  Ports: "found in compose, dockerfiles and scripts",
-  Containers: "infrastructure files in the tree",
-  Config: "what the app expects to be given",
-}
 
 /** One description of the repo, rendered as cards and copied as text */
 function describe(stack: Stack): Section[] {
@@ -170,19 +160,12 @@ export function StackCard({ stack }: { stack: Stack }) {
             {part}
           </Badge>
         ))}
-        <Button
-          variant="ghost"
-          size="sm"
+        <CopyButton
           className="ml-auto"
-          onClick={async () =>
-            toast(
-              (await copy(asText())) ? "Metadata copied" : "Copy blocked by the browser",
-              "Every detected fact, as text",
-            )
-          }
-        >
-          copy
-        </Button>
+          text={asText}
+          message="Metadata copied"
+          note="Every detected fact, as text"
+        />
       </CardHeader>
 
       <CardContent className="pt-1">

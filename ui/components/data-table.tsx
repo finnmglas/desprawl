@@ -4,10 +4,12 @@
 import { useMemo, useState } from "react"
 import { Button } from "./button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { CopyButton } from "./copy-button.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { Tip } from "./tip.tsx"
 import { toast } from "./toast.tsx"
-import { copy, delimit, download } from "../lib/export.ts"
+import { delimit, download } from "../lib/export.ts"
+import { HINTS } from "../lib/hints.ts"
 import { backdrop, cycle, pct } from "../lib/format.ts"
 import { useDisplay } from "../lib/display.tsx"
 import type { Sort } from "../lib/format.ts"
@@ -25,7 +27,7 @@ export interface Column<T> {
   flat?: boolean
   /** Row relative denominator, columns without one stay absolute */
   ofRow?: (row: T) => number
-  /** Shown on hover, for a column whose name does not explain itself */
+  /** Shown on hover, overriding the shared note for this label */
   hint?: string
 }
 
@@ -137,20 +139,11 @@ export function DataTable<T>({
         </div>
         <div className="ml-auto flex items-center gap-1">
           {children}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={async () =>
-              toast(
-                (await copy(delimit(matrix(), "\t")))
-                  ? `Copied ${sorted.length} rows`
-                  : "Copy blocked by the browser",
-                "Paste straight into a sheet",
-              )
-            }
-          >
-            copy
-          </Button>
+          <CopyButton
+            text={() => delimit(matrix(), "\t")}
+            message={`Copied ${sorted.length} rows`}
+            note="Paste straight into a sheet"
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -174,7 +167,7 @@ export function DataTable<T>({
                   onClick={() => setSort(cycle(sort, col.key))}
                   className="hover:text-foreground cursor-pointer select-none"
                 >
-                  <Tip text={col.hint} side="bottom">
+                  <Tip text={col.hint ?? HINTS[col.label]} side="bottom">
                     <span>
                       {col.label}
                       {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}

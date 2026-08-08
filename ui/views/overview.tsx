@@ -33,14 +33,14 @@ const LANGS: Column<Node>[] = [
   { key: "name", label: "Language", get: (l) => l.name },
   { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code), ofRow: lines },
   { key: "comment", label: "comment", num: true, get: (l) => l.comment, cell: (l) => num(l.comment), ofRow: lines },
-  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank), ofRow: lines, hint: "Empty lines, counted apart from code and comments" },
+  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank), ofRow: lines },
   { key: "files", label: "files", num: true, get: (l) => l.files, cell: (l) => num(l.files) },
   { key: "chars", label: "chars", num: true, get: (l) => l.chars, cell: (l) => num(l.chars) },
-  { key: "tok", label: "~tok", num: true, get: (l) => tokens(l.chars), cell: (l) => num(tokens(l.chars)), hint: "Estimated tokens at four characters each. Understates punctuation heavy code" },
-  { key: "nest", label: "nest", num: true, get: (l) => Number(nest(l)), hint: "Mean indentation depth of code lines. A proxy for nesting, not cyclomatic complexity" },
-  { key: "commits", label: "com", num: true, get: (l) => l.commits, cell: (l) => num(l.commits), hint: "Commits that touched these files" },
-  { key: "churn", label: "churn", num: true, get: (l) => churn(l), cell: (l) => num(churn(l)), hint: "Lines added plus removed across the read history" },
-  { key: "last", label: "last", num: true, get: (l) => l.last, cell: (l) => day(l.last), flat: true, hint: "Newest commit touching anything here" },
+  { key: "tok", label: "~tok", num: true, get: (l) => tokens(l.chars), cell: (l) => num(tokens(l.chars)) },
+  { key: "nest", label: "nest", num: true, get: (l) => Number(nest(l)) },
+  { key: "commits", label: "com", num: true, get: (l) => l.commits, cell: (l) => num(l.commits) },
+  { key: "churn", label: "churn", num: true, get: (l) => churn(l), cell: (l) => num(churn(l)) },
+  { key: "last", label: "last", num: true, get: (l) => l.last, cell: (l) => day(l.last), flat: true },
 ]
 
 // prettier-ignore

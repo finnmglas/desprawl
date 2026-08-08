@@ -9,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx
 import { Input } from "../components/input.tsx"
 import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
 import { Onward } from "../components/onward.tsx"
+import { Tip } from "../components/tip.tsx"
 import { toast } from "../components/toast.tsx"
 import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
+import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num } from "../lib/format.ts"
 import { commitDetail, isLive, olderCommits, trueCount } from "../lib/live.ts"
@@ -253,8 +255,10 @@ export function Graph({
                   head.right ? "text-right" : "text-left",
                 )}
               >
-                {head.key}
-                {sort?.key === head.key && (sort.asc ? " ↑" : " ↓")}
+                <Tip text={HINTS[head.key]} side="bottom">
+                  {head.key}
+                  {sort?.key === head.key && (sort.asc ? " ↑" : " ↓")}
+                </Tip>
               </button>
             ))}
           </div>
