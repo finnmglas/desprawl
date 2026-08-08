@@ -5,6 +5,7 @@
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { blank, merge, tokens } from "./model.ts"
+import { view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
@@ -32,9 +33,12 @@ const { values, positionals } = (() => {
 })()
 
 if (values.help) {
-  console.log("desprawl [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
+  console.log("desprawl [view] [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
   process.exit(0)
 }
+
+const viewing = positionals[0] === "view"
+const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()
 
 const num = (n: number): string => n.toLocaleString("en-US")
 const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
@@ -157,8 +161,9 @@ function report(s: Stats): string {
 }
 
 try {
-  const stats = analyze(positionals[0] ?? process.cwd())
-  console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+  const stats = analyze(target)
+  if (viewing) console.log(view(stats))
+  else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
 } catch (err) {
   fail(err)
 }

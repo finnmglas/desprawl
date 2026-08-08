@@ -1,6 +1,7 @@
 # desprawl
 
-Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.
+**Unfuck large typescript projects**\
+by scoping and delivering cleanup work.
 
 ## Quickstart
 
