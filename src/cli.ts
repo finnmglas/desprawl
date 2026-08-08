@@ -4,6 +4,7 @@
 
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
+import { human } from "./human.ts"
 import { blank, merge, tokens } from "./model.ts"
 import { serve } from "./serve.ts"
 import { view } from "./view.ts"
@@ -47,22 +48,6 @@ const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()
 const num = (n: number): string => n.toLocaleString("en-US")
 const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
-
-const UNITS = ["", "k", "m", "b", "t"]
-
-// digits 2: 1, 10, 0.1k, 1.0k, 10k, 0.1m
-function human(n: number, digits: number): string {
-  const sign = n < 0 ? "-" : ""
-  let v = Math.abs(n)
-  let unit = 0
-  while (v >= 10 ** digits && unit < UNITS.length - 1) {
-    v /= 1000
-    unit++
-  }
-  if (unit === 0) return sign + Math.round(v)
-  const whole = Math.floor(v).toString().length
-  return sign + v.toFixed(Math.max(0, digits - whole)) + UNITS[unit]
-}
 
 // mean nesting lv
 const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")

@@ -6,6 +6,7 @@ import { Tabs } from "./tabs.tsx"
 import { CURVES, SCALES, type Curve, type Display, type Scale } from "../lib/display.tsx"
 
 const EXPLAIN: Record<Scale, string> = {
+  simple: "short forms like 3.3m and 1.5k",
   abs: "counts as they are",
   repo: "share of the column total",
   row: "share of the row's own lines",
@@ -22,7 +23,7 @@ export function DisplayControls({ scale, curve, setScale, setCurve }: DisplayCon
       <CardContent className="flex flex-wrap gap-x-10 gap-y-4 p-3">
         {/* title, tabs, then the caption, so a longer caption cannot move the tabs */}
         <div className="flex flex-col items-start gap-1">
-          <span className="text-xs font-medium">Numbers</span>
+          <span className="text-xs font-medium">Number relation</span>
           <Tabs tabs={SCALES} value={scale} onChange={(next) => setScale(next as Scale)} />
           <span className="text-muted-foreground h-4 text-xs whitespace-nowrap">
             {EXPLAIN[scale]}

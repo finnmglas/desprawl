@@ -86,6 +86,8 @@ export function Overview({
   const sparse = days.length <= 14
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
+  const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
+  const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,7 +96,11 @@ export function Overview({
           ["Lines of code", num(stats.code), `${num(stats.files)} files`],
           ["Comments", num(stats.comment), `${pct(stats.comment, source)} of source`],
           ["Tokens", `~${num(tokens(stats.chars))}`, `${num(stats.chars)} chars`],
-          ["Commits", num(stats.commits), `${stats.contributors.length} contributors`],
+          [
+            "Commits",
+            num(stats.commits),
+            `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
+          ],
         ].map(([label, value, sub]) => (
           <Card key={label}>
             <CardHeader>

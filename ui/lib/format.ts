@@ -3,9 +3,17 @@
 
 import type { Curve } from "./display.tsx"
 import { locale } from "./locale.ts"
+import { human } from "../../src/human.ts"
 import type { Node, Split } from "../../src/model.ts"
 
-export const num = (n: number) => n.toLocaleString(locale())
+let abbreviate = true
+
+/** Set before render, so num() below reads the current mode. */
+export const setSimple = (on: boolean) => {
+  abbreviate = on
+}
+
+export const num = (n: number) => (abbreviate ? human(n, 3) : n.toLocaleString(locale()))
 export const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 // tables sort on the raw iso, this is only what the reader sees
 export const day = (iso: string) => {

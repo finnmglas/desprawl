@@ -10,7 +10,7 @@ import { toast } from "../components/toast.tsx"
 import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { useDisplay } from "../lib/display.tsx"
-import { backdrop, cycle, day } from "../lib/format.ts"
+import { backdrop, cycle, day, num } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
 import type { Commit, Stats } from "../../src/model.ts"
@@ -149,8 +149,8 @@ export function Graph({ stats }: { stats: Stats }) {
           <span className="text-muted-foreground text-xs">
             {shown.length !== stats.log.length && `${shown.length} of `}
             {stats.log.length < stats.commits
-              ? `latest ${stats.log.length} of ${stats.commits.toLocaleString(locale())} commits`
-              : `all ${stats.commits.toLocaleString(locale())} commits`}
+              ? `latest ${stats.log.length} of ${num(stats.commits)} commits`
+              : `all ${num(stats.commits)} commits`}
             {!railed && " · sorted, so the branch rails are hidden"}
           </span>
         </div>
@@ -274,13 +274,13 @@ export function Graph({ stats }: { stats: Stats }) {
                   className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
                   style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
                 >
-                  +{commit.insertions.toLocaleString(locale())}
+                  +{num(commit.insertions)}
                 </span>
                 <span
                   className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
                   style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
                 >
-                  -{commit.deletions.toLocaleString(locale())}
+                  -{num(commit.deletions)}
                 </span>
                 <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
                 <span className="text-muted-foreground text-right text-xs tabular-nums">

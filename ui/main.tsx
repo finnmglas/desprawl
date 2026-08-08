@@ -14,7 +14,7 @@ import { Overview } from "./views/overview.tsx"
 import { CHOICES, LABELS, setLocale, stored, type Choice } from "./lib/locale.ts"
 import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
-import { num } from "./lib/format.ts"
+import { num, setSimple } from "./lib/format.ts"
 import { DisplayProvider, type Curve, type Scale } from "./lib/display.tsx"
 import { useView } from "./lib/hash.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
@@ -33,9 +33,10 @@ const TABS = ["Overview", "Explorer", "History"]
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
-  const [scale, setScale] = useState<Scale>("abs")
+  const [scale, setScale] = useState<Scale>("simple")
   const [curve, setCurve] = useState<Curve>("linear")
   const [region, setRegion] = useState<Choice>(stored)
+  setSimple(scale === "simple") // before the tree below renders
   const themed = useTheme()
   useThemeHotkey(themed)
 
@@ -69,7 +70,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
             </button>
             <p className="text-muted-foreground text-xs">
               @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-              {stats.commits.toLocaleString(locale())} commits · desprawl {stats.version}
+              {num(stats.commits)} commits · desprawl {stats.version}
             </p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">

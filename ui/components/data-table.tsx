@@ -71,9 +71,9 @@ export function DataTable<T>({
     return found
   }, [columns, rows])
 
-  /** True when the picked scale turns this column into a share. */
+  /** True when the picked scale turns this column into a share. Simple and abs never do. */
   const shares = (col: Column<T>): boolean =>
-    scale !== "abs" && !!col.num && (scale === "repo" || !!col.ofRow)
+    !!col.num && (scale === "repo" || (scale === "row" && !!col.ofRow))
 
   /** What the cell means right now. Sorting, bars and export all read this. */
   const effective = (col: Column<T>, row: T): number | string => {
