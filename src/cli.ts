@@ -3,8 +3,9 @@
 // goal: render stats
 
 import { parseArgs } from "node:util"
-import { analyze, blank, merge, tokens } from "./analyze.ts"
-import type { Node, Split, Stats } from "./analyze.ts"
+import { analyze } from "./analyze.ts"
+import { blank, merge, tokens } from "./model.ts"
+import type { Node, Split, Stats } from "./model.ts"
 
 const { values, positionals } = parseArgs({
   options: {
