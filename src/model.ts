@@ -2,6 +2,7 @@
 // goal: shapes and their ops
 
 import { execFileSync } from "node:child_process"
+import type { Stack } from "./stack.ts"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -98,6 +99,7 @@ export interface Stats extends Split {
   active: number[][]
   remotes: Remote[]
   languages: Node[] // folded, so they carry churn too
+  stack: Stack
   tree: Node
   series: Series[]
   files: number

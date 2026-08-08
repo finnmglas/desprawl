@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { Button } from "./button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
+import { Tip } from "./tip.tsx"
 import { toast } from "./toast.tsx"
 import { copy, delimit, download } from "../lib/export.ts"
 import { backdrop, cycle, pct } from "../lib/format.ts"
@@ -24,6 +25,8 @@ export interface Column<T> {
   flat?: boolean
   /** Row relative denominator, columns without one stay absolute */
   ofRow?: (row: T) => number
+  /** Shown on hover, for a column whose name does not explain itself */
+  hint?: string
 }
 
 export interface DataTableProps<T> {
@@ -171,8 +174,12 @@ export function DataTable<T>({
                   onClick={() => setSort(cycle(sort, col.key))}
                   className="hover:text-foreground cursor-pointer select-none"
                 >
-                  {col.label}
-                  {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}
+                  <Tip text={col.hint} side="bottom">
+                    <span>
+                      {col.label}
+                      {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}
+                    </span>
+                  </Tip>
                 </TH>
               ))}
             </TR>
