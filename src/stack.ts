@@ -4,6 +4,8 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
+import { CODE } from "./scan.ts"
+import type { Node } from "./model.ts"
 
 export interface Manifest {
   path: string
@@ -388,7 +390,7 @@ function assisted(repo: string): Pick<Ai, "signed" | "scanned" | "capped" | "by"
   return { signed, scanned: commits.length, capped: commits.length >= SIGNED_MAX, by }
 }
 
-export function stack(repo: string): Stack {
+export function stack(repo: string, languages: Node[] = []): Stack {
   const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
   const found: Record<string, string[]> = {}
   const counts = { dockerfiles: 0, compose: 0, kubernetes: 0, terraform: 0 }
@@ -534,7 +536,10 @@ export function stack(repo: string): Stack {
     add(licenses, kind)
   }
 
-  // the dominant extension names the project's real language, node manifest or not
+  // the biggest real language by lines, so 200k lines of generated svg name nothing
+  const primary =
+    [...languages].filter((l) => CODE.has(l.name)).sort((a, b) => b.code - a.code)[0]?.name ?? ""
+
   const tally = new Map<string, number>()
   for (const path of paths) {
     const dot = path.lastIndexOf(".")
@@ -544,7 +549,6 @@ export function stack(repo: string): Stack {
       tally.set(ext, (tally.get(ext) ?? 0) + 1)
     }
   }
-  const primary = [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ""
   const exts = new Set(tally.keys())
   const hasTs =
     exts.has("ts") || exts.has("tsx") || exts.has("mts") || (found.typescript?.length ?? 0) > 0

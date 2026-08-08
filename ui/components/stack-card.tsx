@@ -131,7 +131,7 @@ export function StackCard({ stack }: { stack: Stack }) {
   const identity = [
     stack.name,
     stack.version,
-    stack.kind === "none" ? `no manifest, ${stack.primary}` : "",
+    stack.kind === "none" ? `no manifest, ${stack.primary || "no recognised language"}` : "",
     stack.license ?? (stack.private ? "private, no licence" : "no licence declared"),
     stack.vendored > 0 && `${stack.vendored} vendored licences`,
   ]
@@ -171,8 +171,14 @@ export function StackCard({ stack }: { stack: Stack }) {
       <CardContent className="pt-1">
         {stack.kind === "none" && (
           <p className="text-muted-foreground mb-3 text-xs">
-            No package manifest or tsconfig here, so this is not a node project. Its largest
-            language is <span className="font-medium">{stack.primary}</span>.
+            No package manifest or tsconfig here, so this is not a node project.{" "}
+            {stack.primary ? (
+              <>
+                Its largest language is <span className="font-medium">{stack.primary}</span>.
+              </>
+            ) : (
+              "Nothing tracked here is a language desprawl recognises."
+            )}
           </p>
         )}
 

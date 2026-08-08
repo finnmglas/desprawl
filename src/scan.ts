@@ -64,6 +64,14 @@ function head(file: string): Buffer | null {
   }
 }
 
+// languages a project can be written in. Assets, data and config are counted but never
+// name the repo, or a folder of generated svg would decide what the project is
+// prettier-ignore
+export const CODE = new Set([
+  ts, js, "Rust", "Python", "Go", "Ruby", "Java", "Kotlin", "C", "C++", "C#", "Swift", "PHP",
+  "Shell", "Vue", "Svelte", "Perl", "Groovy",
+])
+
 const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby", "Make", "Docker", "just"])
 const MARKUP = new Set(["HTML", "Markdown", "Vue", "Svelte", "xml"])
 
