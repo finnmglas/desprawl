@@ -1,8 +1,8 @@
 // owner: finn
 // goal: git log to churn
 
-import { git } from "./model.ts"
-import type { Churn, Contributor, Series } from "./model.ts"
+import { LOG_MAX, git } from "./model.ts"
+import type { Churn, Commit, Contributor, Series } from "./model.ts"
 
 // -M writes renames as a{b => c}d or b => c
 function target(path: string): string {
@@ -32,10 +32,17 @@ function spread(byDay: Map<string, number[]>, first: string, last: string): Seri
 
 // authors, output, loc, ...
 export function history(repo: string) {
-  const log = git(repo, "log", "-M", "--numstat", "--pretty=format:%x01%aN%x1f%aE%x1f%aI")
+  const log = git(
+    repo,
+    "log",
+    "-M",
+    "--numstat",
+    "--pretty=format:%x01%h%x1f%p%x1f%aN%x1f%aE%x1f%aI%x1f%D%x1f%s",
+  )
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
   const byPath = new Map<string, Churn>()
   const byDay = new Map<string, number[]>()
+  const history: Commit[] = []
   let commits = 0
   let first = ""
   let last = ""
@@ -43,12 +50,23 @@ export function history(repo: string) {
   for (const chunk of log.split("\x01")) {
     if (!chunk.trim()) continue
     const [header, ...rest] = chunk.split("\n")
-    const [name, email, date] = header.split("\x1f")
+    const [hash, parents, name, email, date, refs, subject] = header.split("\x1f")
     if (!name) continue
 
     commits++
     if (!last) last = date // log is newest first
     first = date
+
+    if (history.length < LOG_MAX) {
+      history.push({
+        hash,
+        parents: parents ? parents.split(" ").filter(Boolean) : [],
+        author: name,
+        date,
+        refs: refs ?? "",
+        subject: subject ?? "",
+      })
+    }
 
     const key = (email || name).toLowerCase()
     const c = by.get(key) ?? {
@@ -96,5 +114,5 @@ export function history(repo: string) {
     }))
     .sort((a, b) => b.commits - a.commits)
 
-  return { commits, contributors, first, last, byPath, series: spread(byDay, first, last) }
+  return { commits, contributors, log: history, first, last, byPath, series: spread(byDay, first, last) }
 }

@@ -4,16 +4,14 @@
 import { useMemo, useState } from "react"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
-import { Card, CardContent } from "../components/card.tsx"
+import { DataTable, type Column } from "../components/data-table.tsx"
 import { Distribution } from "../components/distribution.tsx"
-import { Input, Select } from "../components/input.tsx"
-import { TBody, TD, TH, THead, TR, Table } from "../components/table.tsx"
+import { Input } from "../components/input.tsx"
 import { toast } from "../components/toast.tsx"
+import { copy } from "../lib/export.ts"
 import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
-
-type Sort = "loc" | "churn" | "nest" | "name"
 
 const walk = (root: Node, path: string[]): Node =>
   path.reduce<Node>((at, part) => at.children?.find((c) => c.name === part) ?? at, root)
@@ -27,39 +25,57 @@ export interface ExplorerProps {
 }
 
 export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps) {
-  const [sort, setSort] = useState<Sort>("loc")
   const [filter, setFilter] = useState("")
 
   const here = useMemo(() => walk(stats.tree, path), [stats.tree, path])
 
-  const rows = useMemo(() => {
-    const kids = (here.children ?? []).filter((c) =>
-      filter ? c.name.toLowerCase().includes(filter.toLowerCase()) : true,
-    )
-    const by: Record<Sort, (a: Node, b: Node) => number> = {
-      loc: (a, b) => b.code - a.code,
-      churn: (a, b) => b.insertions + b.deletions - (a.insertions + a.deletions),
-      nest: (a, b) => b.indent / (b.code || 1) - a.indent / (a.code || 1),
-      name: (a, b) => a.name.localeCompare(b.name),
-    }
-    return [...kids].sort(by[sort])
-  }, [here, sort, filter])
+  const rows = useMemo(
+    () =>
+      (here.children ?? []).filter((c) =>
+        filter ? c.name.toLowerCase().includes(filter.toLowerCase()) : true,
+      ),
+    [here, filter],
+  )
 
   // share of the picked language inside each row, painted as a bar
   const langTotal = lang ? (here.langs[lang] ?? 0) : 0
 
   const enter = (node: Node) => {
-    if (!node.children) {
-      toast(node.name, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
-      return
-    }
-    setPath([...path, node.name])
+    if (node.children) return setPath([...path, node.name])
+    toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
   }
+
+  const columns: Column<Node>[] = [
+    {
+      key: "name",
+      label: `${num(here.files)} files`,
+      get: (n) => (n.children ? `${n.name}/` : n.name),
+      cell: (n) => (
+        <span className="flex items-center gap-2">
+          <span className={cn("font-mono text-xs", n.children && "font-medium")}>
+            {n.children ? `${n.name}/` : n.name}
+          </span>
+          {!n.children && n.lang && <Badge variant="outline">{n.lang}</Badge>}
+        </span>
+      ),
+    },
+    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code) },
+    { key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) },
+    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment) },
+    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank) },
+    { key: "files", label: "files", num: true, get: (n) => n.files, cell: (n) => num(n.files) },
+    { key: "chars", label: "chars", num: true, get: (n) => n.chars, cell: (n) => num(n.chars) },
+    { key: "tok", label: "~tok", num: true, get: (n) => tokens(n.chars), cell: (n) => num(tokens(n.chars)) },
+    { key: "nest", label: "nest", num: true, get: (n) => Number(nest(n)) },
+    { key: "commits", label: "com", num: true, get: (n) => n.commits, cell: (n) => num(n.commits) },
+    { key: "churn", label: "churn", num: true, get: (n) => churn(n), cell: (n) => num(churn(n)) },
+    { key: "last", label: "last", num: true, get: (n) => day(n.last) },
+  ]
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1 text-sm">
+        <div className="flex flex-wrap items-center gap-1 text-sm">
           <Button variant="ghost" size="sm" onClick={() => setPath([])}>
             {stats.repo.split("/").pop()}
           </Button>
@@ -73,91 +89,54 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          {path.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => setPath(path.slice(0, -1))}>
+              up
+            </Button>
+          )}
           <Input
             className="w-44"
             placeholder="filter"
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}
           />
-          <Select value={sort} onChange={(e) => setSort(e.currentTarget.value as Sort)}>
-            <option value="loc">by loc</option>
-            <option value="churn">by churn</option>
-            <option value="nest">by nest</option>
-            <option value="name">by name</option>
-          </Select>
         </div>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-        <CardContent className="p-0">
-          <Table>
-            <THead>
-              <TR>
-                <TH>{num(here.files)} files</TH>
-                <TH num>loc</TH>
-                <TH num>pct</TH>
-                <TH num>comment</TH>
-                <TH num>blank</TH>
-                <TH num>files</TH>
-                <TH num>chars</TH>
-                <TH num>~tok</TH>
-                <TH num>nest</TH>
-                <TH num>com</TH>
-                <TH num>churn</TH>
-                <TH num>last</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {rows.map((node) => {
-                const share = lang ? ((node.langs[lang] ?? 0) / (langTotal || 1)) * 100 : 0
-                return (
-                  <TR
-                    key={node.path}
-                    onClick={() => enter(node)}
-                    className="cursor-pointer"
-                    // the bar is the picked language's share of this row
-                    style={
-                      lang
-                        ? {
-                            backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
-                            backgroundRepeat: "no-repeat",
-                            backgroundSize: `${share}% 100%`,
-                            backgroundBlendMode: "normal",
-                          }
-                        : undefined
-                    }
-                  >
-                    <TD>
-                      <span className={cn("font-mono text-xs", node.children && "font-medium")}>
-                        {node.children ? `${node.name}/` : node.name}
-                      </span>
-                      {!node.children && node.lang && (
-                        <Badge variant="outline" className="ml-2">
-                          {node.lang}
-                        </Badge>
-                      )}
-                    </TD>
-                    <TD num>{num(node.code)}</TD>
-                    <TD num>{pct(node.code, here.code)}</TD>
-                    <TD num>{num(node.comment)}</TD>
-                    <TD num>{num(node.blank)}</TD>
-                    <TD num>{num(node.files)}</TD>
-                    <TD num>{num(node.chars)}</TD>
-                    <TD num>{num(tokens(node.chars))}</TD>
-                    <TD num>{nest(node)}</TD>
-                    <TD num>{num(node.commits)}</TD>
-                    <TD num>{num(churn(node))}</TD>
-                    <TD num className="text-muted-foreground">
-                      {day(node.last)}
-                    </TD>
-                  </TR>
-                )
-              })}
-            </TBody>
-          </Table>
-        </CardContent>
-        </Card>
+        <DataTable
+          className="lg:col-span-2"
+          title={path.length ? path.join("/") : "/"}
+          hint={lang ? `shaded by ${lang} share` : "click a folder to descend"}
+          columns={columns}
+          rows={rows}
+          id={(n) => n.path}
+          onRowClick={enter}
+          rowStyle={(n) =>
+            lang
+              ? {
+                  backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: `${((n.langs[lang] ?? 0) / (langTotal || 1)) * 100}% 100%`,
+                }
+              : undefined
+          }
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={async () =>
+              toast(
+                (await copy(JSON.stringify(here, null, 2)))
+                  ? `Copied ${path.join("/") || "/"} as json`
+                  : "Copy blocked by the browser",
+                `${num(here.files)} files, with every child`,
+              )
+            }
+          >
+            json
+          </Button>
+        </DataTable>
 
         <Distribution
           title={path.length ? `${path.join("/")} languages` : "Languages"}

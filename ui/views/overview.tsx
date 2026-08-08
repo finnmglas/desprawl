@@ -10,11 +10,44 @@ import {
   ChartTooltipContent,
   chartColor,
 } from "../components/chart.tsx"
-import { TBody, TD, TH, THead, TR, Table } from "../components/table.tsx"
+import { DataTable, type Column } from "../components/data-table.tsx"
 import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
-import type { Stats } from "../../src/model.ts"
+import type { Contributor, Node, Stats } from "../../src/model.ts"
 
 const CONFIG = { commits: { label: "Commits" } }
+
+const LANGS: Column<Node>[] = [
+  { key: "name", label: "Language", get: (l) => l.name },
+  { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code) },
+  { key: "comment", label: "comment", num: true, get: (l) => l.comment, cell: (l) => num(l.comment) },
+  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank) },
+  { key: "files", label: "files", num: true, get: (l) => l.files, cell: (l) => num(l.files) },
+  { key: "chars", label: "chars", num: true, get: (l) => l.chars, cell: (l) => num(l.chars) },
+  { key: "tok", label: "~tok", num: true, get: (l) => tokens(l.chars), cell: (l) => num(tokens(l.chars)) },
+  { key: "nest", label: "nest", num: true, get: (l) => Number(nest(l)) },
+  { key: "commits", label: "com", num: true, get: (l) => l.commits, cell: (l) => num(l.commits) },
+  { key: "churn", label: "churn", num: true, get: (l) => churn(l), cell: (l) => num(churn(l)) },
+  { key: "last", label: "last", num: true, get: (l) => day(l.last) },
+]
+
+const people = (commits: number, moved: number): Column<Contributor>[] => [
+  { key: "name", label: "Name", get: (p) => p.name },
+  { key: "email", label: "Email", get: (p) => p.email },
+  { key: "commits", label: "com", num: true, get: (p) => p.commits, cell: (p) => num(p.commits) },
+  { key: "pct", label: "pct", num: true, get: (p) => p.commits / (commits || 1), cell: (p) => pct(p.commits, commits) },
+  {
+    key: "added", label: "added", num: true, get: (p) => p.insertions,
+    cell: (p) => <span className="text-chart-2">+{num(p.insertions)}</span>,
+  },
+  {
+    key: "removed", label: "removed", num: true, get: (p) => p.deletions,
+    cell: (p) => <span className="text-destructive">-{num(p.deletions)}</span>,
+  },
+  { key: "churn", label: "churn", num: true, get: (p) => p.insertions + p.deletions, cell: (p) => pct(p.insertions + p.deletions, moved) },
+  { key: "files", label: "files", num: true, get: (p) => p.files, cell: (p) => num(p.files) },
+  { key: "first", label: "first", num: true, get: (p) => day(p.first) },
+  { key: "last", label: "last", num: true, get: (p) => day(p.last) },
+]
 
 export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: string) => void }) {
   const commits = stats.series.find((s) => s.metric === "commits")
@@ -80,102 +113,24 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Languages</CardTitle>
-          <span className="text-muted-foreground text-xs">Click one to explore where it lives</span>
-        </CardHeader>
-        <CardContent className="p-0 pt-2">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Language</TH>
-                <TH num>loc</TH>
-                <TH num>pct</TH>
-                <TH num>comment</TH>
-                <TH num>blank</TH>
-                <TH num>files</TH>
-                <TH num>chars</TH>
-                <TH num>~tok</TH>
-                <TH num>nest</TH>
-                <TH num>com</TH>
-                <TH num>churn</TH>
-                <TH num>last</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {stats.languages.map((lang) => (
-                <TR key={lang.name} className="cursor-pointer" onClick={() => onLang(lang.name)}>
-                  <TD className="font-medium">{lang.name}</TD>
-                  <TD num>{num(lang.code)}</TD>
-                  <TD num>{pct(lang.code, stats.code)}</TD>
-                  <TD num>{num(lang.comment)}</TD>
-                  <TD num>{num(lang.blank)}</TD>
-                  <TD num>{num(lang.files)}</TD>
-                  <TD num>{num(lang.chars)}</TD>
-                  <TD num>{num(tokens(lang.chars))}</TD>
-                  <TD num>{nest(lang)}</TD>
-                  <TD num>{num(lang.commits)}</TD>
-                  <TD num>{num(churn(lang))}</TD>
-                  <TD num className="text-muted-foreground">
-                    {day(lang.last)}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable
+        title="Languages"
+        hint="Click one to see where it lives"
+        columns={LANGS}
+        rows={stats.languages}
+        id={(l) => l.name}
+        onRowClick={(l) => onLang(l.name)}
+        total={{ ...stats.tree, name: "total" }}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Contributors</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 pt-2">
-          <Table>
-            <THead>
-              <TR>
-                <TH>Name</TH>
-                <TH>Email</TH>
-                <TH num>commits</TH>
-                <TH num>pct</TH>
-                <TH num>added</TH>
-                <TH num>removed</TH>
-                <TH num>churn</TH>
-                <TH num>files</TH>
-                <TH num>first</TH>
-                <TH num>last</TH>
-              </TR>
-            </THead>
-            <TBody>
-              {stats.contributors.map((person) => (
-                <TR key={person.email}>
-                  <TD className="font-medium">{person.name}</TD>
-                  <TD className="text-muted-foreground max-w-56 truncate text-xs">
-                    {person.email}
-                  </TD>
-                  <TD num>{num(person.commits)}</TD>
-                  <TD num>{pct(person.commits, stats.commits)}</TD>
-                  <TD num className="text-chart-2">
-                    +{num(person.insertions)}
-                  </TD>
-                  <TD num className="text-destructive">
-                    -{num(person.deletions)}
-                  </TD>
-                  <TD num>{pct(person.insertions + person.deletions, moved)}</TD>
-                  <TD num>{num(person.files)}</TD>
-                  <TD num className="text-muted-foreground">
-                    {day(person.first)}
-                  </TD>
-                  <TD num className="text-muted-foreground">
-                    {day(person.last)}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <DataTable
+        title="Contributors"
+        hint={`${stats.contributors.length} identities, merged by mailmap email`}
+        columns={people(stats.commits, moved)}
+        rows={stats.contributors}
+        id={(p) => p.email}
+      />
+
     </div>
   )
 }

@@ -40,6 +40,18 @@ export interface Series {
   data: number[]
 }
 
+// newest first, capped so a long history cannot bloat the report
+export interface Commit {
+  hash: string
+  parents: string[]
+  author: string
+  date: string
+  refs: string // branch and tag decorations
+  subject: string
+}
+
+export const LOG_MAX = 500
+
 export interface Contributor {
   name: string
   email: string
@@ -56,6 +68,7 @@ export interface Stats extends Split {
   head: string
   commits: number
   contributors: Contributor[]
+  log: Commit[]
   languages: Node[] // folded, so they carry churn too
   tree: Node
   series: Series[]
