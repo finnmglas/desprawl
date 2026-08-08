@@ -89,7 +89,12 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
       const allowed = `http://${HOST}:${(server.address() as { port: number }).port}`
 
       const send = (code: number, body: string, type: string) => {
-        res.writeHead(code, { "content-type": type, "cache-control": "no-store" })
+        res.writeHead(code, {
+          "content-type": type,
+          "cache-control": "no-store",
+          // the url holds the token, and referer would hand it to github
+          "referrer-policy": "no-referrer",
+        })
         res.end(body)
       }
 

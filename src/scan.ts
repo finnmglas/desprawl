@@ -1,7 +1,7 @@
 // owner: finn
 // goal: files to loc
 
-import { closeSync, openSync, readFileSync, readSync } from "node:fs"
+import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { blank, git } from "./model.ts"
 import type { Node, Split } from "./model.ts"
@@ -53,6 +53,8 @@ const PEEK = 8192
 function head(file: string): Buffer | null {
   let fd = -1
   try {
+    // a symlink to a fifo blocks forever on open, and a device is not source either
+    if (!statSync(file).isFile()) return null
     fd = openSync(file, "r")
     const buf = Buffer.alloc(PEEK)
     const read = readSync(fd, buf, 0, PEEK, 0)
