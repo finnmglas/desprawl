@@ -4,6 +4,7 @@
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
 import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
+import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
@@ -58,11 +59,29 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     <DisplayProvider value={{ scale, curve }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
-          {/* min-w-0 lets a long repo path truncate instead of pushing the controls off */}
-          <div className="min-w-0 flex-1">
+          {/* min-w-0 lets a long path truncate instead of pushing the controls off */}
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <div className="flex min-w-0 items-center gap-2">
+              {/* the folder name is the repo's name, the path belongs underneath */}
+              <button
+                onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
+                className="hover:text-muted-foreground cursor-pointer truncate text-lg font-semibold"
+              >
+                {stats.repo.split("/").filter(Boolean).pop()}
+              </button>
+              {stats.remotes.map((remote) => (
+                <RemoteLink key={remote.url} remote={remote} />
+              ))}
+            </div>
             <button
-              onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
-              className="hover:text-muted-foreground block max-w-full cursor-pointer truncate font-mono text-lg font-semibold"
+              onClick={async () =>
+                toast(
+                  (await copy(stats.repo)) ? "Path copied" : "Copy blocked by the browser",
+                  stats.repo,
+                )
+              }
+              title="Copy the path"
+              className="text-muted-foreground hover:text-foreground max-w-full cursor-pointer truncate text-left font-mono text-xs"
             >
               {stats.repo}
             </button>

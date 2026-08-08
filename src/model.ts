@@ -61,6 +61,13 @@ export interface Commit {
 
 export const LOG_MAX = 5000
 
+export interface Remote {
+  name: string
+  /** Browsable https url, ssh and .git forms already resolved. */
+  url: string
+  host: "github" | "gitlab" | "bitbucket" | "git"
+}
+
 export interface Contributor {
   name: string
   email: string
@@ -81,6 +88,7 @@ export interface Stats extends Split {
   log: Commit[]
   /** Per day, the contributor indices who committed. Lets the ui count distinct devs per bucket. */
   active: number[][]
+  remotes: Remote[]
   languages: Node[] // folded, so they carry churn too
   tree: Node
   series: Series[]
