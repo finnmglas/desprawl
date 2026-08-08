@@ -49,7 +49,7 @@ function App({ stats }: { stats: Stats }) {
           </button>
           <p className="text-muted-foreground text-xs">
             @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-            {stats.commits.toLocaleString("en-US")} commits
+            {stats.commits.toLocaleString("en-US")} commits · desprawl {stats.version}
           </p>
         </div>
         <div className="flex items-center gap-2">

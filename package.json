@@ -1,14 +1,13 @@
 {
   "name": "desprawl",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.",
   "license": "MIT",
   "type": "module",
   "bin": {
-    "desprawl": "src/cli.ts"
+    "desprawl": "dist/cli.js"
   },
   "files": [
-    "src",
     "dist"
   ],
   "engines": {
@@ -18,7 +17,7 @@
     "check": "tsc --noEmit && tsc -p ui --noEmit",
     "desprawl": "node src/cli.ts",
     "ui": "vite --config ui/vite.config.ts",
-    "build": "vite build --config ui/vite.config.ts",
+    "build": "vite build --config ui/vite.config.ts && tsc -p tsconfig.build.json",
     "prepack": "pnpm build"
   },
   "devDependencies": {
@@ -36,5 +35,26 @@
     "typescript": "5.9.3",
     "vite": "7.3.6",
     "vite-plugin-singlefile": "2.3.3"
-  }
+  },
+  "author": "Finn Glas <desprawl@finnmglas.com>",
+  "homepage": "https://github.com/finnmglas/desprawl#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/finnmglas/desprawl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/finnmglas/desprawl/issues"
+  },
+  "keywords": [
+    "loc",
+    "cloc",
+    "code-analysis",
+    "codebase",
+    "metrics",
+    "churn",
+    "complexity",
+    "git",
+    "typescript",
+    "cli"
+  ]
 }

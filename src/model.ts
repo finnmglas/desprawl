@@ -2,6 +2,13 @@
 // goal: shapes and their ops
 
 import { execFileSync } from "node:child_process"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
+// one level up from src in the repo, and from dist in the package
+export const VERSION: string = JSON.parse(
+  readFileSync(join(import.meta.dirname, "../package.json"), "utf8"),
+).version
 
 export interface Split {
   code: number
@@ -64,6 +71,7 @@ export interface Contributor {
 }
 
 export interface Stats extends Split {
+  version: string // desprawl that wrote this, so a reader knows the shape
   repo: string
   head: string
   commits: number

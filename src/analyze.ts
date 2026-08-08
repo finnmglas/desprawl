@@ -2,7 +2,7 @@
 // goal: repo stats
 
 import { history } from "./history.ts"
-import { fold, git, grow } from "./model.ts"
+import { VERSION, fold, git, grow } from "./model.ts"
 import { scan } from "./scan.ts"
 import type { Stats } from "./model.ts"
 
@@ -17,6 +17,7 @@ export function analyze(repo: string): Stats {
   // commits and last would clobber the repo-wide pair
   const { name, path, lang, children, commits, last, ...totals } = tree
   return {
+    version: VERSION,
     repo: root,
     head,
     ...hist,
