@@ -7,7 +7,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
-import { bytesAt, count, page, timeline } from "./history.ts"
+import { bytesAt, count, detail, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
@@ -121,6 +121,13 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
           const node = find(load(false).tree, at.split("/").filter(Boolean))
           const files = (node?.children ?? []).filter((c) => !c.children)
           return send(200, JSON.stringify(files), "application/json")
+        }
+
+        // one commit in full, asked for when a row is opened
+        if (url.pathname === "/api/commit") {
+          const hash = url.searchParams.get("hash") ?? ""
+          if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(400, "bad hash", "text/plain")
+          return send(200, JSON.stringify(detail(repo, hash)), "application/json")
         }
 
         // older commits, walked not read whole

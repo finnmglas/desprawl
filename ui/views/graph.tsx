@@ -7,16 +7,18 @@ import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { Input } from "../components/input.tsx"
+import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
 import { Onward } from "../components/onward.tsx"
 import { toast } from "../components/toast.tsx"
 import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num } from "../lib/format.ts"
-import { isLive, olderCommits, trueCount } from "../lib/live.ts"
+import { commitDetail, isLive, olderCommits, trueCount } from "../lib/live.ts"
 import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
+import type { Detail } from "../../src/history.ts"
 import type { Commit, Stats } from "../../src/model.ts"
 
 // prettier-ignore
@@ -117,10 +119,12 @@ const x = (lane: number) => PAD + lane * GAP
 export function Graph({
   stats,
   onTab,
+  onPath,
   faces,
 }: {
   stats: Stats
   onTab: (tab: string) => void
+  onPath: (path: string[]) => void
   faces: Record<string, string>
 }) {
   const who = (c: Commit) => stats.contributors[c.who] ?? { name: "", email: "" }
@@ -130,6 +134,15 @@ export function Graph({
   const [limit, setLimit] = useState(PAGE)
   const [extra, setExtra] = useState<Commit[]>([])
   const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState("")
+  const [detail, setDetail] = useState<Detail | null>(null)
+
+  const toggle = (hash: string) => {
+    if (open === hash) return setOpen("")
+    setOpen(hash)
+    setDetail(null)
+    void commitDetail(hash).then(setDetail)
+  }
   const [total, setTotal] = useState(stats.commits)
 
   // slow to count, so it lands after paint
@@ -171,6 +184,16 @@ export function Graph({
   const railed = !sort && !filter
   const paged = useMemo(() => shown.slice(0, limit), [shown, limit])
   const rows = useMemo(() => (railed ? place(paged) : []), [paged, railed])
+  // an opened row is taller, so every y below it shifts by the same amount
+  const tops = useMemo(() => {
+    let y = 0
+    return paged.map((commit) => {
+      const top = y
+      y += ROW + (commit.hash === open ? DETAIL : 0)
+      return top
+    })
+  }, [paged, open])
+  const height = (tops.at(-1) ?? 0) + ROW + (paged.some((c) => c.hash === open) ? DETAIL : 0)
   const peak = Math.max(1, ...log.map((c) => c.insertions + c.deletions))
   const lanes = railed
     ? Math.max(
@@ -237,18 +260,21 @@ export function Graph({
           </div>
           <div className="flex min-w-[52rem]">
             {railed && (
-              <svg width={width} height={rows.length * ROW} className="shrink-0">
+              <svg width={width} height={height} className="shrink-0">
                 {rows.map((row, i) => {
-                  const y = i * ROW + ROW / 2
+                  const top = tops[i] ?? i * ROW
+                  const grown = row.commit.hash === open ? DETAIL : 0
+                  const y = top + ROW / 2
                   return (
                     <g key={row.commit.hash} strokeWidth={2} fill="none">
+                      {/* an opened row is taller, so every rail through it stretches to match */}
                       {row.active.map((lane) => (
                         <line
                           key={lane}
                           x1={x(lane)}
-                          y1={y - ROW / 2}
+                          y1={top}
                           x2={x(lane)}
-                          y2={y + ROW / 2}
+                          y2={top + ROW + grown}
                           stroke={color(lane)}
                         />
                       ))}
@@ -256,7 +282,7 @@ export function Graph({
                       {row.linked && (
                         <line
                           x1={x(row.lane)}
-                          y1={y - ROW / 2}
+                          y1={top}
                           x2={x(row.lane)}
                           y2={y}
                           stroke={color(row.lane)}
@@ -268,8 +294,8 @@ export function Graph({
                           key={`${edge.from}-${edge.to}`}
                           d={
                             edge.from === edge.to
-                              ? `M${x(edge.from)},${y} L${x(edge.to)},${y + ROW / 2}`
-                              : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 2}`
+                              ? `M${x(edge.from)},${y} L${x(edge.to)},${top + ROW + grown}`
+                              : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${top + ROW + grown}`
                           }
                           stroke={color(edge.to)}
                         />
@@ -289,65 +315,77 @@ export function Graph({
 
             <div className="min-w-0 flex-1">
               {paged.map((commit) => (
-                <div
-                  key={commit.hash}
-                  style={{ height: ROW, gridTemplateColumns: COLS }}
-                  className="hover:bg-muted/50 grid items-center gap-3 pr-3 text-sm"
-                >
-                  <span className="text-muted-foreground text-right text-xs tabular-nums">
-                    #{commit.n}
-                  </span>
+                <div key={commit.hash}>
+                  <div
+                    onClick={() => toggle(commit.hash)}
+                    style={{ height: ROW, gridTemplateColumns: COLS }}
+                    className="hover:bg-muted/50 grid cursor-pointer items-center gap-3 pr-3 text-sm"
+                  >
+                    <span className="text-muted-foreground text-right text-xs tabular-nums">
+                      #{commit.n}
+                    </span>
 
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate">{commit.subject}</span>
-                    {commit.refs &&
-                      commit.refs.split(", ").map((ref) => (
-                        <Badge
-                          key={ref}
-                          variant={ref.startsWith("HEAD") ? "default" : "secondary"}
-                          className="max-w-40 shrink-0 truncate"
-                        >
-                          {ref.replace("HEAD -> ", "")}
-                        </Badge>
-                      ))}
-                  </span>
-                  <span
-                    className="rounded-sm px-1 text-right text-xs tabular-nums"
-                    style={{ color: ADDED, ...backdrop(commit.insertions, peak, ADDED, curve) }}
-                  >
-                    +{num(commit.insertions)}
-                  </span>
-                  <span
-                    className="rounded-sm px-1 text-right text-xs tabular-nums"
-                    style={{ color: REMOVED, ...backdrop(commit.deletions, peak, REMOVED, curve) }}
-                  >
-                    -{num(commit.deletions)}
-                  </span>
-                  <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
-                    <Avatar
-                      name={who(commit).name}
-                      email={who(commit).email}
-                      found={faces[who(commit).email.toLowerCase()]}
-                      className="size-5 text-[9px]"
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="truncate">{commit.subject}</span>
+                      {commit.refs &&
+                        commit.refs.split(", ").map((ref) => (
+                          <Badge
+                            key={ref}
+                            variant={ref.startsWith("HEAD") ? "default" : "secondary"}
+                            className="max-w-40 shrink-0 truncate"
+                          >
+                            {ref.replace("HEAD -> ", "")}
+                          </Badge>
+                        ))}
+                    </span>
+                    <span
+                      className="rounded-sm px-1 text-right text-xs tabular-nums"
+                      style={{ color: ADDED, ...backdrop(commit.insertions, peak, ADDED, curve) }}
+                    >
+                      +{num(commit.insertions)}
+                    </span>
+                    <span
+                      className="rounded-sm px-1 text-right text-xs tabular-nums"
+                      style={{
+                        color: REMOVED,
+                        ...backdrop(commit.deletions, peak, REMOVED, curve),
+                      }}
+                    >
+                      -{num(commit.deletions)}
+                    </span>
+                    <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
+                      <Avatar
+                        name={who(commit).name}
+                        email={who(commit).email}
+                        found={faces[who(commit).email.toLowerCase()]}
+                        className="size-5 text-[9px]"
+                      />
+                      <span className="truncate">{who(commit).name}</span>
+                    </span>
+                    <span className="text-muted-foreground text-right text-xs tabular-nums">
+                      {day(commit.date)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn("justify-end px-0 font-mono text-xs")}
+                      onClick={async (event) => {
+                        event.stopPropagation() // copying must not also open the detail
+                        toast(
+                          (await copy(commit.hash)) ? `Copied ${commit.hash}` : "Copy blocked",
+                          commit.subject,
+                        )
+                      }}
+                    >
+                      {commit.hash}
+                    </Button>
+                  </div>
+                  {open === commit.hash && (
+                    <CommitDetail
+                      commit={detail}
+                      onFile={(path) => onPath(path.split("/").slice(0, -1))}
                     />
-                    <span className="truncate">{who(commit).name}</span>
-                  </span>
-                  <span className="text-muted-foreground text-right text-xs tabular-nums">
-                    {day(commit.date)}
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn("justify-end px-0 font-mono text-xs")}
-                    onClick={async () =>
-                      toast(
-                        (await copy(commit.hash)) ? `Copied ${commit.hash}` : "Copy blocked",
-                        commit.subject,
-                      )
-                    }
-                  >
-                    {commit.hash}
-                  </Button>
+                  )}
                 </div>
               ))}
             </div>

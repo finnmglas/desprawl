@@ -1,7 +1,7 @@
 // owner: finn
 // goal: parts too big to ship up front, asked for once the ui is painted
 
-import type { Timeline } from "../../src/history.ts"
+import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
 const token = () => new URLSearchParams(location.search).get("t")
@@ -22,6 +22,9 @@ async function ask<T>(path: string, fallback: T): Promise<T> {
 
 export const filesIn = (path: string): Promise<Node[]> =>
   ask(`/api/files?path=${encodeURIComponent(path)}`, [])
+
+export const commitDetail = (hash: string): Promise<Detail | null> =>
+  ask<Detail | null>(`/api/commit?hash=${hash}`, null)
 
 export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
   ask(`/api/log?skip=${skip}&count=${count}`, [])

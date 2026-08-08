@@ -167,7 +167,15 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         </header>
 
         {tab === "History" ? (
-          <Graph stats={stats} onTab={(next) => go({ tab: next })} faces={faces} />
+          <Graph
+            stats={stats}
+            onTab={(next) => go({ tab: next })}
+            onPath={(path) => {
+              go({ tab: "Files", path })
+              toast("Opened in Files", path.join("/") || "the repo root")
+            }}
+            faces={faces}
+          />
         ) : tab === "Overview" ? (
           <Overview
             stats={stats}

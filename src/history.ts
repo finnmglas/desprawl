@@ -82,6 +82,40 @@ function* parse(log: string): Generator<Parsed> {
   }
 }
 
+export interface Detail {
+  hash: string
+  author: string
+  email: string
+  date: string
+  subject: string
+  body: string
+  files: { ins: number; del: number; path: string }[]
+}
+
+// one commit, whole message and every file it touched
+export function detail(repo: string, hash: string): Detail {
+  const out = git(
+    repo,
+    "show",
+    "-M",
+    "--numstat",
+    "--format=%h%x1f%aN%x1f%aE%x1f%aI%x1f%s%x1f%b%x02",
+    hash,
+  )
+  const [head, rest = ""] = out.split("\x02")
+  const [h, author, email, date, subject, body] = head.split("\x1f")
+  const files = rest
+    .split("\n")
+    .map((line) => line.split("\t"))
+    .filter((cells) => cells.length === 3)
+    .map(([ins, del, path]) => ({
+      ins: Number(ins) || 0,
+      del: Number(del) || 0,
+      path: target(path),
+    }))
+  return { hash: h, author, email, date, subject, body: (body ?? "").trim(), files }
+}
+
 // older commits, to walk back without reading everything
 export function page(repo: string, skip: number, count: number, names: string[]): Commit[] {
   const log = git(repo, "log", "-M", `--skip=${skip}`, `-n${count}`, "--numstat", FORMAT)
