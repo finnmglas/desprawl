@@ -34,11 +34,27 @@ export interface Bucket extends Split {
   chars: number
 }
 
+export interface Churn {
+  commits: number
+  insertions: number
+  deletions: number
+  last: string // newest touch
+}
+
 // tree node
-export interface Node extends Bucket {
+export interface Node extends Bucket, Churn {
   path: string
   lang?: string
   children?: Node[] // null on files
+}
+
+// granular time series
+export interface Series {
+  metric: string
+  start: string
+  end: string
+  granularity: string
+  data: number[]
 }
 
 // estimate
@@ -62,8 +78,11 @@ export interface Stats extends Split {
   contributors: Contributor[]
   languages: Bucket[]
   tree: Node
+  series: Series[]
   files: number
   chars: number
+  insertions: number
+  deletions: number
   first: string
   last: string
 }
@@ -110,8 +129,10 @@ function classify(text: string, lang: string): Split {
   return split
 }
 
-export const blank = (name: string, path = ""): Node =>
-  ({ name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0 })
+export const blank = (name: string, path = ""): Node => ({
+  name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
+  commits: 0, insertions: 0, deletions: 0, last: "",
+})
 
 export const merge = (into: Node, f: Node): void => {
   into.files++
@@ -120,6 +141,10 @@ export const merge = (into: Node, f: Node): void => {
   into.comment += f.comment
   into.blank += f.blank
   into.indent += f.indent
+  into.commits += f.commits
+  into.insertions += f.insertions
+  into.deletions += f.deletions
+  if (f.last > into.last) into.last = f.last
 }
 
 const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)
@@ -191,17 +216,45 @@ function scan(repo: string): Node[] {
     const lang = LANGS[ext] ?? ext
     const text = buf.toString("utf8")
     files.push({
-      name: path.slice(slash + 1), path, lang, files: 1, chars: text.length,
+      ...blank(path.slice(slash + 1), path), lang, files: 1, chars: text.length,
       ...classify(text, lang),
     })
   }
   return files
 }
 
+// -M writes renames as a{b => c}d or b => c
+function target(path: string): string {
+  const open = path.indexOf("{")
+  if (open === -1) {
+    const arrow = path.indexOf(" => ")
+    return arrow === -1 ? path : path.slice(arrow + 4)
+  }
+  const close = path.indexOf("}", open)
+  const inner = path.slice(open + 1, close)
+  return path.slice(0, open) + inner.slice(inner.indexOf(" => ") + 4) + path.slice(close + 1)
+}
+
+const DAY = 86_400_000
+
+function spread(byDay: Map<string, number[]>, first: string, last: string): Series[] {
+  const [start, end] = [first.slice(0, 10), last.slice(0, 10)]
+  const data: number[][] = [[], [], []]
+  for (let t = Date.parse(start); t <= Date.parse(end); t += DAY) {
+    const day = byDay.get(new Date(t).toISOString().slice(0, 10)) ?? [0, 0, 0]
+    data.forEach((series, i) => series.push(day[i]))
+  }
+  return ["commits", "insertions", "deletions"].map((metric, i) => ({
+    metric, start, end, granularity: "1d", data: data[i],
+  }))
+}
+
 // authors, output, loc, ...
-function history(repo: string): Pick<Stats, "commits" | "contributors" | "first" | "last"> {
-  const log = git(repo, "log", "--numstat", "--pretty=format:%x01%aN%x1f%aE%x1f%aI")
+function history(repo: string) {
+  const log = git(repo, "log", "-M", "--numstat", "--pretty=format:%x01%aN%x1f%aE%x1f%aI")
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
+  const byPath = new Map<string, Churn>()
+  const byDay = new Map<string, number[]>()
   let commits = 0
   let first = ""
   let last = ""
@@ -224,15 +277,32 @@ function history(repo: string): Pick<Stats, "commits" | "contributors" | "first"
     c.commits++
     c.names.set(name, (c.names.get(name) ?? 0) + 1)
     c.first = date
+
+    const day = byDay.get(date.slice(0, 10)) ?? [0, 0, 0]
+    day[0]++
     for (const line of rest) {
       if (!line) continue
-      const [added, deleted, path] = line.split("\t")
-      if (path === undefined) continue
+      const [added, deleted, raw] = line.split("\t")
+      if (raw === undefined) continue
       // binary shows "-" for both
-      c.insertions += Number(added) || 0
-      c.deletions += Number(deleted) || 0
+      const ins = Number(added) || 0
+      const del = Number(deleted) || 0
+      const path = target(raw)
+
+      c.insertions += ins
+      c.deletions += del
       c.paths.add(path)
+      day[1] += ins
+      day[2] += del
+
+      const p = byPath.get(path) ?? { commits: 0, insertions: 0, deletions: 0, last: "" }
+      p.commits++
+      p.insertions += ins
+      p.deletions += del
+      if (!p.last) p.last = date
+      byPath.set(path, p)
     }
+    byDay.set(date.slice(0, 10), day)
     by.set(key, c)
   }
 
@@ -245,19 +315,23 @@ function history(repo: string): Pick<Stats, "commits" | "contributors" | "first"
     }))
     .sort((a, b) => b.commits - a.commits)
 
-  return { commits, contributors, first, last }
+  return { commits, contributors, first, last, byPath, series: spread(byDay, first, last) }
 }
 
 export function analyze(repo: string): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
   const files = scan(root)
+  const { byPath, ...hist } = history(root)
+  for (const f of files) Object.assign(f, byPath.get(f.path))
+
   const tree = grow(files)
-  const { name, path, lang, children, ...totals } = tree
+  // commits and last would clobber the repo-wide pair
+  const { name, path, lang, children, commits, last, ...totals } = tree
   return {
     repo: root,
     head,
-    ...history(root),
+    ...hist,
     languages: fold(files, (f) => f.lang ?? ""),
     tree,
     ...totals,

@@ -64,17 +64,20 @@ function table(rows: string[][]): string {
 }
 
 const HEAD = ["loc", "pct", "comment", "blank", "files", "chars", "~tok", "nest"]
+const CHURN = ["com", "churn", "last"]
 
 type Counts = Split & { files: number; chars: number }
 
-const row = (b: Counts, total: number, label: string): string[] => [
+const row = (b: Counts, total: number, label: string, extra: string[] = []): string[] => [
   label, big(b.code), pct(b.code, total), big(b.comment), big(b.blank),
-  num(b.files), big(b.chars), big(tokens(b.chars)), nest(b),
+  num(b.files), big(b.chars), big(tokens(b.chars)), nest(b), ...extra,
 ]
 
+const churn = (n: Node): string[] => [num(n.commits), big(n.insertions + n.deletions), day(n.last)]
+
 // header sets widths
-const section = (title: string, rows: string[][], s: Stats): string =>
-  `\n${table([[title, ...HEAD], ...rows, row(s, s.code, "total")])}`
+const section = (title: string, head: string[], rows: string[][], total: string[]): string =>
+  `\n${table([[title, ...head], ...rows, total])}`
 
 // loose top-level files roll into (root)
 function branch(n: Node, total: number, level = 0): string[][] {
@@ -86,14 +89,14 @@ function branch(n: Node, total: number, level = 0): string[][] {
   return [...(level ? kids : kids.filter((c) => c.children)), ...(loose.length ? [roll] : [])]
     .sort((a, b) => b.code - a.code)
     .flatMap((c) => [
-      row(c, total, "  ".repeat(level) + c.name + (c.children ? "/" : "")),
+      row(c, total, "  ".repeat(level) + c.name + (c.children ? "/" : ""), churn(c)),
       ...(level + 1 < depth ? branch(c, total, level + 1) : []),
     ])
 }
 
 function report(s: Stats): string {
   const source = s.code + s.comment
-  const churn = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
+  const moved = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const shown = s.contributors.slice(0, top)
 
   const out = [
@@ -103,8 +106,18 @@ function report(s: Stats): string {
     `${big(s.chars)} chars  ~${big(tokens(s.chars))} tokens`,
     `${num(s.commits)} commits  ${num(s.contributors.length)} contributors  ` +
       `${day(s.first)} to ${day(s.last)}`,
-    section("LANGUAGE", s.languages.map((b) => row(b, s.code, b.name)), s),
-    section("TREE", branch(s.tree, s.code), s),
+    section(
+      "LANGUAGE",
+      HEAD,
+      s.languages.map((b) => row(b, s.code, b.name)),
+      row(s, s.code, "total"),
+    ),
+    section(
+      "TREE",
+      [...HEAD, ...CHURN],
+      branch(s.tree, s.code),
+      row(s, s.code, "total", churn(s.tree)),
+    ),
     `\nCONTRIBUTORS (top ${shown.length})`,
     table(
       shown.map((c) => [
@@ -113,7 +126,7 @@ function report(s: Stats): string {
         pct(c.commits, s.commits),
         `+${big(c.insertions)}`,
         `-${big(c.deletions)}`,
-        pct(c.insertions + c.deletions, churn),
+        pct(c.insertions + c.deletions, moved),
         `${num(c.files)}f`,
         `${day(c.first)}..${day(c.last)}`,
       ]),
