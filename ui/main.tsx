@@ -87,7 +87,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               {/* folder name is the repo name */}
               <button
                 onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
-                className="hover:text-muted-foreground cursor-pointer truncate text-lg font-semibold"
+                className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
               >
                 {stats.repo.split("/").filter(Boolean).pop()}
               </button>
@@ -103,7 +103,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                 )
               }
               title="Copy the path"
-              className="text-muted-foreground hover:text-foreground max-w-full cursor-pointer truncate text-left font-mono text-xs"
+              className="text-muted-foreground hover:text-foreground w-fit max-w-full cursor-pointer truncate text-left font-mono text-xs"
             >
               {stats.repo}
             </button>

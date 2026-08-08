@@ -1,7 +1,7 @@
 // owner: finn
 // goal: git log to churn
 
-import { LOG_MAX, git } from "./model.ts"
+import { COMMIT_MAX, LOG_MAX, git } from "./model.ts"
 import type { Churn, Commit, Contributor, Series } from "./model.ts"
 
 // -M writes renames as a{b => c}d or b => c
@@ -17,6 +17,9 @@ function target(path: string): string {
 }
 
 const DAY = 86_400_000
+
+// before git existed, so older means a broken clock
+const EARLIEST = 631_152_000
 
 // every day first to last, the axis the series uses
 function days(first: string, last: string): string[] {
@@ -40,12 +43,139 @@ function spread(byDay: Map<string, number[]>, first: string, last: string): Seri
   }))
 }
 
+export interface Parsed {
+  hash: string
+  parents: string[]
+  name: string
+  email: string
+  date: string
+  refs: string
+  subject: string
+  files: { ins: number; del: number; path: string }[]
+}
+
+const FORMAT = "--pretty=format:%x01%h%x1f%p%x1f%aN%x1f%aE%x1f%aI%x1f%D%x1f%s"
+
+function* parse(log: string): Generator<Parsed> {
+  for (const chunk of log.split("\x01")) {
+    if (!chunk.trim()) continue
+    const [header, ...rest] = chunk.split("\n")
+    const [hash, parents, name, email, date, refs, subject] = header.split("\x1f")
+    if (!name) continue
+    const files = []
+    for (const line of rest) {
+      if (!line) continue
+      const [added, deleted, raw] = line.split("\t")
+      if (raw === undefined) continue
+      files.push({ ins: Number(added) || 0, del: Number(deleted) || 0, path: target(raw) })
+    }
+    yield {
+      hash,
+      parents: parents ? parents.split(" ").filter(Boolean) : [],
+      name,
+      email,
+      date,
+      refs: refs ?? "",
+      subject: subject ?? "",
+      files,
+    }
+  }
+}
+
+// older commits, to walk back without reading everything
+export function page(repo: string, skip: number, count: number, names: string[]): Commit[] {
+  const log = git(repo, "log", "-M", `--skip=${skip}`, `-n${count}`, "--numstat", FORMAT)
+  const seat = new Map(names.map((n, i) => [n, i]))
+  return [...parse(log)].map((c) => ({
+    hash: c.hash,
+    parents: c.parents,
+    insertions: c.files.reduce((a, f) => a + f.ins, 0),
+    deletions: c.files.reduce((a, f) => a + f.del, 0),
+    who: seat.get((c.email || c.name).toLowerCase()) ?? -1,
+    date: c.date,
+    refs: c.refs,
+    subject: c.subject,
+  }))
+}
+
+export interface Timeline {
+  total: number
+  first: string
+  last: string
+  commits: number[]
+  devs: number[]
+  /** even points, for measuring size across history */
+  samples: { hash: string; date: string }[]
+}
+
+const SAMPLES = 80
+
+// every commit, dates and authors only. no diff, so fifteen seconds not twenty minutes
+export function timeline(repo: string): Timeline {
+  const log = git(repo, "log", "--format=%at%x1f%aE%x1f%h")
+  const byDay = new Map<string, Set<string>>()
+  const counts = new Map<string, number>()
+  let total = 0
+  let min = Infinity
+  let max = -Infinity
+  const picked: { hash: string; date: string }[] = []
+
+  for (const line of log.split("\n")) {
+    if (!line) continue
+    const [at, email, hash] = line.split("\x1f")
+    const seconds = Number(at)
+    if (!seconds) continue
+    total++
+    // some committer clocks said 1970, some said 2085
+    if (seconds < EARLIEST || seconds > Date.now() / 1000 + DAY / 1000) continue
+    min = Math.min(min, seconds)
+    max = Math.max(max, seconds)
+    const stamp = new Date(seconds * 1000).toISOString().slice(0, 10)
+    counts.set(stamp, (counts.get(stamp) ?? 0) + 1)
+    picked.push({ hash, date: stamp })
+    const who = byDay.get(stamp) ?? new Set<string>()
+    who.add((email ?? "").toLowerCase())
+    byDay.set(stamp, who)
+  }
+
+  const first = new Date(min * 1000).toISOString().slice(0, 10)
+  const last = new Date(max * 1000).toISOString().slice(0, 10)
+  const commits: number[] = []
+  const devs: number[] = []
+  for (let t = Date.parse(first); t <= Date.parse(last); t += DAY) {
+    const stamp = new Date(t).toISOString().slice(0, 10)
+    commits.push(counts.get(stamp) ?? 0)
+    devs.push(byDay.get(stamp)?.size ?? 0)
+  }
+  // log is newest first, so reverse then thin
+  picked.reverse()
+  const step = Math.max(1, Math.floor(picked.length / SAMPLES))
+  const samples = picked.filter((_, i) => i % step === 0 || i === picked.length - 1)
+
+  return { total, first, last, commits, devs, samples }
+}
+
+// bytes at one commit, from the tree, a walk is a quarter second
+export const bytesAt = (repo: string, hash: string): number => {
+  let total = 0
+  for (const line of git(repo, "ls-tree", "-r", "--long", hash).split("\n")) {
+    const size = Number(line.split(/\s+/)[3])
+    if (size) total += size
+  }
+  return total
+}
+
+// the true total behind a capped read, slow, ask once
+export const count = (repo: string): number =>
+  Number(git(repo, "rev-list", "--count", "HEAD").trim()) || 0
+
 // authors, output, loc, ...
-export function history(repo: string) {
+export function history(repo: string, cap = COMMIT_MAX) {
   const log = git(
     repo,
     "log",
     "-M",
+    `-n${cap}`,
     "--numstat",
     "--pretty=format:%x01%h%x1f%p%x1f%aN%x1f%aE%x1f%aI%x1f%D%x1f%s",
   )
@@ -149,6 +279,7 @@ export function history(repo: string) {
 
   return {
     commits,
+    truncated: commits >= cap,
     contributors,
     log: history,
     active,

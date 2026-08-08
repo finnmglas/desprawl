@@ -4,6 +4,7 @@
 import { transform } from "../components/chart.tsx"
 import type { Curve } from "./display.tsx"
 import { spans, type Grain } from "./format.ts"
+import type { Timeline } from "../../src/history.ts"
 import type { Stats } from "../../src/model.ts"
 
 export interface Spec {
@@ -53,6 +54,13 @@ export const SERIES: Record<string, Spec> = {
     how: "last",
     about: "insertions minus deletions accumulated, a growth curve rather than a true size",
   },
+  size: {
+    label: "git_byte_size",
+    color: "#14b8a6",
+    group: "size",
+    how: "last",
+    about: "bytes git tracks, measured at points across all of history rather than accumulated",
+  },
   devs: {
     label: "devs",
     color: "#f97316",
@@ -72,6 +80,7 @@ export const GROUPS: { key: string; label: string; series: string[]; about: stri
     about: "lines added and removed, sharing one scale so the balance is honest",
   },
   { key: "lines", label: "net lines", series: ["lines"], about: SERIES.lines.about },
+  { key: "size", label: "git_byte_size", series: ["size"], about: SERIES.size.about },
   { key: "devs", label: "devs", series: ["devs"], about: SERIES.devs.about },
 ]
 
@@ -96,46 +105,81 @@ function daily(stats: Stats, key: string): number[] {
   return at("commits")
 }
 
-export function rows(stats: Stats, picked: string[], grain: Grain, curve: Curve): Row[] {
+const DAY = 86_400_000
+
+// windowed series stay undefined outside their window, a gap rather than a false zero
+export function rows(
+  stats: Stats,
+  picked: string[],
+  grain: Grain,
+  curve: Curve,
+  all?: Timeline | null,
+  sizes?: { date: string; bytes: number }[],
+): Row[] {
   const commits = stats.series.find((s) => s.metric === "commits")
   if (!commits || !picked.length) return []
 
-  const groups = spans(commits.data.length, commits.start, grain)
+  // span all history only when something shown covers it
+  const wide = picked.some((k) => k === "commits" || k === "devs" || k === "size")
+  const spanning = all && wide ? all : null
+  const first = spanning ? spanning.first : commits.start
+  const length = spanning ? spanning.commits.length : commits.data.length
+  // where the analysed window begins on the axis
+  const offset = Math.round((Date.parse(commits.start) - Date.parse(first)) / DAY)
+  const groups = spans(length, first, grain)
   // magnitudes differ, so each group is drawn against its own peak
   const share = new Set(picked.map((k) => SERIES[k].group)).size > 1
 
-  const raw: Record<string, number[]> = {}
+  const raw: Record<string, (number | undefined)[]> = {}
   for (const key of picked) {
-    const data = daily(stats, key)
+    // commits and devs from all history when known, the rest from the window
+    // sparse readings, carried forward
+    if (key === "size") {
+      const filled: (number | undefined)[] = new Array(length).fill(undefined)
+      for (const s of sizes ?? []) {
+        const i = Math.round((Date.parse(s.date) - Date.parse(first)) / DAY)
+        if (i >= 0 && i < length) filled[i] = s.bytes
+      }
+      let carried: number | undefined
+      for (let i = 0; i < length; i++) filled[i] = carried = filled[i] ?? carried
+      raw[key] = groups.map(({ days }) => filled[days[days.length - 1]])
+      continue
+    }
+
+    const full = spanning && (key === "commits" || key === "devs")
+    const data = full ? (key === "commits" ? spanning.commits : spanning.devs) : daily(stats, key)
+    const shift = full ? 0 : offset
+    const at = (i: number) => (i - shift >= 0 ? data[i - shift] : undefined)
+
     raw[key] = groups.map(({ days }) => {
-      if (SERIES[key].how === "last") return Math.max(0, data[days[days.length - 1]] ?? 0)
-      if (SERIES[key].how === "distinct") {
+      const known = days.filter((i) => at(i) !== undefined)
+      if (!known.length) return undefined
+      if (SERIES[key].how === "last") return Math.max(0, at(known[known.length - 1]) ?? 0)
+      if (SERIES[key].how === "distinct" && !full) {
         const seen = new Set<number>()
-        for (const i of days) for (const who of stats.active[i] ?? []) seen.add(who)
+        for (const i of known) for (const who of stats.active[i - shift] ?? []) seen.add(who)
         return seen.size
       }
-      return days.reduce((a, i) => a + (data[i] ?? 0), 0)
+      return known.reduce((a, i) => a + (at(i) ?? 0), 0)
     })
   }
 
-  // one peak per group, so added and removed keep their ratio
   const peaks: Record<string, number> = {}
   for (const key of picked) {
     const group = SERIES[key].group
-    peaks[group] = Math.max(peaks[group] ?? 1, ...raw[key])
+    peaks[group] = Math.max(peaks[group] ?? 1, ...raw[key].map((v) => v ?? 0))
   }
 
   return groups.map(({ day }, i) => {
     const row: Row = { day }
     for (const key of picked) {
       const value = raw[key][i]
-      // normalise in the curve's space, or log does nothing here
+      if (value === undefined) continue // a gap, not a zero
       const peak = peaks[SERIES[key].group]
       const scaled = share
         ? (transform(value, curve) / (transform(peak, curve) || 1)) * 100
         : transform(value, curve)
       row[key] = SERIES[key].down ? -scaled : scaled
-      // the tooltip always tells the truth, whatever the axis is doing
       row[`${key}_raw`] = SERIES[key].down ? -value : value
     }
     return row

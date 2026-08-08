@@ -1,7 +1,7 @@
 // owner: finn
 // goal: commit list with the branch rails drawn beside it
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Avatar } from "../components/avatar.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
@@ -13,6 +13,7 @@ import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num } from "../lib/format.ts"
+import { isLive, olderCommits, trueCount } from "../lib/live.ts"
 import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
@@ -52,6 +53,8 @@ const HEADS: { key: string; right?: boolean }[] = [
   { key: "date", right: true },
   { key: "hash", right: true },
 ]
+
+const PAGE = 200
 
 const ROW = 34
 const GAP = 14
@@ -124,10 +127,31 @@ export function Graph({
   const { curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
   const [filter, setFilter] = useState("")
+  const [limit, setLimit] = useState(PAGE)
+  const [extra, setExtra] = useState<Commit[]>([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(stats.commits)
+
+  // slow to count, so it lands after paint
+  useEffect(() => {
+    if (stats.truncated) void trueCount().then((n) => n && setTotal(n))
+  }, [stats.truncated])
+
+  const log = useMemo(() => [...stats.log, ...extra], [stats.log, extra])
+
+  const more = async () => {
+    if (limit < log.length) return setLimit(limit + PAGE * 2)
+    if (!isLive()) return
+    setLoading(true)
+    const older = await olderCommits(log.length, PAGE * 2)
+    setExtra((prev) => [...prev, ...older])
+    setLimit(limit + PAGE * 2)
+    setLoading(false)
+  }
 
   const numbered = useMemo<Numbered[]>(
-    () => stats.log.map((c, i) => ({ ...c, n: stats.commits - i })),
-    [stats],
+    () => log.map((c, i) => ({ ...c, n: total - i })),
+    [log, total],
   )
 
   const shown = useMemo(() => {
@@ -145,8 +169,9 @@ export function Graph({
   }, [numbered, filter, sort])
 
   const railed = !sort && !filter
-  const rows = useMemo(() => (railed ? place(shown) : []), [shown, railed])
-  const peak = Math.max(1, ...stats.log.map((c) => c.insertions + c.deletions))
+  const paged = useMemo(() => shown.slice(0, limit), [shown, limit])
+  const rows = useMemo(() => (railed ? place(paged) : []), [paged, railed])
+  const peak = Math.max(1, ...log.map((c) => c.insertions + c.deletions))
   const lanes = railed
     ? Math.max(
         1,
@@ -163,9 +188,10 @@ export function Graph({
             <CardTitle>History</CardTitle>
             <span className="text-muted-foreground text-xs">
               {shown.length !== stats.log.length && `${shown.length} of `}
-              {stats.log.length < stats.commits
-                ? `latest ${stats.log.length} of ${num(stats.commits)} commits`
-                : `all ${num(stats.commits)} commits`}
+              {log.length < total
+                ? `latest ${num(log.length)} of ${num(total)}`
+                : `all ${num(total)}`}{" "}
+              commits
               {!railed && " · sorted, so the branch rails are hidden"}
             </span>
           </div>
@@ -262,7 +288,7 @@ export function Graph({
             )}
 
             <div className="min-w-0 flex-1">
-              {shown.map((commit) => (
+              {paged.map((commit) => (
                 <div
                   key={commit.hash}
                   style={{ height: ROW, gridTemplateColumns: COLS }}
@@ -326,6 +352,14 @@ export function Graph({
               ))}
             </div>
           </div>
+          {(limit < shown.length || (isLive() && log.length < total)) && (
+            <button
+              onClick={() => void more()}
+              className="hover:bg-muted/50 text-muted-foreground w-full cursor-pointer py-2 text-center text-xs"
+            >
+              {loading ? "loading…" : `show more, ${num(Math.max(0, total - limit))} left`}
+            </button>
+          )}
         </CardContent>
       </Card>
 

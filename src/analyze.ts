@@ -35,14 +35,16 @@ function remotes(repo: string): Remote[] {
   return [...found.values()]
 }
 
-export function analyze(repo: string): Stats {
+export function analyze(repo: string, cap?: number): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
   const files = scan(root)
-  const { byPath, ...hist } = history(root)
+  const { byPath, ...hist } = history(root, cap)
   for (const f of files) Object.assign(f, byPath.get(f.path))
 
   const tree = grow(files)
+  // a file's langs is redundant once the parents have aggregated
+  for (const f of files) f.langs = {}
   // commits and last would clobber the repo-wide pair
   const { name, path, lang, children, commits, last, ...totals } = tree
   return {

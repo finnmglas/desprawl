@@ -1,7 +1,7 @@
 // owner: finn
 // goal: show data
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts"
 import { Avatar } from "../components/avatar.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
@@ -18,6 +18,8 @@ import { Onward } from "../components/onward.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, churn, day, defaultGrain, nest, num, pct, plural, tokens } from "../lib/format.ts"
+import { allTime, sizeCurve, type Sample } from "../lib/live.ts"
+import type { Timeline } from "../../src/history.ts"
 import { ADDED, GROUPS, REMOVED, SERIES, expand, rows } from "../lib/series.ts"
 import type { Grain } from "../lib/format.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
@@ -81,10 +83,30 @@ export function Overview({
 }) {
   const { curve } = useDisplay()
   const [grain, setGrain] = useState<Grain>(() => defaultGrain(stats.first, stats.last))
+  const [grained, setGrained] = useState(false)
+  const [all, setAll] = useState<Timeline | null>(null)
+  const [sizes, setSizes] = useState<Sample[]>([])
+  const [sizing, setSizing] = useState(false)
+  // a second pass, so it lands after paint
+  useEffect(() => {
+    if (stats.truncated) void allTime().then(setAll)
+  }, [stats.truncated])
+  const total = all?.total ?? stats.commits
   // the pair that shows how a repo grew
   const [picked, setPicked] = useState<string[]>(["changes", "lines"])
   const series = expand(picked)
-  const days = useMemo(() => rows(stats, series, grain, curve), [stats, picked, grain, curve])
+  // the old default is too fine once the span is known
+  useEffect(() => {
+    if (all && !grained) {
+      setGrain(defaultGrain(all.first, all.last))
+      setGrained(true)
+    }
+  }, [all, grained])
+
+  const days = useMemo(
+    () => rows(stats, series, grain, curve, all),
+    [stats, picked, grain, curve, all],
+  )
   const config = Object.fromEntries(series.map((k) => [k, SERIES[k]]))
   const share = picked.length > 1
   const sparse = days.length <= 14
@@ -117,8 +139,10 @@ export function Overview({
           },
           {
             label: "Commits",
-            value: num(stats.commits),
-            sub: `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
+            value: num(total),
+            sub: stats.truncated
+              ? `${plural(stats.contributors.length, "dev")} in the latest ${num(stats.commits)}`
+              : `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
             to: "History",
           },
         ].map((card) => (
@@ -144,9 +168,15 @@ export function Overview({
           <div className="flex min-w-0 flex-col gap-0.5">
             <CardTitle>Over time</CardTitle>
             <span className="text-muted-foreground text-xs">
-              {share
-                ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
-                : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
+              {sizing
+                ? "measuring the size at points across history…"
+                : all &&
+                    picked.some((k) => k === "commits" || k === "devs") &&
+                    picked.some((k) => k !== "commits" && k !== "devs")
+                  ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
+                  : share
+                    ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
+                    : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")}
             </span>
           </div>
           <div className="ml-auto flex flex-wrap items-center gap-2">

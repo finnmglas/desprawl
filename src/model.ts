@@ -36,6 +36,8 @@ export interface Node extends Bucket, Churn {
   path: string
   lang?: string
   children?: Node[] // null on files
+  /** files left out of a served tree, fetched when opened */
+  leaves?: number
 }
 
 // granular time series
@@ -60,7 +62,10 @@ export interface Commit {
   subject: string
 }
 
-export const LOG_MAX = 5000
+export const LOG_MAX = 10000
+
+// ex. a full linux kernel log is twenty minutes, so history is read newest first up to here
+export const COMMIT_MAX = 20000
 
 export interface Remote {
   name: string
@@ -85,6 +90,8 @@ export interface Stats extends Split {
   repo: string
   head: string
   commits: number
+  /** True when more commits exist than were read, so churn covers a window */
+  truncated: boolean
   contributors: Contributor[]
   log: Commit[]
   /** Per day, the contributor indices who committed */

@@ -23,7 +23,7 @@ export function RemoteLink({ remote }: { remote: Remote }) {
       title={`${remote.name}: ${remote.url}`}
       className="text-muted-foreground hover:text-foreground transition-colors"
     >
-      <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
+      <svg viewBox="0 0 24 24" className="size-5" fill="currentColor">
         {marks[remote.host]}
       </svg>
     </a>
