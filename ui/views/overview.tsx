@@ -241,6 +241,7 @@ export function Overview({
         columns={LANGS}
         rows={stats.languages}
         id={(l) => l.name}
+        fold={8}
         onRowClick={(l) => onLang(l.name)}
         total={{ ...stats.tree, name: "total" }}
       />
@@ -251,6 +252,7 @@ export function Overview({
         columns={people(stats.commits, moved, faces)}
         rows={stats.contributors}
         id={(p) => p.email}
+        fold={8}
       />
 
       <Onward stats={stats} current="Overview" onTab={onTab} />

@@ -40,6 +40,8 @@ export interface DataTableProps<T> {
   className?: string
   /** Total row pinned to the bottom. */
   total?: T
+  /** Show this many rows, the rest behind a toggle above the total. */
+  fold?: number
 }
 
 export function DataTable<T>({
@@ -53,9 +55,11 @@ export function DataTable<T>({
   children,
   className,
   total,
+  fold,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
+  const [open, setOpen] = useState(false)
 
   const sums = useMemo(() => {
     const found: Record<string, number> = {}
@@ -109,6 +113,11 @@ export function DataTable<T>({
     }
     return found
   }, [columns, rows, scale])
+
+  // the fold hides rows from the eye only, peaks, sums and the export still see them all
+  const foldable = fold !== undefined && sorted.length > fold
+  const shown = foldable && !open ? sorted.slice(0, fold) : sorted
+  const hidden = foldable ? sorted.length - fold : 0
 
   const matrix = () => [
     columns.map((c) => c.label),
@@ -169,7 +178,7 @@ export function DataTable<T>({
             </TR>
           </THead>
           <TBody>
-            {sorted.map((row) => (
+            {shown.map((row) => (
               <TR
                 key={id(row)}
                 onClick={() => onRowClick?.(row)}
@@ -198,6 +207,13 @@ export function DataTable<T>({
                 })}
               </TR>
             ))}
+            {foldable && (
+              <TR className="hover:bg-muted/50" onClick={() => setOpen(!open)}>
+                <TD colSpan={columns.length} className="text-muted-foreground cursor-pointer">
+                  {open ? "show fewer" : `show ${hidden} more`}
+                </TD>
+              </TR>
+            )}
             {total && (
               <TR className="bg-muted/40 font-medium">
                 {columns.map((col) => (
