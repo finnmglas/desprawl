@@ -4,15 +4,37 @@
   "description": "Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.",
   "license": "MIT",
   "type": "module",
-  "bin": { "desprawl": "src/cli.ts" },
-  "files": ["src"],
-  "engines": { "node": ">=22.18" },
+  "bin": {
+    "desprawl": "src/cli.ts"
+  },
+  "files": [
+    "src",
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
-    "check": "tsc --noEmit",
-    "desprawl": "node src/cli.ts"
+    "check": "tsc --noEmit && tsc -p ui --noEmit",
+    "desprawl": "node src/cli.ts",
+    "ui": "vite --config ui/vite.config.ts",
+    "build": "vite build --config ui/vite.config.ts",
+    "prepack": "pnpm build"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "typescript": "^5.9.2"
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "5.2.0",
+    "clsx": "2.1.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "recharts": "2.15.4",
+    "tailwind-merge": "3.6.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vite-plugin-singlefile": "2.3.3"
   }
 }

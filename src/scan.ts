@@ -82,9 +82,10 @@ export function scan(repo: string): Node[] {
 
     const lang = LANGS[ext] ?? ext
     const text = buf.toString("utf8")
+    const split = classify(text, lang)
     files.push({
       ...blank(path.slice(slash + 1), path), lang, files: 1, chars: text.length,
-      ...classify(text, lang),
+      ...split, langs: { [lang]: split.code },
     })
   }
   return files

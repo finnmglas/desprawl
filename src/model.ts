@@ -14,6 +14,7 @@ export interface Bucket extends Split {
   name: string
   files: number
   chars: number
+  langs: Record<string, number> // loc per language in this subtree
 }
 
 export interface Churn {
@@ -39,6 +40,18 @@ export interface Series {
   data: number[]
 }
 
+// newest first, capped so a long history cannot bloat the report
+export interface Commit {
+  hash: string
+  parents: string[]
+  author: string
+  date: string
+  refs: string // branch and tag decorations
+  subject: string
+}
+
+export const LOG_MAX = 500
+
 export interface Contributor {
   name: string
   email: string
@@ -55,7 +68,8 @@ export interface Stats extends Split {
   head: string
   commits: number
   contributors: Contributor[]
-  languages: Bucket[]
+  log: Commit[]
+  languages: Node[] // folded, so they carry churn too
   tree: Node
   series: Series[]
   files: number
@@ -74,7 +88,7 @@ export const git = (cwd: string, ...args: string[]): string =>
 
 export const blank = (name: string, path = ""): Node => ({
   name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
-  commits: 0, insertions: 0, deletions: 0, last: "",
+  commits: 0, insertions: 0, deletions: 0, last: "", langs: {},
 })
 
 export const merge = (into: Node, f: Node): void => {
@@ -88,11 +102,12 @@ export const merge = (into: Node, f: Node): void => {
   into.insertions += f.insertions
   into.deletions += f.deletions
   if (f.last > into.last) into.last = f.last
+  for (const [lang, loc] of Object.entries(f.langs)) into.langs[lang] = (into.langs[lang] ?? 0) + loc
 }
 
 export const rank = <T extends Bucket>(list: T[]): T[] => list.sort((a, b) => b.code - a.code)
 
-export function fold(files: Node[], key: (f: Node) => string): Bucket[] {
+export function fold(files: Node[], key: (f: Node) => string): Node[] {
   const by = new Map<string, Node>()
   for (const f of files) {
     const name = key(f)
