@@ -13,7 +13,7 @@ import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
 import { explain } from "./needs.ts"
-import { open, shell } from "./view.ts"
+import { shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
@@ -223,9 +223,8 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
       else reject(err)
     })
     server.listen(port, HOST, () => {
-      const live = `http://${HOST}:${(server.address() as { port: number }).port}/?t=${token}`
-      open(live)
-      resolve(live)
+      // the caller decides whether a browser opens, so a test can hold this url quietly
+      resolve(`http://${HOST}:${(server.address() as { port: number }).port}/?t=${token}`)
     })
   })
 }

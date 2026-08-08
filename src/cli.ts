@@ -10,7 +10,7 @@ import { blank, git, merge, tokens } from "./model.ts"
 import { explain, needs } from "./needs.ts"
 import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
-import { view } from "./view.ts"
+import { open, view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
@@ -190,12 +190,11 @@ try {
   git(target, "rev-parse", "HEAD")
 
   // live analyses per request, so it never needs the report up front
-  if (viewing && !values.static)
-    console.log(
-      "Interface is live, if it doesn't open, click the link:\n\n" +
-        (await serve(target, cap, values.keep)),
-    )
-  else {
+  if (viewing && !values.static) {
+    const live = await serve(target, cap, values.keep)
+    open(live)
+    console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
+  } else {
     const stats = analyze(target, cap)
     if (viewing) console.log(view(stats))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))

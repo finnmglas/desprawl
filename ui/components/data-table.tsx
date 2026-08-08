@@ -11,6 +11,7 @@ import { toast } from "./toast.tsx"
 import { delimit, download } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { backdrop, cycle, pct } from "../lib/format.ts"
+import { effective, shares } from "../lib/scale.ts"
 import { useDisplay } from "../lib/display.tsx"
 import type { Sort } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
@@ -80,24 +81,15 @@ export function DataTable<T>({
     return found
   }, [columns, rows])
 
-  /** True when the scale turns this column into a share */
-  const shares = (col: Column<T>): boolean =>
-    !!col.num && (scale === "repo" || (scale === "row" && !!col.ofRow))
-
-  /** What the cell means now, sorting and bars read it too */
-  const effective = (col: Column<T>, row: T): number | string => {
-    const value = col.get(row)
-    if (typeof value !== "number" || !shares(col)) return value
-    const over = scale === "repo" ? (sums[col.key] ?? 0) : (col.ofRow?.(row) ?? 0)
-    return over ? value / over : 0
-  }
+  const share = (col: Column<T>) => shares(col, scale)
+  const value = (col: Column<T>, row: T) => effective(col, row, scale, sums)
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const col = columns.find((c) => c.key === sort.key)
     if (!col) return rows
     return [...rows].sort((a, b) => {
-      const [x, y] = [effective(col, a), effective(col, b)]
+      const [x, y] = [value(col, a), value(col, b)]
       const cmp =
         typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
@@ -111,7 +103,7 @@ export function DataTable<T>({
       if (!col.num || col.flat) continue
       let peak = 0
       for (const row of rows) {
-        const value = effective(col, row)
+        const cell = value(col, row)
         if (typeof value === "number" && value > peak) peak = value
       }
       found[col.key] = peak
@@ -126,7 +118,7 @@ export function DataTable<T>({
 
   const matrix = () => [
     columns.map((c) => c.label),
-    ...sorted.map((row) => columns.map((c) => effective(c, row))),
+    ...sorted.map((row) => columns.map((c) => value(c, row))),
   ]
   const slug = title.toLowerCase().replace(/\W+/g, "-")
 
@@ -186,22 +178,22 @@ export function DataTable<T>({
                 className={cn(onRowClick && "cursor-pointer")}
               >
                 {columns.map((col) => {
-                  const value = effective(col, row)
+                  const cell = value(col, row)
                   return (
                     <TD
                       key={col.key}
                       num={col.num}
                       style={
-                        typeof value === "number"
-                          ? backdrop(value, peaks[col.key], "var(--chart-2)", curve)
+                        typeof cell === "number"
+                          ? backdrop(cell, peaks[col.key], "var(--chart-2)", curve)
                           : undefined
                       }
                     >
-                      {shares(col) && typeof value === "number"
-                        ? pct(value, 1)
+                      {share(col) && typeof cell === "number"
+                        ? pct(cell, 1)
                         : col.cell
                           ? col.cell(row)
-                          : value}
+                          : cell}
                     </TD>
                   )
                 })}
@@ -218,7 +210,7 @@ export function DataTable<T>({
               <TR className="bg-muted/40 font-medium">
                 {columns.map((col) => (
                   <TD key={col.key} num={col.num}>
-                    {shares(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
+                    {share(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
                   </TD>
                 ))}
               </TR>
