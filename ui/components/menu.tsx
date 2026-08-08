@@ -50,7 +50,7 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
       {open && (
         <div
           onClick={() => setOpen(false)}
-          className="bg-card absolute right-0 z-40 mt-1 flex w-56 flex-col rounded-md border p-1 shadow-md"
+          className="bg-card absolute right-0 z-40 mt-1 flex w-72 flex-col rounded-md border p-1 shadow-md"
         >
           {children}
         </div>

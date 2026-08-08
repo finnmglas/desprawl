@@ -3,7 +3,6 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { DisplayControls } from "./components/display-controls.tsx"
 import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
@@ -15,7 +14,7 @@ import { CHOICES, LABELS, setLocale, stored, type Choice } from "./lib/locale.ts
 import { locale } from "./lib/locale.ts"
 import { copy, download } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
-import { DisplayProvider, type Curve, type Scale } from "./lib/display.tsx"
+import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
 import { useView } from "./lib/hash.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
@@ -44,11 +43,6 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     go({ lang: picked, path: [], tab: "Explorer" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
-
-  // overview places it between the chart and the tables, per the layout
-  const controls = (
-    <DisplayControls scale={scale} curve={curve} setScale={setScale} setCurve={setCurve} />
-  )
 
   const share = async () =>
     toast(
@@ -94,8 +88,28 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                 export json
               </MenuItem>
               <div className="bg-border my-1 h-px" />
+              <MenuSection label="Number relation" hint={EXPLAIN[scale]}>
+                <Tabs
+                  grow
+                  tabs={SCALES}
+                  value={scale}
+                  onChange={(next) => setScale(next as Scale)}
+                />
+              </MenuSection>
+              <MenuSection
+                label="Bar scale"
+                hint={curve === "log" ? "small values stay visible" : "true proportions"}
+              >
+                <Tabs
+                  grow
+                  tabs={CURVES}
+                  value={curve}
+                  onChange={(next) => setCurve(next as Curve)}
+                />
+              </MenuSection>
               <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
                 <Tabs
+                  grow
                   tabs={CHOICES.map((c) => LABELS[c])}
                   value={LABELS[region]}
                   onChange={(next) => {
@@ -110,23 +124,17 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         </header>
 
         {tab === "History" ? (
-          <>
-            {controls}
-            <Graph stats={stats} />
-          </>
+          <Graph stats={stats} />
         ) : tab === "Overview" ? (
-          <Overview stats={stats} onLang={explore} controls={controls} />
+          <Overview stats={stats} onLang={explore} />
         ) : (
-          <>
-            {controls}
-            <Explorer
-              stats={stats}
-              path={path}
-              setPath={(next) => go({ path: next })}
-              lang={lang}
-              setLang={(next) => go({ lang: next })}
-            />
-          </>
+          <Explorer
+            stats={stats}
+            path={path}
+            setPath={(next) => go({ path: next })}
+            lang={lang}
+            setLang={(next) => go({ lang: next })}
+          />
         )}
       </div>
     </DisplayProvider>

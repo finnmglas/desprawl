@@ -60,15 +60,7 @@ const people = (commits: number, moved: number): Column<Contributor>[] => [
   { key: "last", label: "last", num: true, get: (p) => p.last, cell: (p) => day(p.last), flat: true },
 ]
 
-export function Overview({
-  stats,
-  onLang,
-  controls,
-}: {
-  stats: Stats
-  onLang: (lang: string) => void
-  controls?: React.ReactNode
-}) {
+export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: string) => void }) {
   const { curve } = useDisplay()
   const [grain, setGrain] = useState<Grain>("day")
   const commits = stats.series.find((s) => s.metric === "commits")
@@ -170,8 +162,6 @@ export function Overview({
           </ChartContainer>
         </CardContent>
       </Card>
-
-      {controls}
 
       <DataTable
         title="Languages"
