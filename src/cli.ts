@@ -5,6 +5,7 @@
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { blank, merge, tokens } from "./model.ts"
+import { serve } from "./serve.ts"
 import { view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
@@ -23,6 +24,7 @@ const { values, positionals } = (() => {
         digits: { type: "string", default: "3" },
         depth: { type: "string", default: "1" },
         raw: { type: "boolean", default: false },
+        static: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -33,7 +35,7 @@ const { values, positionals } = (() => {
 })()
 
 if (values.help) {
-  console.log("desprawl [view] [path] [--depth N] [--top N] [--digits N] [--raw] [--json]")
+  console.log("desprawl [view] [path] [--static] [--depth N] [--top N] [--digits N] [--raw] [--json]")
   process.exit(0)
 }
 
@@ -161,9 +163,13 @@ function report(s: Stats): string {
 }
 
 try {
-  const stats = analyze(target)
-  if (viewing) console.log(view(stats))
-  else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+  // live analyses per request, so it never needs the report up front
+  if (viewing && !values.static) console.log(await serve(target))
+  else {
+    const stats = analyze(target)
+    if (viewing) console.log(view(stats))
+    else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+  }
 } catch (err) {
   fail(err)
 }

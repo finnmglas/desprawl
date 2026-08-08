@@ -2,6 +2,7 @@
 // goal: mount, ui
 
 import { createRoot } from "react-dom/client"
+import { useEffect, useState } from "react"
 import { Button } from "./components/button.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
@@ -22,7 +23,7 @@ declare global {
 
 const TABS = ["Overview", "Explorer", "History"]
 
-function App({ stats }: { stats: Stats }) {
+function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
 
@@ -53,6 +54,11 @@ function App({ stats }: { stats: Stats }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {reload && (
+            <Button variant="outline" size="sm" onClick={reload}>
+              refresh
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={share}>
             share
           </Button>
@@ -83,17 +89,46 @@ function App({ stats }: { stats: Stats }) {
           setLang={(next) => go({ lang: next })}
         />
       )}
-      <Toaster />
     </div>
   )
 }
 
-const stats = window.__DESPRAWL__
-const root = createRoot(document.getElementById("root")!)
-root.render(
-  stats ? (
-    <App stats={stats} />
-  ) : (
-    <p className="text-muted-foreground p-6 text-sm">No stats inlined. Run `desprawl view`.</p>
-  ),
-)
+// inlined by `desprawl view`, fetched from `desprawl serve`, nothing otherwise
+function Root() {
+  const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
+  const [error, setError] = useState("")
+  const token = new URLSearchParams(location.search).get("t")
+  const live = !window.__DESPRAWL__ && !!token
+
+  const load = () => {
+    setError("")
+    fetch(`/api/stats?t=${token}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${r.status} ${r.statusText}`))))
+      .then((next: Stats) => {
+        setStats(next)
+        toast("Reanalysed", next.repo)
+      })
+      .catch((err: Error) => setError(err.message))
+  }
+
+  useEffect(() => {
+    if (live) load()
+  }, [])
+
+  if (error) return <p className="text-destructive p-6 text-sm">Could not load stats: {error}</p>
+  if (!stats) {
+    return (
+      <p className="text-muted-foreground p-6 text-sm">
+        {live ? "Analysing…" : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
+      </p>
+    )
+  }
+  return (
+    <>
+      <App stats={stats} reload={live ? load : undefined} />
+      <Toaster />
+    </>
+  )
+}
+
+createRoot(document.getElementById("root")!).render(<Root />)

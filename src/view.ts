@@ -9,18 +9,24 @@ import type { Stats } from "./model.ts"
 
 const OPEN: Record<string, string> = { darwin: "open", win32: "start" }
 
-export function view(stats: Stats): string {
+export function open(target: string): void {
+  const opener = OPEN[process.platform] ?? "xdg-open"
+  spawn(opener, [target], { detached: true, stdio: "ignore" }).unref()
+}
+
+export function shell(): string {
   const built = join(import.meta.dirname, "../dist/index.html")
   if (!existsSync(built)) throw new Error("no viewer built, run: pnpm build")
-  const shell = readFileSync(built, "utf8")
+  return readFileSync(built, "utf8")
+}
+
+export function view(stats: Stats): string {
   // < escaped so a path holding </script> cannot close the tag
   const data = JSON.stringify(stats).replaceAll("<", "\\u003c")
-  const html = shell.replace("</head>", `<script>window.__DESPRAWL__=${data}</script></head>`)
+  const html = shell().replace("</head>", `<script>window.__DESPRAWL__=${data}</script></head>`)
 
   const out = join(tmpdir(), `desprawl-${stats.head}.html`)
   writeFileSync(out, html)
-
-  const opener = OPEN[process.platform] ?? "xdg-open"
-  spawn(opener, [out], { detached: true, stdio: "ignore" }).unref()
+  open(out)
   return out
 }
