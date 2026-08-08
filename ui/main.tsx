@@ -27,7 +27,7 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Explorer", "History"]
+const TABS = ["Overview", "Files", "History"]
 
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
@@ -36,11 +36,15 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [curve, setCurve] = useState<Curve>("linear")
   const [region, setRegion] = useState<Choice>(stored)
   setSimple(scale === "simple") // before the tree below renders
+
+  useEffect(() => {
+    scrollTo({ top: 0 })
+  }, [tab])
   const themed = useTheme()
   useThemeHotkey(themed)
 
   const explore = (picked: string) => {
-    go({ lang: picked, path: [], tab: "Explorer" })
+    go({ lang: picked, path: [], tab: "Files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
 
@@ -124,12 +128,13 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         </header>
 
         {tab === "History" ? (
-          <Graph stats={stats} />
+          <Graph stats={stats} onTab={(next) => go({ tab: next })} />
         ) : tab === "Overview" ? (
-          <Overview stats={stats} onLang={explore} />
+          <Overview stats={stats} onLang={explore} onTab={(next) => go({ tab: next })} />
         ) : (
           <Explorer
             stats={stats}
+            onTab={(next) => go({ tab: next })}
             path={path}
             setPath={(next) => go({ path: next })}
             lang={lang}

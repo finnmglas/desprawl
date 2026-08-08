@@ -6,6 +6,7 @@ import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { Input } from "../components/input.tsx"
+import { Onward } from "../components/onward.tsx"
 import { toast } from "../components/toast.tsx"
 import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
@@ -108,7 +109,7 @@ function place(log: Commit[]): Placed[] {
 
 const x = (lane: number) => PAD + lane * GAP
 
-export function Graph({ stats }: { stats: Stats }) {
+export function Graph({ stats, onTab }: { stats: Stats; onTab: (tab: string) => void }) {
   const { curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
   const [filter, setFilter] = useState("")
@@ -142,168 +143,172 @@ export function Graph({ stats }: { stats: Stats }) {
   const width = railed ? PAD * 2 + lanes * GAP : 0
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center gap-2">
-        <div className="flex flex-col gap-0.5">
-          <CardTitle>History</CardTitle>
-          <span className="text-muted-foreground text-xs">
-            {shown.length !== stats.log.length && `${shown.length} of `}
-            {stats.log.length < stats.commits
-              ? `latest ${stats.log.length} of ${num(stats.commits)} commits`
-              : `all ${num(stats.commits)} commits`}
-            {!railed && " · sorted, so the branch rails are hidden"}
-          </span>
-        </div>
-        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
-          {!railed && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSort(null)
-                setFilter("")
-              }}
-            >
-              reset
-            </Button>
-          )}
-          <Input
-            className="w-full sm:w-52"
-            placeholder="filter subject, author, hash"
-            value={filter}
-            onChange={(e) => setFilter(e.currentTarget.value)}
-          />
-        </div>
-      </CardHeader>
-      <CardContent className="overflow-x-auto p-0 pt-2">
-        <div
-          style={{ paddingLeft: width, gridTemplateColumns: COLS }}
-          className="text-muted-foreground grid min-w-[52rem] gap-3 border-b pr-3 pb-1 text-xs"
-        >
-          {HEADS.map((head) => (
-            <button
-              key={head.key}
-              onClick={() => setSort(cycle(sort, head.key))}
-              className={cn(
-                "hover:text-foreground cursor-pointer truncate",
-                head.right ? "text-right" : "text-left",
-              )}
-            >
-              {head.key}
-              {sort?.key === head.key && (sort.asc ? " ↑" : " ↓")}
-            </button>
-          ))}
-        </div>
-        <div className="flex min-w-[52rem]">
-          {railed && (
-            <svg width={width} height={rows.length * ROW} className="shrink-0">
-              {rows.map((row, i) => {
-                const y = i * ROW + ROW / 2
-                return (
-                  <g key={row.commit.hash} strokeWidth={2} fill="none">
-                    {row.active.map((lane) => (
-                      <line
-                        key={lane}
-                        x1={x(lane)}
-                        y1={y - ROW / 2}
-                        x2={x(lane)}
-                        y2={y + ROW / 2}
-                        stroke={color(lane)}
-                      />
-                    ))}
-
-                    {row.linked && (
-                      <line
-                        x1={x(row.lane)}
-                        y1={y - ROW / 2}
-                        x2={x(row.lane)}
-                        y2={y}
-                        stroke={color(row.lane)}
-                      />
-                    )}
-
-                    {row.edges.map((edge) => (
-                      <path
-                        key={`${edge.from}-${edge.to}`}
-                        d={
-                          edge.from === edge.to
-                            ? `M${x(edge.from)},${y} L${x(edge.to)},${y + ROW / 2}`
-                            : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 2}`
-                        }
-                        stroke={color(edge.to)}
-                      />
-                    ))}
-                    <circle
-                      cx={x(row.lane)}
-                      cy={y}
-                      r={row.commit.parents.length > 1 ? 4.5 : 3.5}
-                      fill={color(row.lane)}
-                      stroke="var(--background)"
-                    />
-                  </g>
-                )
-              })}
-            </svg>
-          )}
-
-          <div className="min-w-0 flex-1">
-            {shown.map((commit) => (
-              <div
-                key={commit.hash}
-                style={{ height: ROW, gridTemplateColumns: COLS }}
-                className="hover:bg-muted/50 grid items-center gap-3 pr-3 text-sm"
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader className="flex-row items-center gap-2">
+          <div className="flex flex-col gap-0.5">
+            <CardTitle>History</CardTitle>
+            <span className="text-muted-foreground text-xs">
+              {shown.length !== stats.log.length && `${shown.length} of `}
+              {stats.log.length < stats.commits
+                ? `latest ${stats.log.length} of ${num(stats.commits)} commits`
+                : `all ${num(stats.commits)} commits`}
+              {!railed && " · sorted, so the branch rails are hidden"}
+            </span>
+          </div>
+          <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
+            {!railed && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSort(null)
+                  setFilter("")
+                }}
               >
-                <span className="text-muted-foreground text-right text-xs tabular-nums">
-                  #{commit.n}
-                </span>
-
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate">{commit.subject}</span>
-                  {commit.refs &&
-                    commit.refs.split(", ").map((ref) => (
-                      <Badge
-                        key={ref}
-                        variant={ref.startsWith("HEAD") ? "default" : "secondary"}
-                        className="max-w-40 shrink-0 truncate"
-                      >
-                        {ref.replace("HEAD -> ", "")}
-                      </Badge>
-                    ))}
-                </span>
-                <span
-                  className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
-                  style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
-                >
-                  +{num(commit.insertions)}
-                </span>
-                <span
-                  className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
-                  style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
-                >
-                  -{num(commit.deletions)}
-                </span>
-                <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
-                <span className="text-muted-foreground text-right text-xs tabular-nums">
-                  {day(commit.date)}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn("justify-end px-0 font-mono text-xs")}
-                  onClick={async () =>
-                    toast(
-                      (await copy(commit.hash)) ? `Copied ${commit.hash}` : "Copy blocked",
-                      commit.subject,
-                    )
-                  }
-                >
-                  {commit.hash}
-                </Button>
-              </div>
+                reset
+              </Button>
+            )}
+            <Input
+              className="w-full sm:w-52"
+              placeholder="filter subject, author, hash"
+              value={filter}
+              onChange={(e) => setFilter(e.currentTarget.value)}
+            />
+          </div>
+        </CardHeader>
+        <CardContent className="overflow-x-auto p-0 pt-2">
+          <div
+            style={{ paddingLeft: width, gridTemplateColumns: COLS }}
+            className="text-muted-foreground grid min-w-[52rem] gap-3 border-b pr-3 pb-1 text-xs"
+          >
+            {HEADS.map((head) => (
+              <button
+                key={head.key}
+                onClick={() => setSort(cycle(sort, head.key))}
+                className={cn(
+                  "hover:text-foreground cursor-pointer truncate",
+                  head.right ? "text-right" : "text-left",
+                )}
+              >
+                {head.key}
+                {sort?.key === head.key && (sort.asc ? " ↑" : " ↓")}
+              </button>
             ))}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <div className="flex min-w-[52rem]">
+            {railed && (
+              <svg width={width} height={rows.length * ROW} className="shrink-0">
+                {rows.map((row, i) => {
+                  const y = i * ROW + ROW / 2
+                  return (
+                    <g key={row.commit.hash} strokeWidth={2} fill="none">
+                      {row.active.map((lane) => (
+                        <line
+                          key={lane}
+                          x1={x(lane)}
+                          y1={y - ROW / 2}
+                          x2={x(lane)}
+                          y2={y + ROW / 2}
+                          stroke={color(lane)}
+                        />
+                      ))}
+
+                      {row.linked && (
+                        <line
+                          x1={x(row.lane)}
+                          y1={y - ROW / 2}
+                          x2={x(row.lane)}
+                          y2={y}
+                          stroke={color(row.lane)}
+                        />
+                      )}
+
+                      {row.edges.map((edge) => (
+                        <path
+                          key={`${edge.from}-${edge.to}`}
+                          d={
+                            edge.from === edge.to
+                              ? `M${x(edge.from)},${y} L${x(edge.to)},${y + ROW / 2}`
+                              : `M${x(edge.from)},${y} C${x(edge.from)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 4} ${x(edge.to)},${y + ROW / 2}`
+                          }
+                          stroke={color(edge.to)}
+                        />
+                      ))}
+                      <circle
+                        cx={x(row.lane)}
+                        cy={y}
+                        r={row.commit.parents.length > 1 ? 4.5 : 3.5}
+                        fill={color(row.lane)}
+                        stroke="var(--background)"
+                      />
+                    </g>
+                  )
+                })}
+              </svg>
+            )}
+
+            <div className="min-w-0 flex-1">
+              {shown.map((commit) => (
+                <div
+                  key={commit.hash}
+                  style={{ height: ROW, gridTemplateColumns: COLS }}
+                  className="hover:bg-muted/50 grid items-center gap-3 pr-3 text-sm"
+                >
+                  <span className="text-muted-foreground text-right text-xs tabular-nums">
+                    #{commit.n}
+                  </span>
+
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">{commit.subject}</span>
+                    {commit.refs &&
+                      commit.refs.split(", ").map((ref) => (
+                        <Badge
+                          key={ref}
+                          variant={ref.startsWith("HEAD") ? "default" : "secondary"}
+                          className="max-w-40 shrink-0 truncate"
+                        >
+                          {ref.replace("HEAD -> ", "")}
+                        </Badge>
+                      ))}
+                  </span>
+                  <span
+                    className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
+                    style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
+                  >
+                    +{num(commit.insertions)}
+                  </span>
+                  <span
+                    className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
+                    style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
+                  >
+                    -{num(commit.deletions)}
+                  </span>
+                  <span className="text-muted-foreground truncate text-xs">{commit.author}</span>
+                  <span className="text-muted-foreground text-right text-xs tabular-nums">
+                    {day(commit.date)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn("justify-end px-0 font-mono text-xs")}
+                    onClick={async () =>
+                      toast(
+                        (await copy(commit.hash)) ? `Copied ${commit.hash}` : "Copy blocked",
+                        commit.subject,
+                      )
+                    }
+                  >
+                    {commit.hash}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Onward stats={stats} current="History" onTab={onTab} />
+    </div>
   )
 }

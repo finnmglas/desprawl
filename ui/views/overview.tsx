@@ -14,9 +14,10 @@ import {
   untransform,
 } from "../components/chart.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
+import { Onward } from "../components/onward.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { useDisplay } from "../lib/display.tsx"
-import { GRAINS, bucket, churn, day, nest, num, pct, tokens } from "../lib/format.ts"
+import { GRAINS, bucket, churn, day, nest, num, pct, plural, tokens } from "../lib/format.ts"
 import type { Grain } from "../lib/format.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
 
@@ -60,7 +61,15 @@ const people = (commits: number, moved: number): Column<Contributor>[] => [
   { key: "last", label: "last", num: true, get: (p) => p.last, cell: (p) => day(p.last), flat: true },
 ]
 
-export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: string) => void }) {
+export function Overview({
+  stats,
+  onLang,
+  onTab,
+}: {
+  stats: Stats
+  onLang: (lang: string) => void
+  onTab: (tab: string) => void
+}) {
   const { curve } = useDisplay()
   const [grain, setGrain] = useState<Grain>("day")
   const commits = stats.series.find((s) => s.metric === "commits")
@@ -78,29 +87,50 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
   const sparse = days.length <= 14
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
-  const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
   const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {/* each card opens the tab that breaks it down */}
         {[
-          ["Lines of code", num(stats.code), `${num(stats.files)} files`],
-          ["Comments", num(stats.comment), `${pct(stats.comment, source)} of source`],
-          ["Tokens", `~${num(tokens(stats.chars))}`, `${num(stats.chars)} chars`],
-          [
-            "Commits",
-            num(stats.commits),
-            `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
-          ],
-        ].map(([label, value, sub]) => (
-          <Card key={label}>
+          {
+            label: "Lines of code",
+            value: num(stats.code),
+            sub: `${num(stats.files)} files`,
+            to: "Files",
+          },
+          {
+            label: "Comments",
+            value: num(stats.comment),
+            sub: `${pct(stats.comment, source)} of source`,
+            to: "Files",
+          },
+          {
+            label: "Tokens",
+            value: `~${num(tokens(stats.chars))}`,
+            sub: `${num(stats.chars)} chars`,
+            to: "Files",
+          },
+          {
+            label: "Commits",
+            value: num(stats.commits),
+            sub: `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
+            to: "History",
+          },
+        ].map((card) => (
+          <Card
+            key={card.label}
+            onClick={() => onTab(card.to)}
+            title={`Open ${card.to}`}
+            className="hover:border-ring cursor-pointer transition-colors"
+          >
             <CardHeader>
-              <CardTitle className="text-muted-foreground">{label}</CardTitle>
+              <CardTitle className="text-muted-foreground">{card.label}</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="text-2xl font-semibold tabular-nums">{value}</div>
-              <div className="text-muted-foreground text-xs">{sub}</div>
+              <div className="text-2xl font-semibold tabular-nums">{card.value}</div>
+              <div className="text-muted-foreground text-xs">{card.sub}</div>
             </CardContent>
           </Card>
         ))}
@@ -180,6 +210,8 @@ export function Overview({ stats, onLang }: { stats: Stats; onLang: (lang: strin
         rows={stats.contributors}
         id={(p) => p.email}
       />
+
+      <Onward stats={stats} current="Overview" onTab={onTab} />
     </div>
   )
 }

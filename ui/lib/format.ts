@@ -14,6 +14,8 @@ export const setSimple = (on: boolean) => {
 }
 
 export const num = (n: number) => (abbreviate ? human(n, 3) : n.toLocaleString(locale()))
+export const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
+
 export const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 // tables sort on the raw iso, this is only what the reader sees
 export const day = (iso: string) => {

@@ -7,6 +7,7 @@ import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
+import { Onward } from "../components/onward.tsx"
 import { toast } from "../components/toast.tsx"
 import { copy } from "../lib/export.ts"
 import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
@@ -21,13 +22,14 @@ const walk = (root: Node, path: string[]): Node =>
 
 export interface ExplorerProps {
   stats: Stats
+  onTab: (tab: string) => void
   path: string[]
   setPath: (path: string[]) => void
   lang: string
   setLang: (lang: string) => void
 }
 
-export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps) {
+export function Explorer({ stats, onTab, path, setPath, lang, setLang }: ExplorerProps) {
   const [filter, setFilter] = useState("")
 
   const here = useMemo(() => walk(stats.tree, path), [stats.tree, path])
@@ -149,6 +151,8 @@ export function Explorer({ stats, path, setPath, lang, setLang }: ExplorerProps)
           onSelect={setLang}
         />
       </div>
+
+      <Onward stats={stats} current="Files" onTab={onTab} />
     </div>
   )
 }
