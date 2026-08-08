@@ -3,6 +3,7 @@
 
 import { randomBytes } from "node:crypto"
 import { createServer } from "node:http"
+import type { ServerResponse } from "node:http"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
@@ -14,6 +15,10 @@ import { git } from "./model.ts"
 import { open, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
+
+// long enough for a reload, a sleeping laptop or a network blip to reconnect,
+// short enough that closing the tab feels like it ended the command
+const GRACE = 15_000
 
 // fixed port, one origin, so the browser keeps its storage
 const PORT = 7423
@@ -53,7 +58,11 @@ function prune(node: Node): Node {
 const find = (node: Node, path: string[]): Node | undefined =>
   path.reduce<Node | undefined>((at, part) => at?.children?.find((c) => c.name === part), node)
 
-export function serve(repo: string, cap?: number, port = PORT): Promise<string> {
+export function serve(repo: string, cap?: number, keep = false, port = PORT): Promise<string> {
+  // closing the last tab ends the run
+  const tabs = new Set<ServerResponse>()
+  let farewell: NodeJS.Timeout | undefined
+
   // hold it until the head moves or a refresh asks
   let cache: { head: string; stats: Stats } | null = null
   let total = 0
@@ -88,6 +97,29 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
       }
 
       if (url.pathname === "/") return send(200, html, "text/html")
+
+      // the browser holds this open for as long as the tab lives
+      if (url.pathname === "/api/session") {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-store",
+          connection: "keep-alive",
+        })
+        res.write(": open\n\n")
+        tabs.add(res)
+        clearTimeout(farewell)
+        req.on("close", () => {
+          tabs.delete(res)
+          if (keep || tabs.size) return
+          farewell = setTimeout(() => {
+            console.log(
+              "\n\nLast tab closed, so desprawl stopped. Pass --keep to leave it running.\n",
+            )
+            process.exit(0)
+          }, GRACE)
+        })
+        return
+      }
 
       // on disk, so a new port keeps them
       if (url.pathname === "/api/prefs") {
@@ -166,7 +198,8 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
 
     // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE" && port === PORT) serve(repo, cap, 0).then(resolve, reject)
+      if (err.code === "EADDRINUSE" && port === PORT)
+        serve(repo, cap, keep, 0).then(resolve, reject)
       else reject(err)
     })
     server.listen(port, HOST, () => {

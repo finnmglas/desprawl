@@ -19,6 +19,7 @@ import { num, setSimple } from "./lib/format.ts"
 import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
+import { attach } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
@@ -236,4 +237,5 @@ function Root() {
   )
 }
 
+attach() // the served run ends when this tab does
 createRoot(document.getElementById("root")!).render(<Root />)

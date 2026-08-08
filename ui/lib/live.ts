@@ -20,6 +20,14 @@ async function ask<T>(path: string, fallback: T): Promise<T> {
   }
 }
 
+/** holds a stream open, so the server sees the tab close */
+export function attach(): void {
+  // a static file has no server to tell, and must never try to reach one
+  if (!isLive()) return
+  // the browser drops this the moment the tab goes, and reopens it after a sleep
+  new EventSource(`/api/session?t=${token()}`)
+}
+
 export const filesIn = (path: string): Promise<Node[]> =>
   ask(`/api/files?path=${encodeURIComponent(path)}`, [])
 

@@ -29,6 +29,7 @@ const { values, positionals } = (() => {
         commits: { type: "string" },
         raw: { type: "boolean", default: false },
         static: { type: "boolean", default: false },
+        keep: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -40,7 +41,7 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [cli|view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    "desprawl [cli|view] [path] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
   )
   process.exit(0)
 }
@@ -164,7 +165,10 @@ function report(s: Stats): string {
 try {
   // live analyses per request, so it never needs the report up front
   if (viewing && !values.static)
-    console.log(await serve(target, values.commits ? Number(values.commits) : undefined))
+    console.log(
+      "Interface is live, if it doesn't open, click the link:\n\n" +
+        (await serve(target, values.commits ? Number(values.commits) : undefined, values.keep)),
+    )
   else {
     const stats = analyze(target, values.commits ? Number(values.commits) : undefined)
     if (viewing) console.log(view(stats))
