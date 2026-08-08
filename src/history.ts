@@ -18,6 +18,15 @@ function target(path: string): string {
 
 const DAY = 86_400_000
 
+/** Every day from first to last, the same dense axis the series uses. */
+function days(first: string, last: string): string[] {
+  const out: string[] = []
+  for (let t = Date.parse(first.slice(0, 10)); t <= Date.parse(last.slice(0, 10)); t += DAY) {
+    out.push(new Date(t).toISOString().slice(0, 10))
+  }
+  return out
+}
+
 function spread(byDay: Map<string, number[]>, first: string, last: string): Series[] {
   const [start, end] = [first.slice(0, 10), last.slice(0, 10)]
   const data: number[][] = [[], [], []]
@@ -43,6 +52,7 @@ export function history(repo: string) {
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
   const byPath = new Map<string, Churn>()
   const byDay = new Map<string, number[]>()
+  const whoByDay = new Map<string, Set<string>>()
   const history: Commit[] = []
   let commits = 0
   let first = ""
@@ -80,8 +90,12 @@ export function history(repo: string) {
     c.names.set(name, (c.names.get(name) ?? 0) + 1)
     c.first = date
 
-    const day = byDay.get(date.slice(0, 10)) ?? [0, 0, 0]
+    const stamp = date.slice(0, 10)
+    const day = byDay.get(stamp) ?? [0, 0, 0]
     day[0]++
+    const who = whoByDay.get(stamp) ?? new Set<string>()
+    who.add(key)
+    whoByDay.set(stamp, who)
     for (const line of rest) {
       if (!line) continue
       const [added, deleted, raw] = line.split("\t")
@@ -119,10 +133,17 @@ export function history(repo: string) {
     }))
     .sort((a, b) => b.commits - a.commits)
 
+  // indices only mean anything once contributors are in their final order
+  const order = new Map(contributors.map((c, i) => [(c.email || c.name).toLowerCase(), i]))
+  const active = days(first, last).map((stamp) =>
+    [...(whoByDay.get(stamp) ?? [])].map((key) => order.get(key) ?? 0),
+  )
+
   return {
     commits,
     contributors,
     log: history,
+    active,
     first,
     last,
     byPath,

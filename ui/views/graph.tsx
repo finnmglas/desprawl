@@ -12,6 +12,7 @@ import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num } from "../lib/format.ts"
+import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
 import type { Commit, Stats } from "../../src/model.ts"
@@ -273,14 +274,14 @@ export function Graph({ stats, onTab }: { stats: Stats; onTab: (tab: string) => 
                       ))}
                   </span>
                   <span
-                    className="text-chart-2 rounded-sm px-1 text-right text-xs tabular-nums"
-                    style={backdrop(commit.insertions, peak, "var(--chart-2)", curve)}
+                    className="rounded-sm px-1 text-right text-xs tabular-nums"
+                    style={{ color: ADDED, ...backdrop(commit.insertions, peak, ADDED, curve) }}
                   >
                     +{num(commit.insertions)}
                   </span>
                   <span
-                    className="text-destructive rounded-sm px-1 text-right text-xs tabular-nums"
-                    style={backdrop(commit.deletions, peak, "var(--destructive)", curve)}
+                    className="rounded-sm px-1 text-right text-xs tabular-nums"
+                    style={{ color: REMOVED, ...backdrop(commit.deletions, peak, REMOVED, curve) }}
                   >
                     -{num(commit.deletions)}
                   </span>

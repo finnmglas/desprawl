@@ -4,7 +4,7 @@
 
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
-import { locale } from "../lib/locale.ts"
+import { num } from "../lib/format.ts"
 import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 
@@ -84,7 +84,7 @@ export function ChartTooltipContent({
             {config[item.dataKey]?.label ?? item.dataKey}
           </span>
           <span className="ml-auto font-medium">
-            {untransform(item.value, curve).toLocaleString(locale())}
+            {num(item.payload?.[`${item.dataKey}_raw`] ?? untransform(item.value, curve))}
           </span>
         </div>
       ))}

@@ -67,6 +67,36 @@ function label(date: Date, grain: Grain): string {
   return monday.toISOString().slice(0, 10)
 }
 
+/** Day buckets on a young repo, months once the history is long. */
+export function defaultGrain(first: string, last: string): Grain {
+  const days = (Date.parse(last.slice(0, 10)) - Date.parse(first.slice(0, 10))) / DAY_MS + 1
+  if (days < 14) return "day"
+  if (days > 5 * 365) return "month"
+  return "week"
+}
+
+/** The day indices behind each bucket, so a metric can sum, take the last, or union them. */
+export function spans(
+  length: number,
+  start: string,
+  grain: Grain,
+): { day: string; days: number[] }[] {
+  const from = Date.parse(start)
+  const out: { day: string; days: number[] }[] = []
+  const seen = new Map<string, number>()
+  for (let i = 0; i < length; i++) {
+    const key = label(new Date(from + i * DAY_MS), grain)
+    const at = seen.get(key)
+    if (at === undefined) {
+      seen.set(key, out.length)
+      out.push({ day: key, days: [i] })
+    } else {
+      out[at].days.push(i)
+    }
+  }
+  return out
+}
+
 /** Sum a dense daily series into coarser buckets, order preserved. */
 export function bucket(data: number[], start: string, grain: Grain): [string, number][] {
   const from = Date.parse(start)

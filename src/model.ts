@@ -79,6 +79,8 @@ export interface Stats extends Split {
   commits: number
   contributors: Contributor[]
   log: Commit[]
+  /** Per day, the contributor indices who committed. Lets the ui count distinct devs per bucket. */
+  active: number[][]
   languages: Node[] // folded, so they carry churn too
   tree: Node
   series: Series[]
