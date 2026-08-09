@@ -38,7 +38,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
-  const { scale, curve } = prefs
+  const { scale, curve, brands } = prefs
   // one writer for every setting
   const change = (next: Partial<Prefs>) => {
     const merged = { ...prefs, ...next }
@@ -74,7 +74,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   }
 
   return (
-    <DisplayProvider value={{ scale, curve }}>
+    <DisplayProvider value={{ scale, curve, brands }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           {/* min-w-0 lets a long path truncate */}

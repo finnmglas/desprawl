@@ -1,7 +1,7 @@
 // owner: finn
 // goal: settings
 
-import type { Curve, Scale } from "./display.tsx"
+import type { Brands, Curve, Scale } from "./display.tsx"
 import type { Choice } from "./locale.ts"
 import type { Theme } from "./theme.tsx"
 
@@ -10,9 +10,16 @@ export interface Prefs {
   scale: Scale
   curve: Curve
   region: Choice
+  brands: Brands
 }
 
-export const FALLBACK: Prefs = { theme: "system", scale: "simple", curve: "linear", region: "auto" }
+export const FALLBACK: Prefs = {
+  theme: "system",
+  scale: "simple",
+  curve: "linear",
+  region: "auto",
+  brands: "on",
+}
 
 const KEY = "desprawl-prefs"
 const token = () => new URLSearchParams(location.search).get("t")

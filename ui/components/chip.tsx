@@ -5,14 +5,16 @@ import { Badge } from "./badge.tsx"
 import { Glyph } from "./mark.tsx"
 import { Tip } from "./tip.tsx"
 import { BRANDS } from "../lib/brands.ts"
+import { useDisplay } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 import { SITES } from "../lib/sites.ts"
 import { NOTES } from "../../src/notes.ts"
 
 /** "Next.js" and "Claude Code 658" both find the note, and the mark, for Claude Code */
 export function Chip({ label, from }: { label: string; from?: string }) {
+  const { brands } = useDisplay()
   const name = BRANDS[label] ? label : label.replace(/\s+\S+$/, "")
-  const brand = BRANDS[name]
+  const brand = brands === "on" && BRANDS[name]
   // the ink is picked for the brand colour, so the theme does not decide it.
   // the colour itself comes down a little on dark, where full saturation glares
   const paint = brand

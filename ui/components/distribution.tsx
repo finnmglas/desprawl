@@ -2,6 +2,7 @@
 // goal: language bar + pickable list
 
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { useDisplay } from "../lib/display.tsx"
 import { tint } from "../lib/tint.ts"
 import { num } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
@@ -16,6 +17,8 @@ export interface DistributionProps {
 }
 
 export function Distribution({ title, langs, selected, onSelect }: DistributionProps) {
+  const { brands } = useDisplay()
+  const paint = (lang: string) => (brands === "on" ? tint(lang) : "var(--muted-foreground)")
   const entries = Object.entries(langs).sort((a, b) => b[1] - a[1])
   const total = entries.reduce((sum, [, loc]) => sum + loc, 0)
 
@@ -34,7 +37,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
               className="cursor-pointer transition-opacity hover:opacity-80"
               style={{
                 width: `${(loc / (total || 1)) * 100}%`,
-                background: tint(lang),
+                background: paint(lang),
                 opacity: selected && selected !== lang ? 0.25 : 1,
               }}
             />
@@ -53,7 +56,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
               >
                 <span
                   className="size-2 shrink-0 rounded-[2px]"
-                  style={{ background: tint(lang) }}
+                  style={{ background: paint(lang) }}
                 />
                 <span className="truncate">{lang}</span>
                 <span className="text-muted-foreground ml-auto tabular-nums">{num(loc)}</span>

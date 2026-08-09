@@ -6,7 +6,15 @@ import { Tabs } from "./tabs.tsx"
 import { toast } from "./toast.tsx"
 import { copy, download } from "../lib/export.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../lib/locale.ts"
-import { CURVES, EXPLAIN, SCALES, type Curve, type Scale } from "../lib/display.tsx"
+import {
+  BRANDINGS,
+  CURVES,
+  EXPLAIN,
+  SCALES,
+  type Brands,
+  type Curve,
+  type Scale,
+} from "../lib/display.tsx"
 import { num } from "../lib/format.ts"
 import type { Prefs } from "../lib/prefs.ts"
 import type { Stats } from "../../src/model.ts"
@@ -43,7 +51,7 @@ export function Settings({
   change: (next: Partial<Prefs>) => void
   reload?: () => void
 }) {
-  const { scale, curve, region } = prefs
+  const { scale, curve, region, brands } = prefs
 
   const share = async () =>
     toast(
@@ -77,6 +85,13 @@ export function Settings({
         tabs={CURVES}
         value={curve}
         onChange={(next) => change({ curve: next as Curve })}
+      />
+      <Choice
+        label="Brand colours"
+        hint={brands === "on" ? "logos and their colours" : "colours that carry meaning only"}
+        tabs={BRANDINGS}
+        value={brands}
+        onChange={(next) => change({ brands: next as Brands })}
       />
       <Choice
         label="Numbers and dates"
