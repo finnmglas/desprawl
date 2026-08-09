@@ -96,7 +96,11 @@ function classify(text: string, lang: string): Split {
   const split: Split = { code: 0, comment: 0, blank: 0, indent: 0 }
   let inBlock = false
 
-  for (const raw of text.split("\n")) {
+  // a trailing newline ends the last line, it does not start a blank one
+  const lines = text ? text.split("\n") : []
+  if (lines.at(-1) === "") lines.pop()
+
+  for (const raw of lines) {
     const line = raw.trim()
     if (inBlock) {
       split.comment++

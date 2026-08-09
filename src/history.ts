@@ -5,6 +5,17 @@ import { COMMIT_MAX, LOG_MAX, git } from "./model.ts"
 import type { Churn, Commit, Contributor, Series } from "./model.ts"
 
 // -M writes renames as a{b => c}d or b => c
+const source = (path: string): string => {
+  const open = path.indexOf("{")
+  if (open === -1) {
+    const arrow = path.indexOf(" => ")
+    return arrow === -1 ? path : path.slice(0, arrow)
+  }
+  const close = path.indexOf("}", open)
+  const inner = path.slice(open + 1, close)
+  return path.slice(0, open) + inner.slice(0, inner.indexOf(" => ")) + path.slice(close + 1)
+}
+
 function target(path: string): string {
   const open = path.indexOf("{")
   if (open === -1) {
@@ -221,6 +232,13 @@ export function history(repo: string, cap = COMMIT_MAX) {
   )
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
   const byPath = new Map<string, Churn>()
+  // the log runs newest first, so a rename is met before the commits under the old name
+  const renamed = new Map<string, string>()
+  const now = (path: string): string => {
+    let at = path
+    for (let hops = 0; renamed.has(at) && hops < 20; hops++) at = renamed.get(at)!
+    return at
+  }
   const byDay = new Map<string, number[]>()
   const whoByDay = new Map<string, Set<string>>()
   const history: Commit[] = []
@@ -285,7 +303,8 @@ export function history(repo: string, cap = COMMIT_MAX) {
       // binary shows "-" for both
       const ins = Number(added) || 0
       const del = Number(deleted) || 0
-      const path = target(raw)
+      const path = now(target(raw))
+      if (raw.includes(" => ")) renamed.set(source(raw), path)
 
       c.insertions += ins
       c.deletions += del

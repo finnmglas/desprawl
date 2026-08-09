@@ -1,0 +1,97 @@
+// owner: finn
+// goal: the ui rules that decide what a number means and where a line is drawn
+
+import assert from "node:assert/strict"
+import { test } from "node:test"
+import { analyze } from "../src/analyze.ts"
+import { human } from "../src/human.ts"
+import { place } from "../ui/lib/lanes.ts"
+import { effective, shares } from "../ui/lib/scale.ts"
+import { bucket, defaultGrain } from "../ui/lib/format.ts"
+import { expand, rows } from "../ui/lib/series.ts"
+import { repo } from "./repo.ts"
+
+const loc = { key: "code", num: true, get: (r: { code: number }) => r.code }
+const rowsOf = [{ code: 10 }, { code: 40 }, { code: 50 }]
+
+test("only the two share modes turn a count into a percentage", () => {
+  assert.equal(shares(loc, "abs"), false)
+  assert.equal(shares(loc, "simple"), false, "adding a mode must not make everything a share")
+  assert.equal(shares(loc, "repo"), true)
+  assert.equal(shares({ ...loc, ofRow: () => 100 }, "row"), true)
+  assert.equal(shares(loc, "row"), false, "no denominator, no share")
+})
+
+test("an absolute cell stays a number, so a column can have a peak", () => {
+  // the backdrop bars measure against this, and vanish if it is not a number
+  let peak = 0
+  for (const row of rowsOf) {
+    const at = effective(loc, row, "abs", {})
+    if (typeof at === "number" && at > peak) peak = at
+  }
+  assert.equal(peak, 50)
+})
+
+test("a share is the row against its denominator", () => {
+  assert.equal(effective(loc, { code: 25 }, "repo", { code: 100 }), 0.25)
+  assert.equal(effective(loc, { code: 25 }, "repo", { code: 0 }), 0, "never divide by nothing")
+})
+
+test("a straight line of commits uses one lane", () => {
+  const log = [
+    { hash: "c", parents: ["b"] },
+    { hash: "b", parents: ["a"] },
+    { hash: "a", parents: [] },
+  ] as Parameters<typeof place>[0]
+  const placed = place(log)
+  assert.deepEqual(
+    placed.map((p) => p.lane),
+    [0, 0, 0],
+  )
+})
+
+test("a lane is freed once its child is drawn, so branches do not pile up", () => {
+  // two branches off one root, merged at the top
+  const log = [
+    { hash: "m", parents: ["x", "y"] },
+    { hash: "x", parents: ["r"] },
+    { hash: "y", parents: ["r"] },
+    { hash: "r", parents: [] },
+  ] as Parameters<typeof place>[0]
+  const placed = place(log)
+  const widest = Math.max(
+    ...placed.map((p) => Math.max(p.lane, ...p.active, ...p.edges.map((e) => e.to))),
+  )
+  assert.ok(widest <= 1, `two branches took ${widest + 1} lanes`)
+  for (const row of placed) {
+    for (const edge of row.edges) assert.ok(edge.to >= 0, "an edge pointed nowhere")
+  }
+})
+
+test("the size series stays empty until the samples arrive", () => {
+  const stats = analyze(repo({ "a.ts": "x\n" }, { "a.ts": "x\ny\n" }))
+  const filled = (out: Record<string, unknown>[]) =>
+    out.filter((d) => typeof d.size === "number").length
+  assert.equal(filled(rows(stats, expand(["size"]), "day", "linear", null)), 0)
+  const samples = [{ date: stats.first.slice(0, 10), bytes: 10 }]
+  assert.ok(filled(rows(stats, expand(["size"]), "day", "linear", null, samples)) > 0)
+})
+
+test("days become weeks and months as a repo ages", () => {
+  // prettier-ignore
+  const spans: [string, string][] = [["2026-01-05", "day"], ["2026-06-01", "week"], ["2046-01-01", "month"]]
+  for (const [last, grain] of spans) assert.equal(defaultGrain("2026-01-01", last), grain, last)
+})
+
+test("bucketing keeps every value, it only regroups them", () => {
+  const daily = [1, 2, 3, 4, 5, 6, 7, 8]
+  const sum = (out: [string, number][]) => out.reduce((a, [, n]) => a + n, 0)
+  assert.equal(sum(bucket(daily, "2026-01-01", "week")), 36)
+  assert.equal(sum(bucket(daily, "2026-01-01", "month")), 36)
+})
+
+test("the number ladder shortens without lying about magnitude", () => {
+  // prettier-ignore
+  const ladder: [number, string][] = [[1, "1"], [999, "999"], [1000, "1.00k"], [1_500_000, "1.50m"], [-2500, "-2.50k"]]
+  for (const [n, shown] of ladder) assert.equal(human(n, 3), shown, String(n))
+})

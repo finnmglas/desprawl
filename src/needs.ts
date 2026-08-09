@@ -29,7 +29,7 @@ function install(tool: string): string {
 }
 
 // the first part that differs decides, 24.13 is not older than 22.18
-const older = (have: string, want: string): boolean => {
+export const older = (have: string, want: string): boolean => {
   const [a, b] = [have, want].map((v) => v.split(".").map(Number))
   const i = b.findIndex((part, n) => (a[n] ?? 0) !== part)
   return i >= 0 && (a[i] ?? 0) < b[i]

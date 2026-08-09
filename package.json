@@ -14,12 +14,13 @@
     "node": ">=22.18"
   },
   "scripts": {
-    "check": "prettier --check src ui *.md && tsc --noEmit && tsc -p ui --noEmit",
+    "check": "prettier --check src ui test *.md && tsc --noEmit && tsc -p ui --noEmit",
+    "test": "node --test 'test/*.test.ts'",
     "desprawl": "node src/cli.ts",
     "ui": "vite --config ui/vite.config.ts",
     "build": "vite build --config ui/vite.config.ts && tsc -p tsconfig.build.json",
     "prepack": "pnpm build",
-    "format": "prettier --write src ui *.md"
+    "format": "prettier --write src ui test *.md"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
