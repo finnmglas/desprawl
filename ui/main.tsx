@@ -34,7 +34,13 @@ const TABS = ["Overview", "Files", "History"]
 
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
-  const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
+  const [{ tab, path, lang, from, to }, go] = useView({
+    tab: TABS[0],
+    path: [],
+    lang: "",
+    from: "",
+    to: "",
+  })
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
@@ -125,6 +131,9 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         {tab === "History" ? (
           <Graph
             stats={stats}
+            from={from}
+            to={to}
+            onRange={(a, b) => go({ from: a, to: b })}
             onTab={(next) => go({ tab: next })}
             onPath={(path) => {
               go({ tab: "Files", path })
@@ -137,6 +146,10 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
             stats={stats}
             onLang={explore}
             onTab={(next) => go({ tab: next })}
+            onCommits={(a, b) => {
+              go({ tab: "History", from: a, to: b })
+              toast("Opened in History", `${a} to ${b}`)
+            }}
             faces={faces}
           />
         ) : (

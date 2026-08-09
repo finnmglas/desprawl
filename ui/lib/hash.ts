@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react"
 
-export type View = { tab: string; path: string[]; lang: string }
+export type View = { tab: string; path: string[]; lang: string; from: string; to: string }
 
 const read = (fallback: View): View => {
   const q = new URLSearchParams(location.hash.slice(1))
@@ -11,6 +11,8 @@ const read = (fallback: View): View => {
     tab: q.get("tab") || fallback.tab,
     path: (q.get("path") || "").split("/").filter(Boolean),
     lang: q.get("lang") || "",
+    from: q.get("from") || "",
+    to: q.get("to") || "",
   }
 }
 
@@ -19,6 +21,8 @@ const write = (view: View): string => {
   q.set("tab", view.tab)
   if (view.path.length) q.set("path", view.path.join("/"))
   if (view.lang) q.set("lang", view.lang)
+  if (view.from) q.set("from", view.from)
+  if (view.to) q.set("to", view.to)
   return `#${q}`
 }
 

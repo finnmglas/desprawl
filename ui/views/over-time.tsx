@@ -14,6 +14,8 @@ import { delimit, download } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, defaultGrain, endsAt, num, startsAt } from "../lib/format.ts"
+
+const day = (at: Date) => at.toISOString().slice(0, 10)
 import { sizeCurve, type Sample } from "../lib/live.ts"
 import { GROUPS, SERIES, expand, rows } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
@@ -21,7 +23,15 @@ import type { Grain } from "../lib/format.ts"
 import type { Timeline } from "../../src/history.ts"
 import type { Stats } from "../../src/model.ts"
 
-export function OverTime({ stats, all }: { stats: Stats; all: Timeline | null }) {
+export function OverTime({
+  stats,
+  all,
+  onCommits,
+}: {
+  stats: Stats
+  all: Timeline | null
+  onCommits: (from: string, to: string) => void
+}) {
   const { curve } = useDisplay()
   const total = all?.total ?? stats.commits
   const [grain, setGrain] = useState<Grain>(() => defaultGrain(stats.first, stats.last))
@@ -135,6 +145,15 @@ export function OverTime({ stats, all }: { stats: Stats; all: Timeline | null })
           {zoom && (
             <Button variant="outline" size="sm" onClick={() => setZoom(null)}>
               reset zoom
+            </Button>
+          )}
+          {zoom && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onCommits(day(new Date(zoom[0])), day(new Date(zoom[1])))}
+            >
+              view commits
             </Button>
           )}
           <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />

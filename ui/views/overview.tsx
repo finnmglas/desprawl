@@ -64,11 +64,14 @@ export function Overview({
   stats,
   onLang,
   onTab,
+  onCommits,
   faces,
 }: {
   stats: Stats
   onLang: (lang: string) => void
   onTab: (tab: string) => void
+  /** hand the zoomed window to the history view */
+  onCommits: (from: string, to: string) => void
   faces: Record<string, string>
 }) {
   const [all, setAll] = useState<Timeline | null>(null)
@@ -142,7 +145,7 @@ export function Overview({
 
       <StackCard stack={stats.stack} />
 
-      <OverTime stats={stats} all={all} />
+      <OverTime stats={stats} all={all} onCommits={onCommits} />
 
       <DataTable
         title="Languages"

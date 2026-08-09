@@ -69,11 +69,18 @@ const x = (lane: number) => PAD + lane * GAP
 
 export function Graph({
   stats,
+  from,
+  to,
+  onRange,
   onTab,
   onPath,
   faces,
 }: {
   stats: Stats
+  /** a window handed over from the chart, as two days */
+  from: string
+  to: string
+  onRange: (from: string, to: string) => void
   onTab: (tab: string) => void
   onPath: (path: string[]) => void
   faces: Record<string, string>
@@ -120,19 +127,25 @@ export function Graph({
 
   const shown = useMemo(() => {
     const needle = filter.toLowerCase()
+    const windowed =
+      from || to
+        ? numbered.filter(
+            (c) => c.date.slice(0, 10) >= from && c.date.slice(0, 10) <= (to || "9999"),
+          )
+        : numbered
     const kept = needle
-      ? numbered.filter((c) =>
+      ? windowed.filter((c) =>
           `${c.subject} ${stats.contributors[c.who]?.name ?? ""} ${c.hash} ${c.refs}`
             .toLowerCase()
             .includes(needle),
         )
-      : numbered
+      : windowed
     if (!sort) return kept
     const cmp = SORTS[sort.key]
     return [...kept].sort((a, b) => (sort.asc ? cmp(a, b) : -cmp(a, b)))
-  }, [numbered, filter, sort])
+  }, [numbered, filter, sort, from, to])
 
-  const railed = !sort && !filter
+  const railed = !sort && !filter && !from && !to
   const paged = useMemo(() => shown.slice(0, limit), [shown, limit])
   const rows = useMemo(() => (railed ? place(paged) : []), [paged, railed])
   // an opened row is taller, so every y below it shifts by the same amount
@@ -166,11 +179,17 @@ export function Graph({
                 ? `latest ${num(log.length)} of ${num(total)}`
                 : `all ${num(total)}`}{" "}
               commits
+              {(from || to) && ` · between ${from || "the start"} and ${to || "now"}`}
               {!railed && " · sorted, so the branch rails are hidden"}
             </>
           }
         >
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
+            {(from || to) && (
+              <Button variant="outline" size="sm" onClick={() => onRange("", "")}>
+                {from} to {to} ✕
+              </Button>
+            )}
             {!railed && (
               <Button
                 variant="outline"
