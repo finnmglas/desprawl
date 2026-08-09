@@ -5,7 +5,7 @@ import type { Curve } from "./display.tsx"
 import { locale } from "./locale.ts"
 export { nest, pct, tokens } from "../../src/human.ts"
 import { human } from "../../src/human.ts"
-import type { Node, Split } from "../../src/model.ts"
+import type { Node } from "../../src/model.ts"
 
 let abbreviate = true
 

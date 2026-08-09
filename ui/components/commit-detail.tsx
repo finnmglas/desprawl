@@ -1,8 +1,8 @@
 // owner: finn
 // goal: opened commit, inline
 
+import { Moved } from "./moved.tsx"
 import { day, num } from "../lib/format.ts"
-import { ADDED, REMOVED } from "../lib/series.ts"
 import type { Detail } from "../../src/history.ts"
 
 /** Fixed, so the rails beside the list can account for the gap exactly. */
@@ -37,12 +37,8 @@ export function CommitDetail({
                 title="Open the folder in Files"
                 className="hover:bg-muted/60 flex cursor-pointer items-center gap-3 rounded-sm text-left text-xs tabular-nums"
               >
-                <span className="w-14 text-right" style={{ color: ADDED }}>
-                  +{num(file.ins)}
-                </span>
-                <span className="w-14 text-right" style={{ color: REMOVED }}>
-                  -{num(file.del)}
-                </span>
+                <Moved n={file.ins} kind="ins" className="w-14 text-right" />
+                <Moved n={file.del} kind="del" className="w-14 text-right" />
                 <span className="truncate font-mono">{file.path}</span>
               </button>
             ))}

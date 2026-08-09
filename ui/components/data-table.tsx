@@ -3,7 +3,8 @@
 
 import { useMemo, useState } from "react"
 import { Button } from "./button.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { Card, CardContent } from "./card.tsx"
+import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { Tip } from "./tip.tsx"
@@ -124,11 +125,7 @@ export function DataTable<T>({
 
   return (
     <Card className={className}>
-      <CardHeader className="flex-row items-center gap-2">
-        <div className="flex flex-col gap-0.5">
-          <CardTitle>{title}</CardTitle>
-          {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
-        </div>
+      <CardHead title={title} hint={hint}>
         <div className="ml-auto flex items-center gap-1">
           {children}
           <CopyButton
@@ -147,7 +144,7 @@ export function DataTable<T>({
             csv
           </Button>
         </div>
-      </CardHeader>
+      </CardHead>
       <CardContent className="p-0 pt-2">
         <Table>
           <THead>

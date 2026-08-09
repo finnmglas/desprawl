@@ -399,13 +399,11 @@ function assisted(repo: string): Pick<Ai, "signed" | "scanned" | "capped" | "by"
   return { signed, scanned: commits.length, capped: commits.length >= SIGNED_MAX, by }
 }
 
-export function stack(repo: string, languages: Node[] = []): Stack {
-  const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
+/** what the tracked paths alone say: marker files, config, ports, assistants */
+function markers(repo: string, paths: string[]) {
   const found: Record<string, string[]> = {}
   const counts = { dockerfiles: 0, compose: 0, kubernetes: 0, terraform: 0 }
-  const licenses: string[] = []
   const node: string[] = []
-  const modules: string[] = []
   const env: string[] = []
   const strict = { on: 0, off: 0 }
   const ports: number[] = []
@@ -418,6 +416,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
 
   for (const path of paths) {
     if (VENDORED.test(path)) continue
+
     for (const [match, where, name] of FILES) {
       if (!match.test(path)) continue
       if (where === "docker") counts.dockerfiles++
@@ -437,10 +436,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       const marker = hit.endsWith("/") ? `${hit.split("/").at(-2)}/` : (hit.split("/").pop() ?? hit)
       agentFiles[marker] = (agentFiles[marker] ?? 0) + 1
     }
-  }
 
-  for (const path of paths) {
-    if (VENDORED.test(path)) continue
     // strictness is the single most useful thing a tsconfig says about a codebase
     if (/^(.*\/)?tsconfig(\..+)?\.json$/.test(path)) {
       const text = read(repo, path)
@@ -457,6 +453,72 @@ export function stack(repo: string, languages: Node[] = []): Stack {
         port(Number(line[1]))
     }
   }
+  return { found, counts, node, env, strict, ports, agents, agentFiles, port }
+}
+
+/** a licence beside the manifest speaks for the project, the rest come with vendored code */
+function licences(repo: string, paths: string[]): { licenses: string[]; vendored: number } {
+  const licenses: string[] = []
+  let vendored = 0
+
+  for (const path of paths.filter((p) => /^(.*\/)?(LICEN[SC]E|COPYING)(\..+)?$/i.test(p))) {
+    if (path.includes("/")) {
+      vendored++
+      continue
+    }
+    const text = read(repo, path).slice(0, 400)
+    const kind = /MIT License/i.test(text)
+      ? "MIT"
+      : /Apache License/i.test(text)
+        ? "Apache-2.0"
+        : /GNU AFFERO/i.test(text)
+          ? "AGPL-3.0"
+          : /GNU GENERAL PUBLIC/i.test(text)
+            ? "GPL"
+            : /GNU LESSER/i.test(text)
+              ? "LGPL"
+              : /BSD/i.test(text)
+                ? "BSD"
+                : /Mozilla Public License/i.test(text)
+                  ? "MPL-2.0"
+                  : /UNLICENSE|public domain/i.test(text)
+                    ? "Unlicense"
+                    : "unknown"
+    add(licenses, kind)
+  }
+  return { licenses, vendored }
+}
+
+// prettier-ignore
+const SERVER = ["Express", "Fastify", "NestJS", "Koa", "Hono", "hapi", "Next.js", "Nuxt", "SvelteKit"]
+// prettier-ignore
+const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt"]
+
+/** what the repo holds, judged by what it depends on and what it ships */
+function shipped(
+  frameworks: string[],
+  connected: boolean,
+  manifests: Manifest[],
+  boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
+): string[] {
+  const parts: string[] = []
+  if (frameworks.some((f) => CLIENT.includes(f))) add(parts, "frontend")
+  if (frameworks.some((f) => SERVER.includes(f)) || connected) add(parts, "backend")
+  if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
+    add(parts, "monorepo root")
+  if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
+  if (manifests.some((m) => m.bin)) add(parts, "cli")
+  if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
+  if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
+  if (boxes.dockerfiles || boxes.compose || boxes.kubernetes || boxes.terraform) add(parts, "infra")
+  return parts
+}
+
+export function stack(repo: string, languages: Node[] = []): Stack {
+  const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
+  const { found, counts, node, env, strict, ports, agents, agentFiles, port } = markers(repo, paths)
+  const licenses: string[] = []
+  const modules: string[] = []
 
   // every manifest, wherever it sits, so a monorepo is read whole
   const manifests = paths
@@ -508,33 +570,8 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     }
   }
 
-  // only a licence at the root speaks for the project, the rest come with vendored code
-  let vendored = 0
-  for (const path of paths.filter((p) => /^(.*\/)?(LICEN[SC]E|COPYING)(\..+)?$/i.test(p))) {
-    if (path.includes("/")) {
-      vendored++
-      continue
-    }
-    const text = read(repo, path).slice(0, 400)
-    const kind = /MIT License/i.test(text)
-      ? "MIT"
-      : /Apache License/i.test(text)
-        ? "Apache-2.0"
-        : /GNU AFFERO/i.test(text)
-          ? "AGPL-3.0"
-          : /GNU GENERAL PUBLIC/i.test(text)
-            ? "GPL"
-            : /GNU LESSER/i.test(text)
-              ? "LGPL"
-              : /BSD/i.test(text)
-                ? "BSD"
-                : /Mozilla Public License/i.test(text)
-                  ? "MPL-2.0"
-                  : /UNLICENSE|public domain/i.test(text)
-                    ? "Unlicense"
-                    : "unknown"
-    add(licenses, kind)
-  }
+  const { licenses: filed, vendored } = licences(repo, paths)
+  for (const kind of filed) add(licenses, kind)
 
   // the biggest real language by lines, so 200k lines of generated svg name nothing
   const primary =
@@ -554,42 +591,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     exts.has("ts") || exts.has("tsx") || exts.has("mts") || (found.typescript?.length ?? 0) > 0
   const hasJs = exts.has("js") || exts.has("jsx") || exts.has("mjs") || exts.has("cjs")
 
-  // what the repo actually contains, judged by what it depends on and what it ships
-  const parts: string[] = []
-  const server = [
-    "Express",
-    "Fastify",
-    "NestJS",
-    "Koa",
-    "Hono",
-    "hapi",
-    "Next.js",
-    "Nuxt",
-    "SvelteKit",
-  ]
-  const client = [
-    "React",
-    "Vue",
-    "Svelte",
-    "Angular",
-    "Solid",
-    "Preact",
-    "Astro",
-    "Next.js",
-    "Nuxt",
-  ]
-  if (dep.frameworks.some((f) => client.includes(f))) add(parts, "frontend")
-  if (dep.frameworks.some((f) => server.includes(f)) || dep.connects.length) add(parts, "backend")
-  if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
-    add(parts, "monorepo root")
-  if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
-  if (manifests.some((m) => "bin" in m)) add(parts, "cli")
-  if (dep.frameworks.includes("React Native") || dep.frameworks.includes("Expo"))
-    add(parts, "mobile")
-  if (dep.frameworks.includes("Electron") || dep.frameworks.includes("Tauri")) add(parts, "desktop")
-  if (manifests.some((m) => m.bin)) add(parts, "cli")
-  if (counts.dockerfiles || counts.compose || counts.kubernetes || counts.terraform)
-    add(parts, "infra")
+  const parts = shipped(dep.frameworks, dep.connects.length > 0, manifests, counts)
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
 

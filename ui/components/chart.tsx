@@ -5,7 +5,7 @@
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
 import { num } from "../lib/format.ts"
-import { transform, untransform } from "../lib/curve.ts"
+import { untransform } from "../lib/curve.ts"
 import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 

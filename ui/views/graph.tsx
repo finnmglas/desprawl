@@ -5,13 +5,14 @@ import { useEffect, useMemo, useState } from "react"
 import { Avatar } from "../components/avatar.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
+import { Card, CardContent } from "../components/card.tsx"
+import { CardHead } from "../components/card-head.tsx"
 import { Input } from "../components/input.tsx"
 import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
+import { Moved } from "../components/moved.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tip } from "../components/tip.tsx"
 import { toast } from "../components/toast.tsx"
-import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
@@ -156,18 +157,19 @@ export function Graph({
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader className="flex-row items-center gap-2">
-          <div className="flex flex-col gap-0.5">
-            <CardTitle>History</CardTitle>
-            <span className="text-muted-foreground text-xs">
+        <CardHead
+          title="History"
+          hint={
+            <>
               {shown.length !== stats.log.length && `${shown.length} of `}
               {log.length < total
                 ? `latest ${num(log.length)} of ${num(total)}`
                 : `all ${num(total)}`}{" "}
               commits
               {!railed && " · sorted, so the branch rails are hidden"}
-            </span>
-          </div>
+            </>
+          }
+        >
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
             {!railed && (
               <Button
@@ -188,7 +190,7 @@ export function Graph({
               onChange={(e) => setFilter(e.currentTarget.value)}
             />
           </div>
-        </CardHeader>
+        </CardHead>
         <CardContent className="overflow-x-auto p-0 pt-2">
           <div
             style={{ paddingLeft: width, gridTemplateColumns: COLS }}
@@ -290,21 +292,18 @@ export function Graph({
                           </Badge>
                         ))}
                     </span>
-                    <span
-                      className="rounded-sm px-1 text-right text-xs tabular-nums"
-                      style={{ color: ADDED, ...backdrop(commit.insertions, peak, ADDED, curve) }}
-                    >
-                      +{num(commit.insertions)}
-                    </span>
-                    <span
-                      className="rounded-sm px-1 text-right text-xs tabular-nums"
-                      style={{
-                        color: REMOVED,
-                        ...backdrop(commit.deletions, peak, REMOVED, curve),
-                      }}
-                    >
-                      -{num(commit.deletions)}
-                    </span>
+                    <Moved
+                      n={commit.insertions}
+                      kind="ins"
+                      className="rounded-sm px-1 text-right text-xs"
+                      style={backdrop(commit.insertions, peak, ADDED, curve)}
+                    />
+                    <Moved
+                      n={commit.deletions}
+                      kind="del"
+                      className="rounded-sm px-1 text-right text-xs"
+                      style={backdrop(commit.deletions, peak, REMOVED, curve)}
+                    />
                     <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
                       <Avatar
                         name={who(commit).name}

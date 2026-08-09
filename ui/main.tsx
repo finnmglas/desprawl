@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
+import { Settings } from "./components/settings.tsx"
 import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
@@ -11,12 +11,11 @@ import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
-import { CHOICES, LABELS, setLocale } from "./lib/locale.ts"
+import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
-import { locale } from "./lib/locale.ts"
-import { copy, download } from "./lib/export.ts"
+import { copy } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
-import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
+import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
 import { attach, isLive, onBusy, token } from "./lib/live.ts"
@@ -39,7 +38,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
-  const { scale, curve, region } = prefs
+  const { scale, curve } = prefs
   // one writer for every setting
   const change = (next: Partial<Prefs>) => {
     const merged = { ...prefs, ...next }
@@ -73,12 +72,6 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     go({ lang: picked, path: [], tab: "Files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
-
-  const share = async () =>
-    toast(
-      (await copy(location.href)) ? "Link copied" : "Copy blocked by the browser",
-      "Opens on this exact folder and language",
-    )
 
   return (
     <DisplayProvider value={{ scale, curve }}>
@@ -125,48 +118,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               onChange={(next) => go({ tab: next })}
             />
             <ThemeToggle {...themed} />
-            <Menu>
-              {reload && <MenuItem onClick={reload}>refresh</MenuItem>}
-              <MenuItem onClick={share}>share link</MenuItem>
-              <MenuItem
-                onClick={() => {
-                  download("desprawl.json", JSON.stringify(stats, null, 2), "application/json")
-                  toast("desprawl.json", "The whole report, tree and series included")
-                }}
-              >
-                export json
-              </MenuItem>
-              <div className="bg-border my-1 h-px" />
-              <MenuSection label="Number relation" hint={EXPLAIN[scale]}>
-                <Tabs
-                  grow
-                  tabs={SCALES}
-                  value={scale}
-                  onChange={(next) => change({ scale: next as Scale })}
-                />
-              </MenuSection>
-              <MenuSection
-                label="Bar scale"
-                hint={curve === "log" ? "small values stay visible" : "true proportions"}
-              >
-                <Tabs
-                  grow
-                  tabs={CURVES}
-                  value={curve}
-                  onChange={(next) => change({ curve: next as Curve })}
-                />
-              </MenuSection>
-              <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
-                <Tabs
-                  grow
-                  tabs={CHOICES.map((c) => LABELS[c])}
-                  value={LABELS[region]}
-                  onChange={(next) =>
-                    change({ region: CHOICES.find((c) => LABELS[c] === next) ?? "auto" })
-                  }
-                />
-              </MenuSection>
-            </Menu>
+            <Settings stats={stats} prefs={prefs} change={change} reload={reload} />
           </div>
         </header>
 

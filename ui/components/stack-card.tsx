@@ -2,12 +2,13 @@
 // goal: what this repo is, at a glance
 
 import { Badge } from "./badge.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { Card, CardContent } from "./card.tsx"
+import { Chip } from "./chip.tsx"
+import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
 import { Tip } from "./tip.tsx"
 import { num } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
-import { NOTES } from "../../src/notes.ts"
 import type { Stack } from "../../src/stack.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
@@ -113,11 +114,7 @@ function Group({ title, rows }: Section) {
           </Tip>
           <span className="flex flex-wrap gap-1">
             {items.map((item) => (
-              <Tip key={String(item)} text={NOTES[String(item)]}>
-                <Badge variant="secondary" className="font-normal">
-                  {item}
-                </Badge>
-              </Tip>
+              <Chip key={String(item)} label={String(item)} />
             ))}
           </span>
         </div>
@@ -150,11 +147,7 @@ export function StackCard({ stack }: { stack: Stack }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row flex-wrap items-center gap-2">
-        <div className="flex flex-col gap-0.5">
-          <CardTitle>Project metadata</CardTitle>
-          <span className="text-muted-foreground text-xs">{identity}</span>
-        </div>
+      <CardHead title="Project metadata" hint={identity} wrap>
         {stack.parts.map((part) => (
           <Badge key={part} variant="outline">
             {part}
@@ -166,7 +159,7 @@ export function StackCard({ stack }: { stack: Stack }) {
           message="Metadata copied"
           note="Every detected fact, as text"
         />
-      </CardHeader>
+      </CardHead>
 
       <CardContent className="pt-1">
         {stack.kind === "none" && (
