@@ -8,7 +8,7 @@ import { CopyButton } from "./copy-button.tsx"
 import { Tip } from "./tip.tsx"
 import { num, pct } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
-import type { Ai } from "../../src/stack.ts"
+import type { Ai } from "../../src/model.ts"
 
 /** The rows, shared by the panel and the copy */
 function describe(ai: Ai): [string, string[]][] {

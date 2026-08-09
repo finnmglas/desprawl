@@ -11,7 +11,7 @@ import { Tip } from "./tip.tsx"
 import { num } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
 import { byWeight } from "../lib/rank.ts"
-import type { Stack } from "../../src/stack.ts"
+import type { Stack } from "../../src/model.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
 type Section = { title: string; rows: [string, Items][] }
