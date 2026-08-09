@@ -7,6 +7,7 @@ import { Back } from "../components/back.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
+import { DownloadButton } from "../components/download-button.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { Input } from "../components/input.tsx"
 import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
@@ -14,7 +15,7 @@ import { Moved } from "../components/moved.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tip } from "../components/tip.tsx"
 import { toast } from "../components/toast.tsx"
-import { copy } from "../lib/export.ts"
+import { copy, named } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num } from "../lib/format.ts"
@@ -170,7 +171,32 @@ export function Graph({
 
   return (
     <div className="flex flex-col gap-4">
-      <Back onTab={onTab} />
+      <div className="flex flex-wrap items-center gap-2">
+        <Back onTab={onTab} />
+        <DownloadButton
+          className="ml-auto"
+          name={named("history.json")}
+          // the history and who made it, without the tree and the series the report also holds
+          text={() =>
+            JSON.stringify(
+              {
+                repo: stats.repo,
+                head: stats.head,
+                first: stats.first,
+                last: stats.last,
+                commits: stats.commits,
+                truncated: stats.truncated,
+                remotes: stats.remotes,
+                contributors: stats.contributors,
+                log: stats.log,
+              },
+              null,
+              2,
+            )
+          }
+          note={`${num(stats.log.length)} commits and ${num(stats.contributors.length)} contributors`}
+        />
+      </div>
       <Card>
         <CardHead
           title="History"

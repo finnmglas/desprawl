@@ -20,7 +20,8 @@ export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProp
   return (
     <div
       className={cn(
-        "bg-muted text-muted-foreground inline-flex gap-1 rounded-lg p-1",
+        // scrolls rather than overflowing: four tabs and their marks do not fit a phone
+        "bg-muted text-muted-foreground inline-flex max-w-full gap-1 overflow-x-auto rounded-lg p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         grow && "flex w-full",
         className,
       )}
@@ -30,7 +31,7 @@ export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProp
           key={tab}
           onClick={() => onChange(tab)}
           className={cn(
-            "flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors",
+            "flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors",
             grow && "flex-1",
             tab === value ? "bg-background text-foreground shadow-xs" : "hover:text-foreground",
           )}

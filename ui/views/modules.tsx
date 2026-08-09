@@ -9,6 +9,7 @@ import { Card, CardContent } from "../components/card.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
+import { DownloadButton } from "../components/download-button.tsx"
 import { Refresh } from "../components/icons.tsx"
 import { Input } from "../components/input.tsx"
 import { Kpi } from "../components/kpi.tsx"
@@ -16,6 +17,7 @@ import { Matrix } from "../components/matrix.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { Tip } from "../components/tip.tsx"
+import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
 import { layeringOf, tanglesOf } from "../lib/verdict.ts"
@@ -163,15 +165,79 @@ export function Modules({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Back onTab={onTab} />
-        <div className="ml-auto flex flex-wrap items-center gap-1">
-          <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
-          <Tabs tabs={GROUPS} value={at} onChange={setGroup} />
-        </div>
+        <DownloadButton
+          className="ml-auto"
+          name={named("imports.json")}
+          text={() => JSON.stringify(graph, null, 2)}
+          note={`${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`}
+        />
+      </div>
+
+      {/* the graph itself, which no grouping below can change */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <Kpi
+          label="Import graph files"
+          value={num(graph.stats.files)}
+          sub={`reaching ${plural(Object.keys(graph.packages).length, "installed package")}`}
+          verdict={{
+            label: "in the graph",
+            tone: "plain",
+            why: "every typescript or javascript file git tracks, with bundled output and declaration files left out",
+          }}
+        />
+        <Kpi
+          label="File imports"
+          value={num(graph.stats.edges)}
+          sub={`and ${num(graph.stats.external)} more into packages`}
+          verdict={{
+            label: "file to file",
+            tone: "plain",
+            why: "imports that resolve to another file in this repo. The ones reaching installed packages are counted apart",
+          }}
+        />
+        <Kpi
+          label="Imports / file"
+          value={(graph.stats.edges / Math.max(1, graph.stats.files)).toFixed(1)}
+          sub="imports the average file makes"
+          verdict={{
+            label: "average",
+            tone: "plain",
+            why: "file to file imports over files. A high number means little stands on its own, a low one that the repo is loosely tied",
+          }}
+        />
+        <Kpi
+          label="Resolution"
+          value={`${(graph.stats.coverage * 100).toFixed(graph.stats.coverage === 1 ? 0 : 2)}%`}
+          sub={
+            graph.missing.length
+              ? `${plural(graph.missing.length, "import")} name nothing`
+              : "every import found its file"
+          }
+          verdict={
+            graph.missing.length
+              ? {
+                  label: "some missing",
+                  tone: "watch",
+                  why: "an import that names nothing is either broken in the code or something this resolver cannot follow. Either way the graph is missing an edge",
+                }
+              : {
+                  label: "complete",
+                  tone: "fine",
+                  why: "every import in the repo resolved to a file, a package, or something on disk. Nothing below is guesswork",
+                }
+          }
+        />
+      </div>
+
+      {/* above the numbers it decides, since every one of them answers to it */}
+      <div className="flex flex-wrap items-center gap-1">
+        <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
+        <Tabs className="ml-auto" tabs={GROUPS} value={at} onChange={setGroup} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Kpi
-          label="Groups"
+          label="Module groups"
           value={num(units.length)}
           sub={`${plural(files, "file")}, grouped ${at === AUTO ? "by weight" : `by ${at}`}`}
           verdict={{
@@ -184,7 +250,7 @@ export function Modules({
           }}
         />
         <Kpi
-          label="Depth"
+          label="Relation depth"
           value={num(levels)}
           sub={
             levels > 1 ? "steps from the top down to the leaves" : "everything sits side by side"
@@ -192,7 +258,7 @@ export function Modules({
           verdict={layeringOf(levels, units.length)}
         />
         <Kpi
-          label="Loops"
+          label="Loops/Cycles"
           value={num(loops.length)}
           sub={
             loops.length
@@ -205,7 +271,7 @@ export function Modules({
           verdict={tanglesOf(loops.length, units.length)}
         />
         <Kpi
-          label="Links"
+          label="Deduplicated linkage"
           value={num(links)}
           sub={`from ${num(graph.stats.edges)} imports between files`}
           verdict={{

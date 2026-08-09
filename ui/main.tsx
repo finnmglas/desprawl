@@ -132,7 +132,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               {busy > 0 && <span className="text-foreground"> · working…</span>}
             </p>
           </div>
-          <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <Tabs
               grow
               icons={MARKS}
