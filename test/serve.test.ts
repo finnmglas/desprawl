@@ -7,7 +7,7 @@ import { serve } from "../src/serve.ts"
 import { repo } from "./repo.ts"
 
 const dir = repo({ "a.ts": "const a = 1\n", "src/b.ts": "const b = 2\n" })
-const url = await serve(dir, undefined, true, 0) // keep, so a closing tab cannot end the run
+const url = await serve(dir, undefined, true, 0, "<html>the built viewer</html>")
 const base = url.slice(0, url.indexOf("/?"))
 const token = url.slice(url.indexOf("t=") + 2)
 const get = (path: string) => fetch(`${base}${path}`, { headers: { origin: base } })
@@ -27,8 +27,23 @@ test("another page may not read it, even knowing the port", async () => {
   assert.equal(res.status, 403)
 })
 
-test("the page and its stats come back for this tab", async () => {
-  assert.equal((await get(`/?t=${token}`)).status, 200)
+test("the page it was given is the page it hands out", async () => {
+  const res = await get(`/?t=${token}`)
+  assert.equal(res.status, 200)
+  assert.match(await res.text(), /the built viewer/)
+})
+
+test("without a built viewer the data still flows, and the page says why", async () => {
+  const bare = await serve(dir, undefined, true, 0, "")
+  const at = bare.slice(0, bare.indexOf("/?"))
+  const key = bare.slice(bare.indexOf("t=") + 2)
+  const page = await fetch(`${at}/?t=${key}`, { headers: { origin: at } })
+  assert.equal(page.status, 500)
+  assert.match(await page.text(), /pnpm build/)
+  assert.equal((await fetch(`${at}/api/stats?t=${key}`, { headers: { origin: at } })).status, 200)
+})
+
+test("the stats come back for this tab", async () => {
   const stats = await (await get(`/api/stats?t=${token}`)).json()
   assert.equal(stats.code, 2)
   assert.equal(stats.repo, dir)

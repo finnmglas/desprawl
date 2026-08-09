@@ -61,7 +61,14 @@ function prune(node: Node): Node {
 const find = (node: Node, path: string[]): Node | undefined =>
   path.reduce<Node | undefined>((at, part) => at?.children?.find((c) => c.name === part), node)
 
-export function serve(repo: string, cap?: number, keep = false, port = PORT): Promise<string> {
+export function serve(
+  repo: string,
+  cap?: number,
+  keep = false,
+  port = PORT,
+  /** the page to hand out, given rather than read when a caller has one */
+  viewer?: string,
+): Promise<string> {
   // closing the last tab ends the run
   const tabs = new Set<ServerResponse>()
   let farewell: NodeJS.Timeout | undefined
@@ -80,7 +87,16 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
   }
   // every page in the browser can reach localhost, so the port alone is not a secret
   const token = randomBytes(16).toString("hex")
-  const html = shell()
+  // the api answers without a built viewer, only the page itself needs one
+  const html =
+    viewer ??
+    (() => {
+      try {
+        return shell()
+      } catch {
+        return ""
+      }
+    })()
 
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
@@ -107,7 +123,10 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
       const json = (data: unknown, code = 200) =>
         send(code, JSON.stringify(data), "application/json")
 
-      if (url.pathname === "/") return send(200, html, "text/html")
+      if (url.pathname === "/")
+        return html
+          ? send(200, html, "text/html")
+          : send(500, "no viewer built, run: pnpm build", "text/plain")
 
       // the browser holds this open for as long as the tab lives
       if (url.pathname === "/api/session") {
@@ -214,7 +233,7 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
     // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && port === PORT)
-        serve(repo, cap, keep, 0).then(resolve, reject)
+        serve(repo, cap, keep, 0, viewer).then(resolve, reject)
       else reject(err)
     })
     server.listen(port, HOST, () => {
