@@ -20,6 +20,7 @@
     "ui": "vite --config ui/vite.config.ts",
     "build": "vite build --config ui/vite.config.ts && tsc -p tsconfig.build.json",
     "prepack": "pnpm build",
+    "prepare": "git config core.hooksPath .githooks || true",
     "format": "prettier --write src ui test *.md"
   },
   "devDependencies": {
