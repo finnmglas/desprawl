@@ -66,7 +66,7 @@ test("identity is the biggest real language, never an asset", () => {
   assert.equal(s.stack.primary, "TypeScript")
   // the asset is still counted, it just does not name the repo
   assert.ok(
-    s.languages.find((l) => l.name === "svg")!.code >
+    s.languages.find((l) => l.name === "SVG")!.code >
       s.languages.find((l) => l.name === "TypeScript")!.code,
   )
 })

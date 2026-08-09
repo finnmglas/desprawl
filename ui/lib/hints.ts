@@ -54,6 +54,16 @@ export const HINTS: Record<string, string> = {
   Containers: "infrastructure files in the tree",
   APIs: "checked in request collections and schemas",
   Config: "what the app expects to be given",
+
+  // the parts a repo holds, shown as badges under the card title
+  frontend: "ships a user interface, from a client framework in the manifests",
+  backend: "serves or reaches other systems, from a server framework or a client library",
+  cli: "a manifest declares a bin, so it installs a command",
+  monorepo: "a manifest declares workspaces",
+  "monorepo root": "workspaces and no dependencies of its own, so it only holds packages",
+  mobile: "react native or expo",
+  desktop: "electron or tauri",
+  infra: "dockerfiles, compose, kubernetes or terraform in the tree",
   Assistants: "ai coding tools this repo shows a trace of",
   Signed: "commits whose author line or trailers name an ai",
   Rules: "instruction files checked in for those tools",

@@ -31,10 +31,21 @@ test("crlf counts the same as lf, so windows reports what linux does", () => {
   same("blank")
 })
 
-test("binary files are skipped, not counted as text", () => {
-  const f = langs(repo({ "logo.png": "\0\0PNG\0data", "a.ts": "x\n" }))
-  assert.equal(f["logo.png"], undefined)
-  assert.ok(f["a.ts"])
+test("a document contributes no lines, but the repo is still shown to hold it", () => {
+  const nul = String.fromCharCode(0)
+  const f = langs(
+    repo({
+      "logo.png": `${nul}PNG${nul}data`,
+      "report.pdf": `%PDF${nul}x`,
+      "mystery.dat": `${nul}raw`,
+      "a.ts": "x\n",
+    }),
+  )
+  assert.equal(f["logo.png"].lang, "Image")
+  assert.equal(f["logo.png"].code, 0, "a binary has no lines to count")
+  assert.equal(f["report.pdf"].lang, "PDF")
+  assert.equal(f["mystery.dat"], undefined, "an unrecognised binary stays out")
+  assert.equal(f["a.ts"].code, 1)
 })
 
 test("a symlink to a fifo cannot hang the scan", { skip: process.platform === "win32" }, () => {
@@ -59,10 +70,10 @@ test("a shebang names a file with no extension", () => {
   assert.equal(f["LICENSE"], undefined)
 })
 
-test("an unknown extension is still counted, under its own name", () => {
-  const f = langs(repo({ "icon.svg": "<svg>\n</svg>\n" }))
-  assert.equal(f["icon.svg"].lang, "svg")
-  assert.equal(f["icon.svg"].code, 2)
+test("an extension we have never seen is still counted, under its own name", () => {
+  const f = langs(repo({ "board.weird": "one\ntwo\n" }))
+  assert.equal(f["board.weird"].lang, "weird")
+  assert.equal(f["board.weird"].code, 2)
 })
 
 test("indentation is measured, since the nest column depends on it", () => {

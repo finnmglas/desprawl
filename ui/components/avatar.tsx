@@ -13,6 +13,15 @@ export function faceOf(email: string): string {
     : `https://github.com/${noreply[2]}.png?size=48`
 }
 
+/** the same address that names the avatar also names the profile */
+export function profileOf(email: string): string {
+  const github = /^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$/i.exec(email)
+  if (github) return `https://github.com/${github[1]}`
+  const gitlab = /^(?:\d+-)?([^@]+)@users\.noreply\.gitlab\.com$/i.exec(email)
+  if (gitlab) return `https://gitlab.com/${gitlab[1]}`
+  return ""
+}
+
 const initialsOf = (name: string): string =>
   name
     .split(/[\s_-]+/)
@@ -36,10 +45,11 @@ export function Avatar({
 }) {
   const [broken, setBroken] = useState(false)
   const src = found || faceOf(email)
+  const profile = profileOf(email)
 
-  return (
+  const face = (
     <span
-      title={name}
+      title={profile ? `${name}, open the profile` : name}
       className={cn(
         "bg-muted text-muted-foreground grid size-6 shrink-0 place-items-center overflow-hidden rounded-full text-[10px] font-medium",
         className,
@@ -57,5 +67,13 @@ export function Avatar({
         initialsOf(name)
       )}
     </span>
+  )
+
+  return profile ? (
+    <a href={profile} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>
+      {face}
+    </a>
+  ) : (
+    face
   )
 }

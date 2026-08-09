@@ -2,18 +2,9 @@
 // goal: language bar + pickable list
 
 import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { tint } from "../lib/tint.ts"
 import { num } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
-
-const COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-]
-
-const color = (i: number) => (i < COLORS.length ? COLORS[i] : "var(--muted-foreground)")
 
 export interface DistributionProps {
   title: string
@@ -35,7 +26,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pt-3">
         <div className="flex h-2 overflow-hidden rounded-full">
-          {entries.map(([lang, loc], i) => (
+          {entries.map(([lang, loc]) => (
             <button
               key={lang}
               title={`${lang} ${((loc / (total || 1)) * 100).toFixed(1)}%`}
@@ -43,7 +34,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
               className="cursor-pointer transition-opacity hover:opacity-80"
               style={{
                 width: `${(loc / (total || 1)) * 100}%`,
-                background: color(i),
+                background: tint(lang),
                 opacity: selected && selected !== lang ? 0.25 : 1,
               }}
             />
@@ -51,7 +42,7 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
         </div>
 
         <ul className="divide-border flex flex-col divide-y text-sm">
-          {entries.map(([lang, loc], i) => (
+          {entries.map(([lang, loc]) => (
             <li key={lang}>
               <button
                 onClick={() => onSelect(lang === selected ? "" : lang)}
@@ -60,7 +51,10 @@ export function Distribution({ title, langs, selected, onSelect }: DistributionP
                   lang === selected && "bg-muted/70",
                 )}
               >
-                <span className="size-2 shrink-0 rounded-[2px]" style={{ background: color(i) }} />
+                <span
+                  className="size-2 shrink-0 rounded-[2px]"
+                  style={{ background: tint(lang) }}
+                />
                 <span className="truncate">{lang}</span>
                 <span className="text-muted-foreground ml-auto tabular-nums">{num(loc)}</span>
                 <span className="text-muted-foreground w-12 text-right tabular-nums">

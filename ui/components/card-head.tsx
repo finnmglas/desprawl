@@ -17,7 +17,7 @@ export function CardHead({
   children?: React.ReactNode
 }) {
   return (
-    <CardHeader className={cn("flex-row items-center gap-2", wrap && "flex-wrap")}>
+    <CardHeader className={cn("relative flex-row items-center gap-2", wrap && "flex-wrap")}>
       <div className="flex min-w-0 flex-col gap-0.5">
         <CardTitle>{title}</CardTitle>
         {hint && <span className="text-muted-foreground text-xs">{hint}</span>}

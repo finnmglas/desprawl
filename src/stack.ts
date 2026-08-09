@@ -96,6 +96,8 @@ export interface Stack {
   apis: string[]
   licenses: string[]
   parts: string[]
+  /** label to the dependency that implied it, so a claim can be followed */
+  from: Record<string, string>
   ai: Ai
 }
 
@@ -110,6 +112,11 @@ const FRAMEWORKS: Table = {
   expo: "Expo", electron: "Electron", "@tauri-apps/api": "Tauri", gatsby: "Gatsby",
   express: "Express", fastify: "Fastify", "@nestjs/core": "NestJS", koa: "Koa", hono: "Hono",
   "@hapi/hapi": "hapi", "aws-lambda": "Lambda",
+  "@builder.io/qwik": "Qwik", "@redwoodjs/core": "RedwoodJS", "@adonisjs/core": "AdonisJS",
+  "@strapi/strapi": "Strapi", "@medusajs/medusa": "Medusa", "@keystone-6/core": "Keystone",
+  elysia: "Elysia", h3: "h3", nitropack: "Nitro", "@capacitor/core": "Capacitor",
+  quasar: "Quasar", vike: "Vike", "@tanstack/react-start": "TanStack Start",
+  "@feathersjs/feathers": "Feathers", restify: "restify", polka: "polka",
 }
 
 // prettier-ignore
@@ -119,6 +126,9 @@ const STATE: Table = {
   "@tanstack/react-query": "TanStack Query", "@tanstack/query-core": "TanStack Query",
   swr: "SWR", "apollo-client": "Apollo", "@apollo/client": "Apollo", effector: "Effector",
   "@ngrx/store": "NgRx", vuex: "Vuex", nanostores: "Nano Stores",
+  immer: "Immer", "redux-saga": "Redux Saga", rxjs: "RxJS", "@preact/signals": "Signals",
+  "@legendapp/state": "Legend State", "@tanstack/store": "TanStack Store",
+  "react-hook-form": "React Hook Form", "@tanstack/react-form": "TanStack Form",
 }
 
 // prettier-ignore
@@ -129,6 +139,13 @@ const UI: Table = {
   "@mantine/core": "Mantine", "styled-components": "styled-components", "@emotion/react": "Emotion",
   bulma: "Bulma", "primereact: ": "PrimeReact", "@diceui/": "DiceUI", "class-variance-authority": "cva",
   "@nextui-org/react": "NextUI", vuetify: "Vuetify", "@ionic/react": "Ionic",
+  "@heroui/react": "HeroUI", "@ariakit/react": "Ariakit", "@base-ui-components/react": "Base UI",
+  "@fluentui/react-components": "Fluent", "@carbon/react": "Carbon", "@blueprintjs/core": "Blueprint",
+  "react-aria-components": "React Aria", "lucide-react": "Lucide", "react-icons": "React Icons",
+  "@tabler/icons-react": "Tabler", "@phosphor-icons/react": "Phosphor", "framer-motion": "Motion",
+  motion: "Motion", "@react-spring/web": "React Spring", gsap: "GSAP", cmdk: "cmdk",
+  sonner: "Sonner", vaul: "Vaul", "@dnd-kit/core": "dnd kit", "@tanstack/react-table": "TanStack Table",
+  "ag-grid-react": "AG Grid", "embla-carousel-react": "Embla",
 }
 
 // prettier-ignore
@@ -141,6 +158,17 @@ const CONNECTS: Table = {
   socket: "sockets", "socket.io": "Socket.IO", ws: "WebSocket", "@aws-sdk/client-s3": "S3",
   stripe: "Stripe", "@sentry/node": "Sentry", "@sentry/react": "Sentry", openai: "OpenAI",
   "@anthropic-ai/sdk": "Anthropic",
+  kysely: "Kysely", typeorm: "TypeORM", sequelize: "Sequelize", knex: "Knex",
+  "@libsql/client": "libSQL", "@neondatabase/serverless": "Neon", "@planetscale/database": "PlanetScale",
+  "@vercel/postgres": "Vercel Postgres", "@upstash/redis": "Upstash", mongodb: "MongoDB",
+  "@elastic/elasticsearch": "Elasticsearch", meilisearch: "Meilisearch", algoliasearch: "Algolia",
+  nodemailer: "Nodemailer", resend: "Resend", "@sendgrid/mail": "SendGrid", twilio: "Twilio",
+  "@slack/web-api": "Slack", "discord.js": "Discord", ai: "AI SDK", "@ai-sdk/openai": "AI SDK",
+  langchain: "LangChain", "@langchain/core": "LangChain", llamaindex: "LlamaIndex",
+  ollama: "Ollama", "@google/generative-ai": "Gemini", "@mistralai/mistralai": "Mistral",
+  replicate: "Replicate", "@huggingface/inference": "Hugging Face", "@lemonsqueezy/lemonsqueezy.js": "Lemon Squeezy",
+  "launchdarkly-js-client-sdk": "LaunchDarkly", "@unleash/proxy-client-react": "Unleash",
+  "@growthbook/growthbook": "GrowthBook", "@statsig/js-client": "Statsig",
 }
 
 // prettier-ignore
@@ -148,6 +176,10 @@ const TESTING: Table = {
   vitest: "Vitest", jest: "Jest", mocha: "Mocha", "@playwright/test": "Playwright",
   cypress: "Cypress", "@testing-library/react": "Testing Library", ava: "AVA",
   jasmine: "Jasmine", karma: "Karma", supertest: "supertest", pytest: "pytest",
+  msw: "MSW", nock: "nock", sinon: "Sinon", chai: "Chai", puppeteer: "Puppeteer",
+  webdriverio: "WebdriverIO", "selenium-webdriver": "Selenium", testcafe: "TestCafe",
+  "@stryker-mutator/core": "Stryker", "fast-check": "fast-check", "@faker-js/faker": "Faker",
+  k6: "k6", artillery: "Artillery", autocannon: "autocannon", c8: "c8", nyc: "nyc",
 }
 
 // prettier-ignore
@@ -155,12 +187,19 @@ const BUILDERS: Table = {
   vite: "Vite", webpack: "webpack", rollup: "Rollup", esbuild: "esbuild", parcel: "Parcel",
   turbo: "Turborepo", nx: "Nx", lerna: "Lerna", tsup: "tsup", rspack: "Rspack",
   "@swc/core": "SWC", babel: "Babel", "@babel/core": "Babel", gulp: "Gulp", grunt: "Grunt",
+  unbuild: "unbuild", tsdown: "tsdown", bunchee: "bunchee", microbundle: "microbundle",
+  rolldown: "Rolldown", "@changesets/cli": "Changesets", "semantic-release": "semantic-release",
+  "release-it": "release-it", husky: "Husky", "lint-staged": "lint-staged",
+  "@commitlint/cli": "commitlint", "simple-git-hooks": "simple-git-hooks", typedoc: "TypeDoc",
 }
 
 // prettier-ignore
 const LINTERS: Table = {
   eslint: "ESLint", "@biomejs/biome": "Biome", oxlint: "oxlint", tslint: "TSLint (dead)",
   standard: "standard", xo: "xo", stylelint: "Stylelint",
+  knip: "Knip", depcheck: "depcheck", madge: "Madge", "dependency-cruiser": "dependency-cruiser",
+  "ts-prune": "ts-prune", publint: "publint", "@arethetypeswrong/cli": "are the types wrong",
+  syncpack: "syncpack", sherif: "Sherif",
 }
 
 // prettier-ignore
@@ -170,6 +209,9 @@ const FORMATTERS: Table = { prettier: "Prettier", "@biomejs/biome": "Biome", oxf
 const RUNTIME: Table = {
   "@types/node": "Node", "bun-types": "Bun", "@cloudflare/workers-types": "Workers",
   "@deno/types": "Deno", "@types/aws-lambda": "Lambda", wrangler: "Workers",
+  "@types/bun": "Bun", "@vercel/node": "Vercel", "@netlify/functions": "Netlify",
+  "firebase-functions": "Firebase", "aws-cdk-lib": "AWS CDK", sst: "SST", serverless: "Serverless",
+  "@pulumi/pulumi": "Pulumi",
 }
 
 // prettier-ignore
@@ -177,6 +219,8 @@ const STYLING: Table = {
   sass: "Sass", less: "Less", stylus: "Stylus", postcss: "PostCSS", autoprefixer: "PostCSS",
   "@vanilla-extract/css": "vanilla-extract", "unocss": "UnoCSS", "tailwind-merge": "Tailwind",
   clsx: "clsx", classnames: "classnames",
+  "@pandacss/dev": "Panda", "@stitches/react": "Stitches", "@linaria/core": "Linaria",
+  "styled-jsx": "styled-jsx", "tailwind-variants": "tailwind-variants",
 }
 
 // prettier-ignore
@@ -185,6 +229,10 @@ const CONTENT: Table = {
   "@lingui/core": "i18n", "next-mdx-remote": "MDX", "@mdx-js/react": "MDX",
   contentlayer: "Contentlayer", "@sanity/client": "Sanity", "contentful": "Contentful",
   storyblok: "Storyblok", "@storybook/react": "Storybook", "@payloadcms/next": "Payload",
+  velite: "Velite", "fumadocs-core": "Fumadocs", nextra: "Nextra", "@docusaurus/core": "Docusaurus",
+  vitepress: "VitePress", "@keystatic/core": "Keystatic", tinacms: "TinaCMS",
+  "@prismicio/client": "Prismic", "gray-matter": "gray-matter", remark: "remark", rehype: "rehype",
+  shiki: "Shiki", prismjs: "Prism", "highlight.js": "highlight.js", marked: "marked",
 }
 
 // prettier-ignore
@@ -193,6 +241,9 @@ const OBSERVE: Table = {
   "@vercel/analytics": "Vercel Analytics", "@vercel/speed-insights": "Vercel Analytics",
   "@datadog/browser-rum": "Datadog", "@opentelemetry/api": "OpenTelemetry", mixpanel: "Mixpanel",
   "@amplitude/analytics-browser": "Amplitude", pino: "pino", winston: "winston",
+  "@bugsnag/js": "Bugsnag", rollbar: "Rollbar", "logrocket": "LogRocket", newrelic: "New Relic",
+  "prom-client": "Prometheus", "@axiomhq/js": "Axiom", "@grafana/faro-web-sdk": "Grafana Faro",
+  consola: "consola", loglevel: "loglevel", debug: "debug",
 }
 
 // prettier-ignore
@@ -200,6 +251,9 @@ const AUTH: Table = {
   "next-auth": "NextAuth", "@auth/core": "Auth.js", "@clerk/nextjs": "Clerk",
   "@auth0/auth0-react": "Auth0", passport: "Passport", jsonwebtoken: "JWT", jose: "JWT",
   "@supabase/auth-helpers-nextjs": "Supabase Auth", lucia: "Lucia", bcrypt: "bcrypt",
+  "better-auth": "Better Auth", "@workos-inc/node": "WorkOS", "@kinde-oss/kinde-auth-nextjs": "Kinde",
+  "openid-client": "OpenID", argon2: "argon2", "@node-rs/argon2": "argon2", "iron-session": "iron session",
+  "@stytch/nextjs": "Stytch", "keycloak-js": "Keycloak", "@propelauth/react": "PropelAuth",
 }
 
 // every dependency table, and the field it fills
@@ -542,6 +596,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     linters: [],
     formatters: [],
   }
+  const from: Record<string, string> = {}
   const scripts: string[] = []
   const bundlers: string[] = []
   const typescript: string[] = []
@@ -566,7 +621,13 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       names.add(name)
       pinning[pin(String(range))]++
       if (name === "typescript") add(typescript, String(range))
-      for (const [bucket, table] of TABLES) add(dep[bucket], label(table, name))
+      for (const [bucket, table] of TABLES) {
+        const found = label(table, name)
+        if (!found) continue
+        add(dep[bucket], found)
+        // several packages imply one label, the plainest name is the best evidence
+        if (!from[found] || name.length < from[found].length) from[found] = name
+      }
     }
   }
 
@@ -646,6 +707,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     apis: found.apis ?? [],
     licenses,
     parts,
+    from,
     ai: { ...signatures, tools, files: agentFiles },
   }
 }

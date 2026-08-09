@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/moved.tsx"
+import { Mark } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/stack-card.tsx"
@@ -16,7 +17,20 @@ import { allTime } from "../lib/live.ts"
 import type { Timeline } from "../../src/history.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
 
-const LANGS: Column<Node>[] = [{ key: "name", label: "Language", get: (l) => l.name }, ...METRICS]
+const LANGS: Column<Node>[] = [
+  {
+    key: "name",
+    label: "Language",
+    get: (l) => l.name,
+    cell: (l) => (
+      <span className="flex items-center gap-2">
+        <Mark label={l.name} />
+        {l.name}
+      </span>
+    ),
+  },
+  ...METRICS,
+]
 
 // prettier-ignore
 const people = (commits: number, moved: number, faces: Record<string, string>): Column<Contributor>[] => [

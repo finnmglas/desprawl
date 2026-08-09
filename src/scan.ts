@@ -10,7 +10,7 @@ const ts = "TypeScript"
 const js = "JavaScript"
 
 // prettier-ignore
-const LANGS: Record<string, string> = {
+export const LANGS: Record<string, string> = {
   ts, tsx: ts, mts: ts, cts: ts,
   js: js, jsx: js, mjs: js, cjs: js,
   rs: "Rust", py: "Python", go: "Go", rb: "Ruby", java: "Java", kt: "Kotlin",
@@ -18,14 +18,42 @@ const LANGS: Record<string, string> = {
   css: "CSS", scss: "SCSS", html: "HTML", vue: "Vue", svelte: "Svelte",
   json: "JSON", yaml: "YAML", yml: "YAML", toml: "TOML", sql: "SQL", prisma: "Prisma",
   md: "Markdown", sh: "Shell", bash: "Shell", flow: "Flow",
+  zig: "Zig", lua: "Lua", dart: "Dart", scala: "Scala", clj: "Clojure", cljs: "Clojure",
+  ex: "Elixir", exs: "Elixir", erl: "Erlang", hs: "Haskell", jl: "Julia", r: "R", nim: "Nim",
+  pl: "Perl", pm: "Perl", ps1: "PowerShell", bat: "Batch", cmd: "Batch", zsh: "Shell",
+  fish: "Shell", vb: "Visual Basic", f90: "Fortran", groovy: "Groovy", gradle: "Gradle",
+  tf: "Terraform", hcl: "HCL", nix: "Nix", proto: "Protobuf", graphql: "GraphQL", gql: "GraphQL",
+  sol: "Solidity", astro: "Astro", mdx: "MDX", tex: "LaTeX", adoc: "AsciiDoc", rst: "reStructuredText",
+  txt: "Text", snap: "Snapshot", svg: "SVG", xml: "XML", csv: "CSV", tsv: "CSV", ini: "INI",
+  cfg: "INI", conf: "INI", properties: "INI", plist: "XML", bzl: "Starlark", mk: "Make",
+  patch: "Patch", diff: "Patch", lock: "Lockfile", ipynb: "Notebook",
 }
 
 // named, not extended
 // prettier-ignore
-const NAMES: Record<string, string> = {
+export const NAMES: Record<string, string> = {
   makefile: "Make", "gnumakefile": "Make", dockerfile: "Docker", containerfile: "Docker",
   justfile: "just", rakefile: "Ruby", gemfile: "Ruby", brewfile: "Ruby", vagrantfile: "Ruby",
   jenkinsfile: "Groovy", procfile: "Procfile", "cmakelists.txt": "CMake",
+}
+
+// binaries carry no lines, but a repo holding them is worth seeing
+// prettier-ignore
+const DOCS: Record<string, string> = {
+  pdf: "PDF", doc: "Word", docx: "Word", odt: "Word", rtf: "Word",
+  xls: "Excel", xlsx: "Excel", xlsm: "Excel", ods: "Excel",
+  ppt: "PowerPoint", pptx: "PowerPoint", odp: "PowerPoint",
+  png: "Image", jpg: "Image", jpeg: "Image", gif: "Image", webp: "Image", ico: "Image",
+  bmp: "Image", tiff: "Image", avif: "Image", heic: "Image",
+  mp4: "Video", mov: "Video", avi: "Video", webm: "Video", mkv: "Video",
+  mp3: "Audio", wav: "Audio", flac: "Audio", ogg: "Audio", m4a: "Audio",
+  zip: "Archive", tar: "Archive", gz: "Archive", tgz: "Archive", bz2: "Archive",
+  "7z": "Archive", rar: "Archive", xz: "Archive",
+  ttf: "Font", otf: "Font", woff: "Font", woff2: "Font", eot: "Font",
+  psd: "Design", ai: "Design", sketch: "Design", fig: "Design", xd: "Design",
+  exe: "Binary", dll: "Binary", so: "Binary", dylib: "Binary", bin: "Binary", o: "Binary",
+  class: "Binary", jar: "Binary", pyc: "Binary", wasm: "WebAssembly",
+  db: "Database", sqlite: "Database", sqlite3: "Database", mdb: "Database",
 }
 
 // the other way a file says what it is
@@ -131,7 +159,15 @@ export function scan(repo: string): Node[] {
     const file = join(repo, path)
     // submodule, symlink and raced delete all come back null
     const peek = head(file)
-    if (!peek || peek.includes(0)) continue
+    if (!peek) continue
+
+    // a document has no lines to count, but it is still a file the repo carries
+    if (peek.includes(0)) {
+      const kind = DOCS[ext]
+      if (kind)
+        files.push({ ...blank(path.slice(slash + 1), path), lang: kind, files: 1, langs: {} })
+      continue
+    }
 
     // a name we know beats an extension, or CMakeLists.txt would be txt
     const named = NAMES[path.slice(slash + 1).toLowerCase()]

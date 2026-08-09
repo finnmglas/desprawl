@@ -1,6 +1,7 @@
 // owner: finn
 // goal: what this repo is, at a glance
 
+import { useState } from "react"
 import { Badge } from "./badge.tsx"
 import { Card, CardContent } from "./card.tsx"
 import { Chip } from "./chip.tsx"
@@ -9,6 +10,7 @@ import { CopyButton } from "./copy-button.tsx"
 import { Tip } from "./tip.tsx"
 import { num } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
+import { byWeight } from "../lib/rank.ts"
 import type { Stack } from "../../src/stack.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
@@ -67,7 +69,7 @@ function describe(stack: Stack): Section[] {
     {
       title: "Build",
       rows: [
-        ["Tools", [...stack.build, ...stack.bundlers]],
+        ["Tools", [...new Set([...stack.build, ...stack.bundlers])]],
         ["Testing", stack.testing],
         ["Lint", stack.linters],
         ["Format", stack.formatters],
@@ -96,7 +98,50 @@ function describe(stack: Stack): Section[] {
 const kept = (rows: [string, Items][]) =>
   rows.map(([label, items]) => [label, items.filter(Boolean)] as const).filter(([, i]) => i.length)
 
-function Group({ title, rows }: Section) {
+const SHOWN = 5
+
+/** the structural ones first, the rest behind a count until asked for */
+function Row({
+  label,
+  items,
+  from,
+}: {
+  label: string
+  items: string[]
+  from: Record<string, string>
+}) {
+  const [all, setAll] = useState(false)
+  const sorted = byWeight(items)
+  const hidden = sorted.length - SHOWN
+
+  return (
+    <div className="flex items-start gap-2">
+      <Tip
+        text={HINTS[label]}
+        className="text-muted-foreground w-20 shrink-0 pt-1 text-xs leading-4"
+      >
+        {label}
+      </Tip>
+      <span className="flex flex-wrap gap-1">
+        {(all ? sorted : sorted.slice(0, SHOWN)).map((item) => (
+          <Chip key={item} label={item} from={from[item]} />
+        ))}
+        {hidden > 0 && (
+          <Badge
+            variant="outline"
+            onClick={() => setAll(!all)}
+            className="cursor-pointer font-normal"
+            title={all ? "show fewer" : `show ${hidden} more`}
+          >
+            {all ? "less" : `+${hidden}`}
+          </Badge>
+        )}
+      </span>
+    </div>
+  )
+}
+
+function Group({ title, rows, from }: Section & { from: Record<string, string> }) {
   const shown = kept(rows)
   if (!shown.length) return null
   return (
@@ -105,19 +150,7 @@ function Group({ title, rows }: Section) {
         {title}
       </span>
       {shown.map(([label, items]) => (
-        <div key={label} className="flex items-start gap-2">
-          <Tip
-            text={HINTS[label]}
-            className="text-muted-foreground w-20 shrink-0 pt-1 text-xs leading-4"
-          >
-            {label}
-          </Tip>
-          <span className="flex flex-wrap gap-1">
-            {items.map((item) => (
-              <Chip key={String(item)} label={String(item)} />
-            ))}
-          </span>
-        </div>
+        <Row key={label} label={label} items={items.map(String)} from={from} />
       ))}
     </div>
   )
@@ -148,11 +181,14 @@ export function StackCard({ stack }: { stack: Stack }) {
   return (
     <Card>
       <CardHead title="Project metadata" hint={identity} wrap>
-        {stack.parts.map((part) => (
-          <Badge key={part} variant="outline">
-            {part}
-          </Badge>
-        ))}
+        {/* centred on the card, not on the gap left between the title and the button */}
+        <div className="order-last flex w-full flex-wrap justify-center gap-1 sm:absolute sm:inset-x-0 sm:order-none sm:mx-auto sm:w-fit">
+          {stack.parts.map((part) => (
+            <Tip key={part} text={HINTS[part]} side="bottom">
+              <Badge variant="outline">{part}</Badge>
+            </Tip>
+          ))}
+        </div>
         <CopyButton
           className="ml-auto"
           text={asText}
@@ -177,7 +213,7 @@ export function StackCard({ stack }: { stack: Stack }) {
 
         <div className="grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
           {sections.map((section) => (
-            <Group key={section.title} {...section} />
+            <Group key={section.title} {...section} from={stack.from} />
           ))}
         </div>
       </CardContent>

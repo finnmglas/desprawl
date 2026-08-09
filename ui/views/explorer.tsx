@@ -2,17 +2,18 @@
 // goal: click folders, see loc per language
 
 import { useEffect, useMemo, useState } from "react"
-import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
 import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
+import { Kind } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { toast } from "../components/toast.tsx"
 import { nest, num, pct } from "../lib/format.ts"
 import { filesIn } from "../lib/live.ts"
+import { mainly } from "../lib/tint.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
@@ -69,10 +70,10 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
       get: (n) => (n.children ? `${n.name}/` : n.name),
       cell: (n) => (
         <span className="flex items-center gap-2">
+          <Kind folder={!!n.children} lang={n.children ? mainly(n.langs) : (n.lang ?? "")} />
           <span className={cn("font-mono text-xs", n.children && "font-medium")}>
             {n.children ? `${n.name}/` : n.name}
           </span>
-          {!n.children && n.lang && <Badge variant="outline">{n.lang}</Badge>}
         </span>
       ),
     },
