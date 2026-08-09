@@ -13,6 +13,8 @@ Analyzes only git-tracked files.
 - **contributors**, merged by email (with renames followed)
 - **project metadata**, the stack read off manifests and marker files: language, packages and pinning, frameworks, what it connects to, build, ci and containers
 - **assistance**, which ai coding tools left a trace, from checked in rules and from commit signatures
+- **imports**, every module specifier resolved to the file it names, with aliases, workspace packages and the `.js` to `.ts` rewrite followed
+- **structure**, those imports folded into groups: the levels they stack into, what stays inside a group against what leaves, and the loops that stop any of them being moved
 
 ```
 /home/you/desprawl  @3982e3d
@@ -60,6 +62,8 @@ desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--comm
 `desprawl` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1:7423`, falling back to a free port when that one is taken, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost. One fixed origin means the browser keeps your display settings between runs. Closing the last tab ends the run, so nothing is left listening, and `--keep` turns that off.
 
 Given a git url instead of a path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses that, or fast forwards the copy it already has. The https and ssh forms of one url land in the same place.
+
+The **Modules** view reads the import graph rather than the tree. Files are grouped into folders, `auto` picking them by weight so no group holds more than a tenth of the repo and no group is a single file, or by a fixed depth if you prefer. Each group gets a level from how far its own dependencies reach, a share of imports that never leave it, and a place in a grid of every dependency at once. Groups that import each other are reported as loops, together with a set of imports whose removal opens them, each marked as type only or real work.
 
 `desprawl --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
 

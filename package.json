@@ -1,6 +1,6 @@
 {
   "name": "desprawl",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.",
   "license": "MIT",
   "type": "module",
