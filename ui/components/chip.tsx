@@ -46,7 +46,7 @@ export function Chip({ label, from }: { label: string; from?: string }) {
       }
     >
       {href ? (
-        <a href={href} target="_blank" rel="noreferrer" title={from ? `${from} on npm` : name}>
+        <a href={href} target="_blank" rel="noreferrer">
           {badge}
         </a>
       ) : (

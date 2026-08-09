@@ -3,8 +3,10 @@
 # goal: nothing lands that the checks reject
 
 # whichever manager this machine has, so a missing pnpm does not block a commit
+# build too: the checks typecheck the source, only the build parses the jsx the way
+# esbuild does, and a bundle that will not build is worse than a test that fails
 if command -v pnpm >/dev/null 2>&1; then
-  pnpm check && pnpm test
+  pnpm check && pnpm test && pnpm build
 else
-  npm run check && npm test
+  npm run check && npm test && npm run build
 fi

@@ -12,7 +12,10 @@ import { Mark } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/stack-card.tsx"
+import { Tip } from "../components/tip.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
+import { cn } from "../lib/ui.ts"
+import { TONES, commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
 import { allTime } from "../lib/live.ts"
 import type { Timeline } from "../../src/history.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
@@ -93,19 +96,22 @@ export function Overview({
           {
             label: "Lines of code",
             value: num(stats.code),
-            sub: `${num(stats.files)} files`,
+            sub: `${num(stats.files)} files${stats.stack.primary ? `, primarily ${stats.stack.primary}` : ""}`,
+            verdict: sizeOf(stats.code),
             to: "Files",
           },
           {
             label: "Comments",
             value: num(stats.comment),
             sub: `${pct(stats.comment, source)} of source`,
+            verdict: commentsOf(stats.comment, source),
             to: "Files",
           },
           {
             label: "Tokens",
             value: `~${num(tokens(stats.chars))}`,
             sub: `${num(stats.chars)} chars`,
+            verdict: contextOf(tokens(stats.chars)),
             to: "Files",
           },
           {
@@ -114,17 +120,29 @@ export function Overview({
             sub: stats.truncated
               ? `${plural(stats.contributors.length, "dev")} in the latest ${num(stats.commits)}`
               : `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
+            verdict: historyOf(total),
             to: "History",
           },
         ].map((card) => (
           <Card
             key={card.label}
             onClick={() => onTab(card.to)}
-            title={`Open ${card.to}`}
+            // no native title here: the browser's own tooltip would cover the badge's
+            aria-label={`Open ${card.to}`}
             className="hover:border-ring cursor-pointer transition-colors"
           >
-            <CardHeader>
+            <CardHeader className="flex-row items-start gap-2">
               <CardTitle className="text-muted-foreground">{card.label}</CardTitle>
+              <Tip text={card.verdict.why} side="bottom" className="ml-auto">
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
+                    TONES[card.verdict.tone],
+                  )}
+                >
+                  {card.verdict.label}
+                </span>
+              </Tip>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="text-2xl font-semibold tabular-nums">{card.value}</div>
