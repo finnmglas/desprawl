@@ -8,6 +8,7 @@ import { CopyButton } from "./copy-button.tsx"
 import { DownloadButton } from "./download-button.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { Tip } from "./tip.tsx"
+import { type Column } from "../lib/columns.ts"
 import { delimit, named } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { backdrop, cycle, pct } from "../lib/format.ts"
@@ -16,21 +17,7 @@ import { useDisplay } from "../lib/display.tsx"
 import type { Sort } from "../lib/format.ts"
 import { cn } from "../lib/ui.ts"
 
-export interface Column<T> {
-  key: string
-  label: string
-  num?: boolean
-  /** Exported and sorted value. */
-  get: (row: T) => string | number
-  /** Render override, defaults to get(). */
-  cell?: (row: T) => React.ReactNode
-  /** Suppress backdrop bar on numeric column */
-  flat?: boolean
-  /** Row relative denominator, columns without one stay absolute */
-  ofRow?: (row: T) => number
-  /** Shown on hover, overriding the shared note for this label */
-  hint?: string
-}
+export type { Column }
 
 export interface DataTableProps<T> {
   title: string

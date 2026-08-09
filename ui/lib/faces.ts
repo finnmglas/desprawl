@@ -1,7 +1,7 @@
 // owner: finn
 // goal: ask github once which email belongs to which face
 
-import { toast } from "../components/toast.tsx"
+import { toast } from "./toast.ts"
 import type { Stats } from "../../src/model.ts"
 
 const PAGES = 3 // 300 commits is enough to name everyone who still shows in the table

@@ -1,7 +1,7 @@
 // owner: finn
 // goal: parts too big to ship up front, asked for once the ui is painted
 
-import { toast } from "../components/toast.tsx"
+import { toast } from "./toast.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"

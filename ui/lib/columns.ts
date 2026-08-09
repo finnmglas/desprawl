@@ -2,8 +2,23 @@
 // goal: one definition of the per node metrics, shared by every table that shows them
 
 import { churn, day, nest, num, tokens } from "./format.ts"
-import type { Column } from "../components/data-table.tsx"
 import type { Node } from "../../src/model.ts"
+
+export interface Column<T> {
+  key: string
+  label: string
+  num?: boolean
+  /** Exported and sorted value. */
+  get: (row: T) => string | number
+  /** Render override, defaults to get(). */
+  cell?: (row: T) => React.ReactNode
+  /** Suppress backdrop bar on numeric column */
+  flat?: boolean
+  /** Row relative denominator, columns without one stay absolute */
+  ofRow?: (row: T) => number
+  /** Shown on hover, overriding the shared note for this label */
+  hint?: string
+}
 
 /** a row's own lines, the denominator when reading shares within a row */
 export const lines = (n: Node) => n.code + n.comment + n.blank
