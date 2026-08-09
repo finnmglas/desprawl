@@ -34,16 +34,17 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 ## CLI reference
 
 ```sh
-desprawl [view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
+desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
-|                          |                                                 |
-| ------------------------ | ----------------------------------------------- |
-| `desprawl`               | report on the current directory                 |
-| `desprawl ../other-repo` | report on another repo                          |
-| `desprawl view`          | open the explorer live, reanalysing on demand   |
-| `desprawl view --static` | open it as one self contained html file instead |
-| `desprawl --json`        | whole report, tree + time series                |
+|                          |                                              |
+| ------------------------ | -------------------------------------------- |
+| `desprawl`               | open the explorer on the current directory   |
+| `desprawl ../other-repo` | open it on another repo                      |
+| `desprawl <git url>`     | clone it to your downloads, then open that   |
+| `desprawl cli`           | print the report in the terminal instead     |
+| `desprawl --static`      | open one self contained html file, no server |
+| `desprawl --json`        | whole report, tree + time series             |
 
 | flag          |                                                                     |
 | ------------- | ------------------------------------------------------------------- |
@@ -51,13 +52,16 @@ desprawl [view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits 
 | `--top N`     | contributors shown, default 10                                      |
 | `--commits N` | commits read from the log, default 10,000                           |
 | `--digits N`  | significant digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
-| `--static`    | with `view`, write a standalone file rather than serving            |
+| `--static`    | write a standalone file rather than serving                         |
+| `--keep`      | keep serving after the last tab closes                              |
 | `--raw`       | exact numbers instead of scaled ones                                |
 | `--json`      | machine readable, every number exact                                |
 
-`desprawl view` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1:7423`, falling back to a free port when that one is taken, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost. One fixed origin means the browser keeps your display settings between runs.
+`desprawl` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1:7423`, falling back to a free port when that one is taken, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost. One fixed origin means the browser keeps your display settings between runs. Closing the last tab ends the run, so nothing is left listening, and `--keep` turns that off.
 
-`desprawl view --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
+Given a git url instead of a path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses that, or fast forwards the copy it already has. The https and ssh forms of one url land in the same place.
+
+`desprawl --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
 
 ## Read more
 

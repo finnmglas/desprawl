@@ -43,6 +43,7 @@ export function analyze(repo: string, cap?: number): Stats {
   const { byPath, ...hist } = history(root, cap)
   for (const f of files) Object.assign(f, byPath.get(f.path))
 
+  const languages = fold(files, (f) => f.lang ?? "")
   const tree = grow(files)
   // a file's langs is redundant once the parents have aggregated
   for (const f of files) f.langs = {}
@@ -53,8 +54,8 @@ export function analyze(repo: string, cap?: number): Stats {
     repo: root,
     head,
     ...hist,
-    languages: fold(files, (f) => f.lang ?? ""),
-    stack: stack(root),
+    languages,
+    stack: stack(root, languages),
     tree,
     remotes: remotes(root),
     ...totals,

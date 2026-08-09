@@ -13,16 +13,17 @@ const KEY = "desprawl-locale"
 export const EXPORT_LOCALE = "en-US"
 
 const resolve = (choice: Choice): string =>
-  choice === "auto" ? (navigator.language ?? EXPORT_LOCALE) : choice
+  choice === "auto" ? (globalThis.navigator?.language ?? EXPORT_LOCALE) : choice
 
-export const stored = (): Choice => (localStorage.getItem(KEY) as Choice | null) ?? "auto"
+export const stored = (): Choice =>
+  (globalThis.localStorage?.getItem(KEY) as Choice | null) ?? "auto"
 
-let active = resolve(stored())
+let active = ""
 
 /** Read at format time, so a change repaints without threading a prop everywhere. */
-export const locale = (): string => active
+export const locale = (): string => (active ||= resolve(stored()))
 
 export function setLocale(choice: Choice): void {
   active = resolve(choice)
-  localStorage.setItem(KEY, choice)
+  globalThis.localStorage?.setItem(KEY, choice)
 }

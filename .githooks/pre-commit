@@ -1,0 +1,10 @@
+#!/bin/sh
+# owner: finn
+# goal: nothing lands that the checks reject
+
+# whichever manager this machine has, so a missing pnpm does not block a commit
+if command -v pnpm >/dev/null 2>&1; then
+  pnpm check && pnpm test
+else
+  npm run check && npm test
+fi

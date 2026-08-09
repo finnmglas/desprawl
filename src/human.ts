@@ -1,5 +1,5 @@
 // owner: finn
-// goal: simple number postfixes
+// goal: numbers the cli and the ui both have to agree on
 
 const UNITS = ["", "k", "m", "b", "t"]
 
@@ -16,3 +16,12 @@ export function human(n: number, digits: number): string {
   const whole = Math.floor(v).toString().length
   return sign + v.toFixed(Math.max(0, digits - whole)) + UNITS[unit]
 }
+
+export const tokens = (chars: number): number => Math.round(chars / 4)
+
+export const pct = (n: number, of: number): string =>
+  of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%"
+
+// mean indentation of code lines
+export const nest = (s: { code: number; indent: number }): string =>
+  s.code ? (s.indent / s.code).toFixed(1) : "0.0"

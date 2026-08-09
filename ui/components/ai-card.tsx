@@ -1,13 +1,13 @@
 // owner: finn
 // goal: show which assistants touched repo
 
-import { Badge } from "./badge.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "./card.tsx"
+import { Card, CardContent } from "./card.tsx"
+import { Chip } from "./chip.tsx"
+import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
 import { Tip } from "./tip.tsx"
 import { num, pct } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
-import { NOTES } from "../../src/notes.ts"
 import type { Ai } from "../../src/stack.ts"
 
 /** The rows, shared by the panel and the copy */
@@ -33,13 +33,11 @@ export function AiCard({ ai }: { ai: Ai }) {
 
   return (
     <Card>
-      <CardHeader className="flex-row flex-wrap items-center gap-2">
-        <div className="flex flex-col gap-0.5">
-          <CardTitle>Assistance</CardTitle>
-          <span className="text-muted-foreground text-xs">
-            {rows.length ? share : "no assistant left a trace here"}
-          </span>
-        </div>
+      <CardHead
+        title="Assistance"
+        hint={rows.length ? share : "no assistant left a trace here"}
+        wrap
+      >
         {rows.length > 0 && (
           <CopyButton
             className="ml-auto"
@@ -48,7 +46,7 @@ export function AiCard({ ai }: { ai: Ai }) {
             note="Tools, signatures and rule files"
           />
         )}
-      </CardHeader>
+      </CardHead>
 
       {rows.length > 0 && (
         <CardContent className="flex flex-wrap gap-x-10 gap-y-3 pt-1">
@@ -58,11 +56,7 @@ export function AiCard({ ai }: { ai: Ai }) {
                 {label}
               </Tip>
               {items.map((item) => (
-                <Tip key={item} text={NOTES[item.split(" ")[0]]}>
-                  <Badge variant="secondary" className="font-normal">
-                    {item}
-                  </Badge>
-                </Tip>
+                <Chip key={item} label={item} />
               ))}
             </div>
           ))}

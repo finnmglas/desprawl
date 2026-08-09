@@ -3,6 +3,7 @@
 
 import { randomBytes } from "node:crypto"
 import { createServer } from "node:http"
+import type { ServerResponse } from "node:http"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
@@ -11,22 +12,31 @@ import { bytesAt, count, detail, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
-import { open, shell } from "./view.ts"
+import { explain } from "./needs.ts"
+import { shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
+
+// long enough for a reload, a sleeping laptop or a network blip to reconnect,
+// short enough that closing the tab feels like it ended the command
+const GRACE = 15_000
 
 // fixed port, one origin, so the browser keeps its storage
 const PORT = 7423
 
-const store = join(
-  process.env.XDG_CONFIG_HOME || join(homedir(), ".config"),
-  "desprawl",
-  "prefs.json",
-)
+// where each platform keeps small config of its own
+const config =
+  process.platform === "win32"
+    ? (process.env.APPDATA ?? homedir())
+    : process.env.XDG_CONFIG_HOME || join(homedir(), ".config")
+
+const store = join(config, "desprawl", "prefs.json")
 
 const readPrefs = (): string => {
   try {
-    return readFileSync(store, "utf8")
+    const text = readFileSync(store, "utf8")
+    JSON.parse(text) // catch corruptions
+    return text
   } catch {
     return "{}"
   }
@@ -51,7 +61,18 @@ function prune(node: Node): Node {
 const find = (node: Node, path: string[]): Node | undefined =>
   path.reduce<Node | undefined>((at, part) => at?.children?.find((c) => c.name === part), node)
 
-export function serve(repo: string, cap?: number, port = PORT): Promise<string> {
+export function serve(
+  repo: string,
+  cap?: number,
+  keep = false,
+  port = PORT,
+  /** the page to hand out, given rather than read when a caller has one */
+  viewer?: string,
+): Promise<string> {
+  // closing the last tab ends the run
+  const tabs = new Set<ServerResponse>()
+  let farewell: NodeJS.Timeout | undefined
+
   // hold it until the head moves or a refresh asks
   let cache: { head: string; stats: Stats } | null = null
   let total = 0
@@ -66,7 +87,16 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
   }
   // every page in the browser can reach localhost, so the port alone is not a secret
   const token = randomBytes(16).toString("hex")
-  const html = shell()
+  // the api answers without a built viewer, only the page itself needs one
+  const html =
+    viewer ??
+    (() => {
+      try {
+        return shell()
+      } catch {
+        return ""
+      }
+    })()
 
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
@@ -75,7 +105,12 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
       const allowed = `http://${HOST}:${(server.address() as { port: number }).port}`
 
       const send = (code: number, body: string, type: string) => {
-        res.writeHead(code, { "content-type": type, "cache-control": "no-store" })
+        res.writeHead(code, {
+          "content-type": type,
+          "cache-control": "no-store",
+          // the url holds the token, and referer would hand it to github
+          "referrer-policy": "no-referrer",
+        })
         res.end(body)
       }
 
@@ -85,14 +120,50 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
         return send(401, "bad token", "text/plain")
       }
 
-      if (url.pathname === "/") return send(200, html, "text/html")
+      const json = (data: unknown, code = 200) =>
+        send(code, JSON.stringify(data), "application/json")
+
+      if (url.pathname === "/")
+        return html
+          ? send(200, html, "text/html")
+          : send(500, "no viewer built, run: pnpm build", "text/plain")
+
+      // the browser holds this open for as long as the tab lives
+      if (url.pathname === "/api/session") {
+        res.writeHead(200, {
+          "content-type": "text/event-stream",
+          "cache-control": "no-store",
+          connection: "keep-alive",
+        })
+        res.write(": open\n\n")
+        tabs.add(res)
+        clearTimeout(farewell)
+        req.on("close", () => {
+          tabs.delete(res)
+          if (keep || tabs.size) return
+          farewell = setTimeout(() => {
+            console.log(
+              "\n\nLast tab closed, so desprawl stopped. Pass --keep to leave it running.\n",
+            )
+            process.exit(0)
+          }, GRACE)
+        })
+        return
+      }
 
       // on disk, so a new port keeps them
       if (url.pathname === "/api/prefs") {
         if (req.method === "GET") return send(200, readPrefs(), "application/json")
         if (req.method === "PUT") {
           let body = ""
-          req.on("data", (chunk) => (body += chunk))
+          // settings are small, catch it
+          req.on("data", (chunk) => {
+            body += chunk
+            if (body.length > 64_000) {
+              send(413, "settings are smaller than this", "text/plain")
+              req.destroy()
+            }
+          })
           req.on("end", () => {
             try {
               JSON.parse(body) // never poison the next read
@@ -108,26 +179,22 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
       try {
         if (url.pathname === "/api/stats") {
           const stats = load(url.searchParams.has("fresh"))
-          return send(
-            200,
-            JSON.stringify({ ...stats, tree: prune(stats.tree) }),
-            "application/json",
-          )
+          return json({ ...stats, tree: prune(stats.tree) })
         }
 
-        // one folder's files
         if (url.pathname === "/api/files") {
           const at = url.searchParams.get("path") ?? ""
           const node = find(load(false).tree, at.split("/").filter(Boolean))
-          const files = (node?.children ?? []).filter((c) => !c.children)
-          return send(200, JSON.stringify(files), "application/json")
+          // an empty list would read as an empty folder, which is a different thing
+          if (!node) return json({ error: `no folder at ${at}` }, 404)
+          const files = (node.children ?? []).filter((c) => !c.children)
+          return json(files)
         }
 
-        // one commit in full, asked for when a row is opened
         if (url.pathname === "/api/commit") {
           const hash = url.searchParams.get("hash") ?? ""
           if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(400, "bad hash", "text/plain")
-          return send(200, JSON.stringify(detail(repo, hash)), "application/json")
+          return json(detail(repo, hash))
         }
 
         // older commits, walked not read whole
@@ -135,42 +202,43 @@ export function serve(repo: string, cap?: number, port = PORT): Promise<string> 
           const skip = Number(url.searchParams.get("skip")) || 0
           const take = Math.min(Number(url.searchParams.get("count")) || 200, 2000)
           const names = load(false).contributors.map((c) => (c.email || c.name).toLowerCase())
-          return send(200, JSON.stringify(page(repo, skip, take, names)), "application/json")
+          return json(page(repo, skip, take, names))
         }
 
         // slow, so the ui asks after it has painted
         if (url.pathname === "/api/count") {
           total ||= count(repo)
-          return send(200, JSON.stringify({ commits: total }), "application/json")
+          return json({ commits: total })
         }
 
         // measured at even points, not accumulated
         if (url.pathname === "/api/size") {
           allTime ||= timeline(repo)
           sizes ||= allTime.samples.map((s) => ({ date: s.date, bytes: bytesAt(repo, s.hash) }))
-          return send(200, JSON.stringify(sizes), "application/json")
+          return json(sizes)
         }
 
         // dates and authors only, so the chart spans everything
         if (url.pathname === "/api/timeline") {
           allTime ||= timeline(repo)
-          return send(200, JSON.stringify(allTime), "application/json")
+          return json(allTime)
         }
       } catch (err) {
-        return send(500, JSON.stringify({ error: String(err) }), "application/json")
+        const said = explain(err) ?? (err instanceof Error ? err.message.trim() : String(err))
+        return json({ error: said }, 500)
       }
       return send(404, "not found", "text/plain")
     })
 
     // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE" && port === PORT) serve(repo, cap, 0).then(resolve, reject)
+      if (err.code === "EADDRINUSE" && port === PORT)
+        serve(repo, cap, keep, 0, viewer).then(resolve, reject)
       else reject(err)
     })
     server.listen(port, HOST, () => {
-      const live = `http://${HOST}:${(server.address() as { port: number }).port}/?t=${token}`
-      open(live)
-      resolve(live)
+      // the caller decides whether a browser opens, so a test can hold this url quietly
+      resolve(`http://${HOST}:${(server.address() as { port: number }).port}/?t=${token}`)
     })
   })
 }

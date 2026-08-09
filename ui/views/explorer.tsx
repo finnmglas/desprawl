@@ -5,18 +5,16 @@ import { useEffect, useMemo, useState } from "react"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
+import { withShare } from "../lib/columns.ts"
 import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
 import { Onward } from "../components/onward.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { toast } from "../components/toast.tsx"
-import { churn, day, nest, num, pct, tokens } from "../lib/format.ts"
+import { nest, num, pct } from "../lib/format.ts"
 import { filesIn } from "../lib/live.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
-
-// a row's own lines, the denominator when reading shares within a row
-const lines = (n: Node) => n.code + n.comment + n.blank
 
 // files carry no langs map, their one language is the file itself
 const own = (n: Node, lang: string): number =>
@@ -63,7 +61,6 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
     toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
   }
 
-  // prettier-ignore
   const columns: Column<Node>[] = [
     {
       key: "name",
@@ -79,17 +76,8 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
         </span>
       ),
     },
-    { key: "code", label: "loc", num: true, get: (n) => n.code, cell: (n) => num(n.code), ofRow: lines },
-    { key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) },
-    { key: "comment", label: "comment", num: true, get: (n) => n.comment, cell: (n) => num(n.comment), ofRow: lines },
-    { key: "blank", label: "blank", num: true, get: (n) => n.blank, cell: (n) => num(n.blank), ofRow: lines },
-    { key: "files", label: "files", num: true, get: (n) => n.files, cell: (n) => num(n.files) },
-    { key: "chars", label: "chars", num: true, get: (n) => n.chars, cell: (n) => num(n.chars) },
-    { key: "tok", label: "~tok", num: true, get: (n) => tokens(n.chars), cell: (n) => num(tokens(n.chars)) },
-    { key: "nest", label: "nest", num: true, get: (n) => Number(nest(n)) },
-    { key: "commits", label: "com", num: true, get: (n) => n.commits, cell: (n) => num(n.commits) },
-    { key: "churn", label: "churn", num: true, get: (n) => churn(n), cell: (n) => num(churn(n)) },
-    { key: "last", label: "last", num: true, get: (n) => n.last, cell: (n) => day(n.last), flat: true },
+    // prettier-ignore
+    ...withShare({ key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) }),
   ]
 
   return (

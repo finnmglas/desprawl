@@ -7,9 +7,13 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 // one level up from src in the repo, and from dist in the package
-export const VERSION: string = JSON.parse(
-  readFileSync(join(import.meta.dirname, "../package.json"), "utf8"),
-).version
+const manifest = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as {
+  version: string
+  engines: { node: string }
+}
+
+export const VERSION: string = manifest.version
+export const ENGINE: string = manifest.engines.node
 
 export interface Split {
   code: number
@@ -110,11 +114,15 @@ export interface Stats extends Split {
   last: string
 }
 
-// estimate
-export const tokens = (chars: number): number => Math.round(chars / 4)
-
+// stderr piped, not inherited, so git's own wording never lands on top of ours.
+// quotePath off, or a path with an umlaut arrives escaped and matches nothing
 export const git = (cwd: string, ...args: string[]): string =>
-  execFileSync("git", args, { cwd, encoding: "utf8", maxBuffer: 1 << 30 })
+  execFileSync("git", ["-c", "core.quotePath=false", ...args], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 1 << 30,
+    stdio: "pipe",
+  })
 
 // prettier-ignore
 export const blank = (name: string, path = ""): Node => ({

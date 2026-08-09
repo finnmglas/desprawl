@@ -2,16 +2,20 @@
 // owner: finn
 // goal: render stats
 
+import { existsSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
-import { human } from "./human.ts"
-import { blank, merge, tokens } from "./model.ts"
+import { human, nest, pct, tokens } from "./human.ts"
+import { blank, git, merge } from "./model.ts"
+import { explain, needs } from "./needs.ts"
+import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
-import { view } from "./view.ts"
+import { open, view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
-  console.error(`desprawl: ${err instanceof Error ? err.message.trim() : err}`)
+  const said = typeof err === "string" ? err : explain(err)
+  console.error(`desprawl: ${said ?? (err instanceof Error ? err.message.trim() : err)}`)
   return process.exit(1)
 }
 
@@ -27,6 +31,7 @@ const { values, positionals } = (() => {
         commits: { type: "string" },
         raw: { type: "boolean", default: false },
         static: { type: "boolean", default: false },
+        keep: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -38,20 +43,33 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [view] [path] [--static] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    "desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
   )
   process.exit(0)
 }
 
-const viewing = positionals[0] === "view"
-const target = (viewing ? positionals[1] : positionals[0]) ?? process.cwd()
+// git and node are the only things a user has to bring
+const missing = needs()
+if (missing) fail(missing)
+
+// a first positional is the command only when it names one, otherwise it is the path
+const command = ["cli", "view"].includes(positionals[0] ?? "") ? positionals[0] : ""
+const asked = (command ? positionals[1] : positionals[0]) ?? process.cwd()
+
+// a url is fetched to disk first, everything below only ever sees a path
+const target = (() => {
+  try {
+    return isUrl(asked) ? local(asked) : asked
+  } catch (err) {
+    return fail(err)
+  }
+})()
+
+// the explorer is the default surface, the terminal report is asked for by name or by --json
+const viewing = command !== "cli" && !values.json
 
 const num = (n: number): string => n.toLocaleString("en-US")
-const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
-
-// mean nesting lv
-const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")
 
 // junk falls back, never NaN
 const int = (v: string | undefined, fallback: number): number =>
@@ -61,6 +79,9 @@ const int = (v: string | undefined, fallback: number): number =>
 const big = values.raw ? num : (v: number) => human(v, int(values.digits, 3))
 const top = int(values.top, 10)
 const depth = int(values.depth, 1)
+
+// junk or zero means the default, never NaN on git's command line
+const cap = int(values.commits, 0) || undefined
 
 const NAMES = 44
 
@@ -87,7 +108,6 @@ const row = (b: Counts, total: number, label: string, extra: string[] = []): str
 
 const churn = (n: Node): string[] => [num(n.commits), big(n.insertions + n.deletions), day(n.last)]
 
-// header sets widths
 const section = (title: string, head: string[], rows: string[][], total: string[]): string =>
   `\n${table([[title, ...head], ...rows, total])}`
 
@@ -107,6 +127,12 @@ function branch(n: Node, total: number, level = 0): string[][] {
 }
 
 function report(s: Stats): string {
+  if (!s.files)
+    return (
+      `${s.repo}  @${s.head}\n` +
+      "Nothing countable here. Every tracked file is binary, or has neither a known extension " +
+      "nor a name desprawl recognises."
+    )
   const source = s.code + s.comment
   const moved = s.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const shown = s.contributors.slice(0, top)
@@ -152,11 +178,19 @@ function report(s: Stats): string {
 }
 
 try {
+  // say it here in a sentence, a served failure is a 500 nobody can read
+  if (!existsSync(target)) fail(`no such path as ${target}`)
+  // --git-dir passes on a bare repo and on one with no commits, these do not
+  git(target, "rev-parse", "--show-toplevel")
+  git(target, "rev-parse", "HEAD")
+
   // live analyses per request, so it never needs the report up front
-  if (viewing && !values.static)
-    console.log(await serve(target, values.commits ? Number(values.commits) : undefined))
-  else {
-    const stats = analyze(target, values.commits ? Number(values.commits) : undefined)
+  if (viewing && !values.static) {
+    const live = await serve(target, cap, values.keep)
+    open(live)
+    console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
+  } else {
+    const stats = analyze(target, cap)
     if (viewing) console.log(view(stats))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }
