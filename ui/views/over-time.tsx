@@ -4,13 +4,16 @@
 import { useEffect, useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, XAxis, YAxis } from "recharts"
 import { Button } from "../components/button.tsx"
+import { CopyButton } from "../components/copy-button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { CURSOR, ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart.tsx"
 import { Tabs } from "../components/tabs.tsx"
+import { toast } from "../components/toast.tsx"
+import { delimit, download } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
-import { GRAINS, defaultGrain, num } from "../lib/format.ts"
+import { GRAINS, defaultGrain, endsAt, num, startsAt } from "../lib/format.ts"
 import { sizeCurve, type Sample } from "../lib/live.ts"
 import { GROUPS, SERIES, expand, rows } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
@@ -51,18 +54,18 @@ export function OverTime({ stats, all }: { stats: Stats; all: Timeline | null })
     [stats, picked, grain, curve, all, sizes],
   )
 
-  // dragging across the chart zooms the chart, every other view stays where it was
-  const [zoom, setZoom] = useState<[string, string] | null>(null)
+  // dragging across the chart zooms the chart, every other view stays where it was.
+  // the zoom is kept as an instant, not as bucket labels, so changing the granularity
+  // keeps the window you chose instead of throwing it away
+  const [zoom, setZoom] = useState<[number, number] | null>(null)
   const [drag, setDrag] = useState<[string, string] | null>(null)
-  // a bucket label only means something within one granularity
-  useEffect(() => setZoom(null), [grain, all])
 
   const shown = useMemo(() => {
     if (!zoom) return days
-    const [from, to] = zoom.map((label) => days.findIndex((d) => d.day === label))
-    if (from < 0 || to < 0) return days
-    return days.slice(Math.min(from, to), Math.max(from, to) + 1)
-  }, [days, zoom])
+    const [from, to] = zoom
+    const inside = days.filter((d) => startsAt(d.day) <= to && endsAt(d.day, grain) >= from)
+    return inside.length ? inside : days
+  }, [days, zoom, grain])
 
   const select = {
     onMouseDown: (e: { activeLabel?: string }) =>
@@ -71,13 +74,39 @@ export function OverTime({ stats, all }: { stats: Stats; all: Timeline | null })
       drag && e?.activeLabel && setDrag([drag[0], e.activeLabel]),
     // a click is not a range
     onMouseUp: () => {
-      if (drag && drag[0] !== drag[1]) setZoom(drag)
+      if (drag && drag[0] !== drag[1]) {
+        const [a, b] = [startsAt(drag[0]), startsAt(drag[1])]
+        const [first, last] = a <= b ? drag : [drag[1], drag[0]]
+        setZoom([startsAt(first), endsAt(last, grain)])
+      }
       setDrag(null)
     },
     onMouseLeave: () => setDrag(null),
     onDoubleClick: () => setZoom(null),
   }
   const config = Object.fromEntries(series.map((k) => [k, SERIES[k]]))
+
+  // the same numbers as objects, which is what a paste into anything else wants
+  const records = () =>
+    JSON.stringify(
+      shown.map((row) =>
+        Object.fromEntries([
+          ["day", row.day],
+          ...series.map((k) => [SERIES[k].label, row[`${k}_raw`] ?? row[k] ?? null]),
+        ]),
+      ),
+      null,
+      2,
+    )
+
+  // the numbers as measured, not as drawn: a log curve or a share is display only
+  const matrix = () => [
+    ["day", ...series.map((k) => SERIES[k].label)],
+    ...shown.map((row) => [
+      String(row.day),
+      ...series.map((k) => String(row[`${k}_raw`] ?? row[k] ?? "")),
+    ]),
+  ]
   const share = picked.length > 1
   // a line needs two points, below that a bar is the only honest shape
   const sparse = shown.length < 2
@@ -109,6 +138,21 @@ export function OverTime({ stats, all }: { stats: Stats; all: Timeline | null })
             </Button>
           )}
           <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />
+          <CopyButton
+            text={records}
+            message={`Copied ${shown.length} buckets`}
+            note="As json, one object per bucket"
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              download("over-time.csv", delimit(matrix(), ","))
+              toast("over-time.csv", `${shown.length} buckets, ${series.length} series`)
+            }}
+          >
+            csv
+          </Button>
         </div>
       </CardHead>
       <CardContent>

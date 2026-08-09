@@ -95,6 +95,19 @@ export function spans(
   return out
 }
 
+/** the instant a bucket label starts, whatever granularity wrote it */
+export const startsAt = (label: string): number =>
+  Date.parse(label.length === 4 ? `${label}-01-01` : label.length === 7 ? `${label}-01` : label)
+
+/** and the instant it ends, so two granularities can be compared */
+export function endsAt(label: string, grain: Grain): number {
+  const from = new Date(startsAt(label))
+  if (grain === "year") from.setUTCFullYear(from.getUTCFullYear() + 1)
+  else if (grain === "month") from.setUTCMonth(from.getUTCMonth() + 1)
+  else from.setUTCDate(from.getUTCDate() + (grain === "week" ? 7 : 1))
+  return from.getTime() - 1
+}
+
 /** Sum a dense daily series into coarser buckets, order preserved. */
 export function bucket(data: number[], start: string, grain: Grain): [string, number][] {
   const from = Date.parse(start)
