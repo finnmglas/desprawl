@@ -3,33 +3,20 @@
 // inspo: sonner, shadcn
 
 import * as React from "react"
+import { sink, type Toast } from "../lib/toast.ts"
+// the queue lives in lib so anything may raise one, this stays where components look for it
+export { toast } from "../lib/toast.ts"
 import { cn } from "../lib/ui.ts"
-
-export interface Toast {
-  id: number
-  message: string
-  detail?: string
-  variant?: "default" | "error"
-}
-
-let seq = 0
-let publish: ((t: Toast) => void) | null = null
-
-/** Fire a toast from anywhere. No-op until <Toaster /> is mounted. */
-export const toast = (message: string, detail?: string, variant?: Toast["variant"]) =>
-  publish?.({ id: ++seq, message, detail, variant })
 
 export function Toaster({ timeout = 4000 }: { timeout?: number }) {
   const [items, setItems] = React.useState<Toast[]>([])
 
   React.useEffect(() => {
-    publish = (t) => {
-      setItems((prev) => [...prev, t])
-      setTimeout(() => setItems((prev) => prev.filter((i) => i.id !== t.id)), timeout)
-    }
-    return () => {
-      publish = null
-    }
+    sink((notice) => {
+      setItems((prev) => [...prev, notice])
+      setTimeout(() => setItems((prev) => prev.filter((i) => i.id !== notice.id)), timeout)
+    })
+    return () => sink(null)
   }, [timeout])
 
   return (

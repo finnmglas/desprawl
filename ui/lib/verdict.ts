@@ -71,6 +71,42 @@ export const contextOf = (tokens: number): Verdict => ({
   why: "roughly how many model contexts the whole repo would fill, at four characters a token",
 })
 
+/** a folder importing one that imports it back cannot be moved, tested or read apart */
+export const tanglesOf = (n: number, units: number): Verdict =>
+  n === 0
+    ? {
+        label: "acyclic",
+        tone: "fine",
+        why: "no unit here imports one that imports it back, so the levels below are the real order",
+      }
+    : {
+        label: band(n, [
+          [2, "one knot"],
+          [5, "a few knots"],
+          [Infinity, "knotted"],
+        ]),
+        tone: "watch",
+        why: `${n} groups of units import each other in a loop, out of ${units}. Neither side can move, be tested or be understood without the other`,
+      }
+
+/** how many steps of dependency separate the entry points from the leaves */
+export const layeringOf = (levels: number, units: number): Verdict =>
+  units > 3 && levels < 3
+    ? {
+        label: "flat",
+        tone: "plain",
+        why: "almost everything sits at the same depth, so the folders carry no order of their own",
+      }
+    : {
+        label: band(levels, [
+          [4, "shallow"],
+          [8, "layered"],
+          [Infinity, "deep"],
+        ]),
+        tone: levels < 8 ? "fine" : "plain",
+        why: "the longest chain of units that depend on each other. Deep is not worse, it is further to trace",
+      }
+
 export const TONES: Record<Verdict["tone"], string> = {
   plain: "bg-muted text-muted-foreground",
   fine: "bg-sky-500/15 text-sky-700 dark:text-sky-300",

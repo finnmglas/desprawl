@@ -17,8 +17,8 @@ export const EXPLAIN: Record<Scale, string> = {
   row: "share of the row's own lines",
 }
 
-export type Brands = "on" | "off"
-export const BRANDINGS: Brands[] = ["on", "off"]
+export type Brands = "focus" | "flashy" | "off"
+export const BRANDINGS: Brands[] = ["focus", "flashy", "off"]
 
 export interface Display {
   scale: Scale
@@ -26,7 +26,7 @@ export interface Display {
   brands: Brands
 }
 
-const Ctx = createContext<Display>({ scale: "simple", curve: "linear", brands: "on" })
+const Ctx = createContext<Display>({ scale: "simple", curve: "linear", brands: "focus" })
 
 export const DisplayProvider = Ctx.Provider
 export const useDisplay = (): Display => useContext(Ctx)

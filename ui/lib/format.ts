@@ -23,6 +23,24 @@ export const day = (iso: string) => {
   if (!date) return "-"
   return locale().startsWith("en") ? date : new Date(date).toLocaleDateString(locale())
 }
+/**
+ * Long paths lose their middle, never their ends: the first folder says where it
+ * lives and the last says what it is, and both are what a reader matches on.
+ */
+export function shortPath(path: string, max = 38): string {
+  if (path.length <= max) return path
+  const parts = path.split("/")
+  if (parts.length < 3) return `${path.slice(0, max / 2)}…${path.slice(-max / 2 + 1)}`
+  const tail: string[] = []
+  let room = max - parts[0].length - 2
+  for (let i = parts.length - 1; i > 0; i--) {
+    if (tail.length && room - parts[i].length - 1 < 0) break
+    tail.unshift(parts[i])
+    room -= parts[i].length + 1
+  }
+  return [parts[0], "…", ...tail].join("/")
+}
+
 export const churn = (n: Node) => n.insertions + n.deletions
 
 // excel style, a cell against its column's biggest

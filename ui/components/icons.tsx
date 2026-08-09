@@ -63,6 +63,33 @@ export const File = ({ className }: { className?: string }) => (
   />
 )
 
+// the actions, drawn from lucide's own paths
+export const Copy = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2ZM4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"
+  />
+)
+export const Check = ({ className }: { className?: string }) => (
+  <Line className={className} d="m20 6-11 11-5-5" />
+)
+export const Refresh = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16M21 21v-5h-5"
+  />
+)
+export const Download = ({ className }: { className?: string }) => (
+  <Line className={className} d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+)
+
+export const Blocks = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M4.5 3h5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 3 9.5v-5A1.5 1.5 0 0 1 4.5 3ZM14.5 3h5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 13 9.5v-5A1.5 1.5 0 0 1 14.5 3ZM4.5 13h5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 3 19.5v-5A1.5 1.5 0 0 1 4.5 13ZM14.5 13h5a1.5 1.5 0 0 1 1.5 1.5v5a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 13 19.5v-5A1.5 1.5 0 0 1 14.5 13Z"
+  />
+)
+
 // where the repo is hosted
 const HOSTS: Record<string, string> = {
   github:

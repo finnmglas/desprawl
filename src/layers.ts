@@ -1,0 +1,389 @@
+// owner: finn
+// goal: fold the import graph to units, level them, and name what tangles
+
+import { scc } from "./cycles.ts"
+import type { Graph } from "./graph.ts"
+
+/** what a unit is for, since a config file is not architecture and should not read as it */
+export type Role = "source" | "test" | "support"
+
+export interface Unit {
+  path: string
+  role: Role
+  files: number
+  lines: number
+  /** what it declares, summed over its files */
+  exports: number
+  functions: number
+  classes: number
+  /** installed packages it reaches for, counted once each */
+  packages: number
+  /** units it imports, and how many file imports back each one */
+  out: Record<string, number>
+  in: Record<string, number>
+  /** of those imports, the ones that are type only and vanish at build time */
+  types: Record<string, number>
+  /** imports that never leave it, the cohesion a folder earns */
+  internal: number
+  /** how deep its dependencies go, 0 for a unit that imports nothing here */
+  level: number
+  /** martin's instability, 0 is depended upon, 1 leans on everything */
+  instability: number
+  /** the tangle it belongs to, -1 when it stands alone */
+  tangle: number
+}
+
+export interface Cut {
+  from: string
+  to: string
+  imports: number
+  /** how many of them are type only, which is the cheap kind to move */
+  types: number
+  /** removing this one, on its own, already breaks the loop apart */
+  alone: boolean
+}
+
+export interface Tangle {
+  units: string[]
+  edges: number
+  /** whether it is still a loop once type only imports are dropped */
+  runtime: boolean
+  /** one set of edges whose removal opens the loop, not proven minimal */
+  cut: Cut[]
+}
+
+export interface Layout {
+  units: Unit[]
+  levels: number
+  tangles: Tangle[]
+  /** edges between units, and the ones no levelling can explain */
+  edges: number
+  feedback: number
+  /** the folder depth these units were folded at, 0 when the grouping picked its own */
+  depth: number
+}
+
+const TEST =
+  /(^|\/)(__tests__|__mocks__|tests?|specs?|e2e|cypress|fixtures?|mocks?|stories)(\/|$)|\.(test|spec|stories)\.[cm]?[jt]sx?$/
+const SUPPORT =
+  /(^|\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|\.\w+)(\/|$)|\.config\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.(config|setup|rc)\.[cm]?[jt]sx?$/
+
+/** a file sitting loose at the root is configuration, a folder there is the code */
+const LOOSE = /^[^/]+\.[cm]?[jt]sx?$/
+
+export const roleOf = (path: string): Role =>
+  TEST.test(path) ? "test" : SUPPORT.test(path) || LOOSE.test(path) ? "support" : "source"
+
+/** the folder a file answers to at this depth, or the file when it sits above it */
+export const unitOf = (path: string, depth: number): string => {
+  const parts = path.split("/")
+  return parts.length <= depth ? path : parts.slice(0, depth).join("/")
+}
+
+/** a group named for a folder that has chosen folders below it, so this is the remainder */
+export const LOOSE_FILES = "*"
+
+interface Branch {
+  path: string
+  /** lines below here, which is what the balance is measured in */
+  weight: number
+  kids: Branch[]
+  files: string[]
+}
+
+/**
+ * A cut through the folder tree, picked rather than declared. A group is a folder,
+ * and a file belongs to the deepest chosen folder above it, so the repo is always
+ * covered exactly once. Starting from the repo itself it keeps opening the heaviest
+ * group by naming the heaviest folder inside it, which is what balances the result.
+ *
+ * A single file is never a group. A file is a node of the import graph already, and
+ * reading every one of them is what the file grain is for.
+ */
+export function balanced(
+  graph: Graph,
+  { ideal = 10, least = 4, max = 128, share = 6 } = {},
+): Record<string, string> {
+  // a file is one node of the graph however long it is, and its length is what it
+  // costs to read. Both matter, so a group's weight is its share of each
+  const files = Object.keys(graph.modules).length || 1
+  const lines = Object.values(graph.modules).reduce((sum, m) => sum + m.lines, 0) || 1
+  const weight = (module?: { lines: number }) =>
+    module ? 0.5 * (1 / files) + 0.5 * (module.lines / lines) : 0
+
+  const root: Branch = { path: "", weight: 0, kids: [], files: [] }
+  const branches = new Map<string, Branch>([["", root]])
+  for (const module of Object.values(graph.modules)) {
+    let at = root
+    at.weight += weight(module)
+    for (const step of module.path.split("/").slice(0, -1)) {
+      const path = at.path ? `${at.path}/${step}` : step
+      let next = branches.get(path)
+      if (!next)
+        (branches.set(path, (next = { path, weight: 0, kids: [], files: [] })), at.kids.push(next))
+      at = next
+      at.weight += weight(module)
+    }
+    at.files.push(module.path)
+  }
+
+  // every top folder stands on its own, however small. Sweeping them together mixes
+  // the bottom of the stack with the top and manufactures loops that the code does not have
+  const chosen = new Set<string>(["", ...root.kids.map((kid) => kid.path)])
+  /** the deepest chosen folder at or above a branch, which is the group it feeds */
+  const owner = (path: string): string => {
+    for (let at = path; ;) {
+      if (chosen.has(at)) return at
+      const up = at.lastIndexOf("/")
+      at = up === -1 ? "" : at.slice(0, up)
+    }
+  }
+  const own = (branch: Branch) =>
+    branch.files.reduce((sum, path) => sum + weight(graph.modules[path]), 0)
+
+  const weigh = () => {
+    const held = new Map<string, number>([...chosen].map((path) => [path, 0]))
+    for (const branch of branches.values()) {
+      const group = owner(branch.path)
+      held.set(group, (held.get(group) ?? 0) + own(branch))
+    }
+    return held
+  }
+
+  const goal = root.weight / ideal
+  const stuck = new Set<string>()
+  while (chosen.size < max) {
+    const held = weigh()
+    const open = [...held].filter(([path]) => !stuck.has(path))
+    if (!open.length) break
+    const [worst, weight] = open.reduce((a, b) => (b[1] > a[1] ? b : a))
+    if (chosen.size >= least && weight <= goal) break
+
+    // opened all at once, never one child at a time: peeling names a four file folder
+    // beside a hundred file one, and leaves the group it came from just as heavy
+    const inside = [...branches.values()].filter(
+      (branch) => branch.path && !chosen.has(branch.path) && owner(branch.path) === worst,
+    )
+    const parts = inside
+      .filter((b) => !inside.some((o) => o !== b && b.path.startsWith(`${o.path}/`)))
+      // a child too small to carry its own weight stays in what is left of its parent,
+      // which is what stops a folder of fifty siblings becoming fifty groups
+      .filter((branch) => branch.weight >= goal / share)
+    // a group of nothing but its own files cannot be opened any further
+    if (!parts.length || chosen.size + parts.length > max) {
+      stuck.add(worst)
+      continue
+    }
+    for (const part of parts) chosen.add(part.path)
+  }
+
+  // a folder with chosen folders under it only holds what is left, and says so
+  const deeper = new Set(
+    [...chosen].filter((path) => [...chosen].some((other) => other.startsWith(`${path}/`))),
+  )
+  const name = (path: string) =>
+    deeper.has(path) || !path ? `${path ? `${path}/` : ""}${LOOSE_FILES}` : path
+
+  const assign: Record<string, string> = {}
+  for (const branch of branches.values())
+    for (const file of branch.files) assign[file] = name(owner(branch.path))
+  return assign
+}
+
+export function fold(graph: Graph, at: number | Record<string, string>): Layout {
+  const depth = typeof at === "number" ? at : 0
+  const keyOf = (path: string) =>
+    typeof at === "number" ? unitOf(path, at) : (at[path] ?? unitOf(path, 1))
+  const units = new Map<string, Unit>()
+  const seen = (path: string): Unit => {
+    let unit = units.get(path)
+    if (!unit)
+      units.set(
+        path,
+        (unit = {
+          path,
+          role: "source",
+          files: 0,
+          lines: 0,
+          exports: 0,
+          functions: 0,
+          classes: 0,
+          packages: 0,
+          out: {},
+          in: {},
+          types: {},
+          internal: 0,
+          level: 0,
+          instability: 0,
+          tangle: -1,
+        }),
+      )
+    return unit
+  }
+
+  const reached = new Map<string, Set<string>>()
+  const roles = new Map<string, Record<Role, number>>()
+  for (const module of Object.values(graph.modules)) {
+    const from = seen(keyOf(module.path))
+    const tally = roles.get(from.path) ?? { source: 0, test: 0, support: 0 }
+    tally[roleOf(module.path)]++
+    roles.set(from.path, tally)
+    from.files++
+    from.lines += module.lines
+    from.exports += module.symbols.exports
+    from.functions += module.symbols.functions
+    from.classes += module.symbols.classes
+    const packages = reached.get(from.path) ?? new Set()
+    for (const name of module.packages) packages.add(name)
+    reached.set(from.path, packages)
+    for (const edge of module.out) {
+      const to = keyOf(edge.to)
+      if (to === from.path) {
+        from.internal++
+        continue
+      }
+      from.out[to] = (from.out[to] ?? 0) + 1
+      if (edge.type) from.types[to] = (from.types[to] ?? 0) + 1
+      const target = seen(to)
+      target.in[from.path] = (target.in[from.path] ?? 0) + 1
+    }
+  }
+
+  for (const unit of units.values()) {
+    unit.packages = reached.get(unit.path)?.size ?? 0
+    const tally = roles.get(unit.path)
+    if (tally)
+      unit.role = (Object.keys(tally) as Role[]).reduce((a, b) => (tally[b] > tally[a] ? b : a))
+    const leaving = Object.keys(unit.out).length
+    const arriving = Object.keys(unit.in).length
+    unit.instability = leaving + arriving ? leaving / (leaving + arriving) : 0
+  }
+
+  // an import that only carries a type is gone by the time anything runs
+  const runs = (path: string) =>
+    Object.keys(seen(path).out).filter((to) => seen(path).out[to] > (seen(path).types[to] ?? 0))
+  // how big the loop a unit sits in still is once those are gone, 1 for none at all
+  const still = new Map<string, number>()
+  for (const group of scc(units.keys(), runs))
+    for (const path of group) still.set(path, group.length)
+
+  const groups = scc(units.keys(), (path) => Object.keys(seen(path).out))
+  const level = new Map<string, number>()
+  const tangles: Tangle[] = []
+  // sinks come back first, so every target already has its level
+  for (const group of groups) {
+    const inside = new Set(group)
+    let deepest = -1
+    for (const member of group)
+      for (const target of Object.keys(seen(member).out))
+        if (!inside.has(target)) deepest = Math.max(deepest, level.get(target) ?? 0)
+    for (const member of group) level.set(member, deepest + 1)
+
+    if (group.length < 2) continue
+    const id = tangles.length
+    let edges = 0
+    for (const member of group) {
+      seen(member).tangle = id
+      for (const target of Object.keys(seen(member).out)) if (inside.has(target)) edges++
+    }
+    tangles.push({
+      units: [...group].sort(),
+      edges,
+      // some part of it survives without the types, so it is a real load order loop
+      runtime: group.some((member) => (still.get(member) ?? 1) > 1),
+      cut: cut(group, (p) => Object.keys(seen(p).out))
+        .map(([from, to]) => ({
+          from,
+          to,
+          imports: seen(from).out[to],
+          types: seen(from).types[to] ?? 0,
+          alone: opens(group, (p) => Object.keys(seen(p).out), [from, to]),
+        }))
+        // the cheap ones first: a type import is a move, a runtime one is a refactor
+        .sort((a, b) => b.types / b.imports - a.types / a.imports || a.imports - b.imports),
+    })
+  }
+
+  let edges = 0
+  let feedback = 0
+  for (const unit of units.values()) {
+    unit.level = level.get(unit.path) ?? 0
+    for (const target of Object.keys(unit.out)) {
+      edges++
+      // between groups every edge points down by construction, so only a tangle can climb
+      if (unit.tangle >= 0 && seen(target).tangle === unit.tangle) feedback++
+    }
+  }
+
+  return {
+    units: [...units.values()].sort((a, b) => b.level - a.level || a.path.localeCompare(b.path)),
+    levels: Math.max(0, ...level.values()) + 1,
+    tangles: tangles.sort((a, b) => b.units.length - a.units.length),
+    edges,
+    feedback,
+    depth,
+  }
+}
+
+/** whether dropping one import already splits the group, which is checkable rather than claimed */
+function opens(group: string[], out: (path: string) => string[], edge: [string, string]): boolean {
+  const inside = new Set(group)
+  const left = scc(group, (path) =>
+    out(path).filter((to) => inside.has(to) && !(path === edge[0] && to === edge[1])),
+  )
+  return left.every((part) => part.length < group.length)
+}
+
+/**
+ * Eades, Lin and Smyth: lay the tangle out in the order that fits it best, taking
+ * sources from the front and sinks from the back, and the edges still pointing
+ * backwards are the ones to cut. Not a proven smallest set, but far smaller than
+ * the back edges of a walk, which depend on where the walk happened to start.
+ */
+function cut(group: string[], out: (path: string) => string[]): [string, string][] {
+  const inside = new Set(group)
+  const to = new Map(group.map((u) => [u, out(u).filter((v) => inside.has(v) && v !== u)]))
+  const from = new Map(group.map((u) => [u, [] as string[]]))
+  for (const [u, targets] of to) for (const v of targets) from.get(v)!.push(u)
+
+  const live = new Set(group)
+  const leaving = new Map(group.map((u) => [u, to.get(u)!.length]))
+  const arriving = new Map(group.map((u) => [u, from.get(u)!.length]))
+  const drop = (u: string) => {
+    live.delete(u)
+    for (const v of to.get(u)!) if (live.has(v)) arriving.set(v, arriving.get(v)! - 1)
+    for (const v of from.get(u)!) if (live.has(v)) leaving.set(v, leaving.get(v)! - 1)
+  }
+
+  const head: string[] = []
+  const tail: string[] = []
+  while (live.size) {
+    let took = true
+    while (took) {
+      took = false
+      for (const u of [...live]) {
+        if (!leaving.get(u)) tail.unshift(u)
+        else if (!arriving.get(u)) head.push(u)
+        else continue
+        drop(u)
+        took = true
+      }
+    }
+    if (!live.size) break
+    // the one that gives out most and takes back least belongs earliest
+    let best = ""
+    let score = -Infinity
+    for (const u of live) {
+      const gap = leaving.get(u)! - arriving.get(u)!
+      if (gap > score) [score, best] = [gap, u]
+    }
+    head.push(best)
+    drop(best)
+  }
+
+  const rank = new Map([...head, ...tail].map((u, i) => [u, i]))
+  const back: [string, string][] = []
+  for (const [u, targets] of to)
+    for (const v of targets) if (rank.get(u)! > rank.get(v)!) back.push([u, v])
+  return back
+}

@@ -18,7 +18,7 @@ export interface DistributionProps {
 
 export function Distribution({ title, langs, selected, onSelect }: DistributionProps) {
   const { brands } = useDisplay()
-  const paint = (lang: string) => (brands === "on" ? tint(lang) : "var(--muted-foreground)")
+  const paint = (lang: string) => (brands === "off" ? "var(--muted-foreground)" : tint(lang))
   const entries = Object.entries(langs).sort((a, b) => b[1] - a[1])
   const total = entries.reduce((sum, [, loc]) => sum + loc, 0)
 

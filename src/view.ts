@@ -5,6 +5,7 @@ import { spawn } from "node:child_process"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { build } from "./graph.ts"
 import type { Stats } from "./model.ts"
 
 export function open(target: string): void {
@@ -28,10 +29,18 @@ export function shell(): string {
 
 export function view(stats: Stats): string {
   // < escaped so a path holding </script> cannot close the tag
-  const data = JSON.stringify(stats).replaceAll("<", "\\u003c")
-  const html = shell().replace("</head>", `<script>window.__DESPRAWL__=${data}</script></head>`)
+  const inline = (data: unknown) => JSON.stringify(data).replaceAll("<", "\\u003c")
+  // there is no server behind a file, so the imports travel with it
+  const html = shell().replace(
+    "</head>",
+    `<script>window.__DESPRAWL__=${inline(stats)};window.__DESPRAWL_GRAPH__=${inline(build(stats.repo))}</script></head>`,
+  )
 
-  const out = join(tmpdir(), `desprawl-${stats.head}.html`)
+  const name = stats.repo.split(/[\\/]/).filter(Boolean).pop() || "repo"
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const out = join(tmpdir(), `${stamp}-${name}-${stats.head}.html`)
   writeFileSync(out, html)
   open(out)
   return out

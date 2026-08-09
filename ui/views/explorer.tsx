@@ -141,7 +141,7 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           }
         >
           <CopyButton
-            label="json"
+            label="Copies this folder as json"
             text={() => JSON.stringify(here, null, 2)}
             message={`Copied ${path.join("/") || "/"} as json`}
             note={`${num(here.files)} files, with every child`}

@@ -5,12 +5,12 @@ import { useEffect, useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, XAxis, YAxis } from "recharts"
 import { Button } from "../components/button.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
+import { DownloadButton } from "../components/download-button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { CURSOR, ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart.tsx"
 import { Tabs } from "../components/tabs.tsx"
-import { toast } from "../components/toast.tsx"
-import { delimit, download } from "../lib/export.ts"
+import { delimit, named } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, defaultGrain, endsAt, num, startsAt } from "../lib/format.ts"
@@ -162,16 +162,11 @@ export function OverTime({
             message={`Copied ${shown.length} buckets`}
             note="As json, one object per bucket"
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              download("over-time.csv", delimit(matrix(), ","))
-              toast("over-time.csv", `${shown.length} buckets, ${series.length} series`)
-            }}
-          >
-            csv
-          </Button>
+          <DownloadButton
+            name={named("over-time.csv")}
+            text={() => delimit(matrix(), ",")}
+            note={`${shown.length} buckets, ${series.length} series`}
+          />
         </div>
       </CardHead>
       <CardContent>

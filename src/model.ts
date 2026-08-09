@@ -2,7 +2,6 @@
 // goal: shapes and their ops
 
 import { execFileSync } from "node:child_process"
-import type { Stack } from "./stack.ts"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
@@ -88,6 +87,104 @@ export interface Contributor {
   files: number
   first: string
   last: string
+}
+
+export interface Manifest {
+  path: string
+  name?: string
+  version?: string
+  license?: string
+  private?: boolean
+  manager?: string
+  workspaces: boolean
+  /** Ships a command, so the package is a cli */
+  bin: boolean
+  /** module, commonjs, or unset */
+  type?: string
+  engines?: Record<string, string>
+  deps: Record<string, string>
+  scripts: Record<string, string>
+}
+
+export interface Pinning {
+  exact: number
+  caret: number
+  tilde: number
+  range: number
+  linked: number
+}
+
+export interface Ai {
+  /** every ai coding tool the repo shows a trace of, from files or from the history */
+  tools: string[]
+  /** the instruction files, as markers, and how many of each the tree holds */
+  files: Record<string, number>
+  /** commits an ai signed, and how many of the newest were read to find them */
+  signed: number
+  scanned: number
+  /** the read hit its cap, so older commits went unseen */
+  capped: boolean
+  /** commits signed, per tool */
+  by: Record<string, number>
+}
+
+export interface Stack {
+  /** typescript, javascript, both, or not a node project at all */
+  kind: "typescript" | "javascript" | "mixed" | "none"
+  /** the dominant language by file count, whatever it is */
+  primary: string
+  /** what the root manifest calls this project */
+  name?: string
+  version?: string
+  /** declared by the root manifest or a licence file beside it, never a vendored one */
+  license?: string
+  /** a manifest marked private is not meant to be published */
+  private: boolean
+  /** licence files further down, which belong to bundled third party code */
+  vendored: number
+  manifests: Manifest[]
+  typescript: string[]
+  managers: string[]
+  lockfiles: string[]
+  pinning: Pinning
+  dependencies: number
+  build: string[]
+  frameworks: string[]
+  state: string[]
+  ui: string[]
+  connects: string[]
+  testing: string[]
+  runtimes: string[]
+  styling: string[]
+  content: string[]
+  /** charts, maps and the drawing libraries */
+  visuals: string[]
+  observability: string[]
+  auth: string[]
+  scripts: string[]
+  linters: string[]
+  formatters: string[]
+  rules: string[]
+  ci: string[]
+  bundlers: string[]
+  ports: number[]
+  /** where this repo looks like it deploys, from config, infrastructure and workflows */
+  hosts: string[]
+  /** node versions asked for, from engines and .nvmrc */
+  node: string[]
+  /** esm, cjs or both, from package type and file extensions */
+  modules: string[]
+  /** how many tsconfigs turn strict on, and how many leave it off */
+  strict: { on: number; off: number }
+  /** files that hint at configuration the repo expects */
+  env: string[]
+  containers: { dockerfiles: number; compose: number; kubernetes: number; terraform: number }
+  apis: string[]
+  licenses: string[]
+  parts: string[]
+  /** label to the dependency that implied it, so a claim can be followed */
+  from: Record<string, string>
+  ai: Ai
 }
 
 export interface Stats extends Split {

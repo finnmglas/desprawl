@@ -14,7 +14,7 @@ import { NOTES } from "../../src/notes.ts"
 export function Chip({ label, from }: { label: string; from?: string }) {
   const { brands } = useDisplay()
   const name = BRANDS[label] ? label : label.replace(/\s+\S+$/, "")
-  const brand = brands === "on" && BRANDS[name]
+  const brand = brands === "flashy" && BRANDS[name]
   // the ink is picked for the brand colour, so the theme does not decide it.
   // the colour itself comes down a little on dark, where full saturation glares
   const paint = brand

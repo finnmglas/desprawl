@@ -7,11 +7,13 @@ import { Card, CardContent } from "./card.tsx"
 import { Chip } from "./chip.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
+import { DownloadButton } from "./download-button.tsx"
 import { Tip } from "./tip.tsx"
+import { named } from "../lib/export.ts"
 import { num } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
 import { byWeight } from "../lib/rank.ts"
-import type { Stack } from "../../src/stack.ts"
+import type { Stack } from "../../src/model.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
 type Section = { title: string; rows: [string, Items][] }
@@ -191,12 +193,14 @@ export function StackCard({ stack }: { stack: Stack }) {
             </Tip>
           ))}
         </div>
-        <CopyButton
-          className="ml-auto"
-          text={asText}
-          message="Metadata copied"
-          note="Every detected fact, as text"
-        />
+        <div className="ml-auto flex items-center gap-1">
+          <CopyButton text={asText} message="Metadata copied" note="Every detected fact, as text" />
+          <DownloadButton
+            name={named("project-metadata.json")}
+            text={() => JSON.stringify(stack, null, 2)}
+            note="Every detected fact, as json"
+          />
+        </div>
       </CardHead>
 
       <CardContent className="pt-1">

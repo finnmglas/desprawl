@@ -1,7 +1,8 @@
 // owner: finn
 // goal: parts too big to ship up front, asked for once the ui is painted
 
-import { toast } from "../components/toast.tsx"
+import { toast } from "./toast.ts"
+import type { Graph } from "../../src/graph.ts"
 import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
@@ -65,6 +66,9 @@ export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
   ask(`/api/log?skip=${skip}&count=${count}`, [])
 
 export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/api/timeline", null)
+
+/** built on the first ask, held by the server after */
+export const importGraph = (): Promise<Graph | null> => ask<Graph | null>("/api/graph", null)
 
 export interface Sample {
   date: string
