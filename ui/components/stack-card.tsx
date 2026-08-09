@@ -55,6 +55,7 @@ function describe(stack: Stack): Section[] {
         ["State", stack.state],
         ["UI", [...new Set([...stack.ui, ...stack.styling])]],
         ["Content", stack.content],
+        ["Visuals", stack.visuals],
       ],
     },
     {
@@ -88,6 +89,7 @@ function describe(stack: Stack): Section[] {
             box.terraform > 0 && `${box.terraform} terraform`,
           ],
         ],
+        ["Hosting", stack.hosts],
         ["APIs", stack.apis],
         ["Config", stack.env],
       ],
@@ -98,7 +100,7 @@ function describe(stack: Stack): Section[] {
 const kept = (rows: [string, Items][]) =>
   rows.map(([label, items]) => [label, items.filter(Boolean)] as const).filter(([, i]) => i.length)
 
-const SHOWN = 5
+const SHOWN = 3
 
 /** the structural ones first, the rest behind a count until asked for */
 function Row({

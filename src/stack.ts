@@ -75,6 +75,8 @@ export interface Stack {
   runtimes: string[]
   styling: string[]
   content: string[]
+  /** charts, maps and the drawing libraries */
+  visuals: string[]
   observability: string[]
   auth: string[]
   scripts: string[]
@@ -84,6 +86,8 @@ export interface Stack {
   ci: string[]
   bundlers: string[]
   ports: number[]
+  /** where this repo looks like it deploys, from config, infrastructure and workflows */
+  hosts: string[]
   /** node versions asked for, from engines and .nvmrc */
   node: string[]
   /** esm, cjs or both, from package type and file extensions */
@@ -128,7 +132,8 @@ const STATE: Table = {
   "@ngrx/store": "NgRx", vuex: "Vuex", nanostores: "Nano Stores",
   immer: "Immer", "redux-saga": "Redux Saga", rxjs: "RxJS", "@preact/signals": "Signals",
   "@legendapp/state": "Legend State", "@tanstack/store": "TanStack Store",
-  "react-hook-form": "React Hook Form", "@tanstack/react-form": "TanStack Form",
+  "react-hook-form": "React Hook Form", "@hookform/": "React Hook Form",
+  "@tanstack/react-form": "TanStack Form",
 }
 
 // prettier-ignore
@@ -146,6 +151,10 @@ const UI: Table = {
   motion: "Motion", "@react-spring/web": "React Spring", gsap: "GSAP", cmdk: "cmdk",
   sonner: "Sonner", vaul: "Vaul", "@dnd-kit/core": "dnd kit", "@tanstack/react-table": "TanStack Table",
   "ag-grid-react": "AG Grid", "embla-carousel-react": "Embla",
+  "radix-ui": "Radix", shadcn: "shadcn", "@dnd-kit/": "dnd kit", "@floating-ui/": "Floating UI",
+  "@tiptap/": "Tiptap", "@codemirror/": "CodeMirror", "@lexical/": "Lexical",
+  "@monaco-editor/react": "Monaco", "@tanstack/react-virtual": "TanStack Virtual",
+  "next-themes": "next-themes", "@fontsource": "Fontsource",
 }
 
 // prettier-ignore
@@ -169,6 +178,8 @@ const CONNECTS: Table = {
   replicate: "Replicate", "@huggingface/inference": "Hugging Face", "@lemonsqueezy/lemonsqueezy.js": "Lemon Squeezy",
   "launchdarkly-js-client-sdk": "LaunchDarkly", "@unleash/proxy-client-react": "Unleash",
   "@growthbook/growthbook": "GrowthBook", "@statsig/js-client": "Statsig",
+  "@ai-sdk/": "AI SDK", "@convex-dev/": "Convex", "@clerk/": "Clerk", "@google-cloud/": "Google Cloud",
+  "@aws-sdk/": "AWS", "@azure/": "Azure", "@crowdin/cli": "Crowdin", "@hcaptcha/react-hcaptcha": "hCaptcha",
 }
 
 // prettier-ignore
@@ -200,10 +211,11 @@ const LINTERS: Table = {
   knip: "Knip", depcheck: "depcheck", madge: "Madge", "dependency-cruiser": "dependency-cruiser",
   "ts-prune": "ts-prune", publint: "publint", "@arethetypeswrong/cli": "are the types wrong",
   syncpack: "syncpack", sherif: "Sherif",
+  "eslint-config-next": "ESLint", "@eslint/eslintrc": "ESLint", gitleaks: "Gitleaks",
 }
 
 // prettier-ignore
-const FORMATTERS: Table = { prettier: "Prettier", "@biomejs/biome": "Biome", oxfmt: "oxfmt", dprint: "dprint" }
+const FORMATTERS: Table = { prettier: "Prettier", "@biomejs/biome": "Biome", oxfmt: "oxfmt", dprint: "dprint" , "@ianvs/prettier-plugin-sort-imports": "Prettier" }
 
 // prettier-ignore
 const RUNTIME: Table = {
@@ -221,6 +233,7 @@ const STYLING: Table = {
   clsx: "clsx", classnames: "classnames",
   "@pandacss/dev": "Panda", "@stitches/react": "Stitches", "@linaria/core": "Linaria",
   "styled-jsx": "styled-jsx", "tailwind-variants": "tailwind-variants",
+  "@tailwindcss/postcss": "Tailwind", "tw-animate-css": "Tailwind",
 }
 
 // prettier-ignore
@@ -233,6 +246,15 @@ const CONTENT: Table = {
   vitepress: "VitePress", "@keystatic/core": "Keystatic", tinacms: "TinaCMS",
   "@prismicio/client": "Prismic", "gray-matter": "gray-matter", remark: "remark", rehype: "rehype",
   shiki: "Shiki", prismjs: "Prism", "highlight.js": "highlight.js", marked: "marked",
+}
+
+// prettier-ignore
+const VISUALS: Table = {
+  "@react-three/": "React Three Fiber", three: "three.js", "@turf/": "Turf", d3: "D3",
+  "d3-force": "D3", dagre: "dagre", cytoscape: "Cytoscape", "chart.js": "Chart.js",
+  echarts: "ECharts", recharts: "Recharts", "@nivo/core": "nivo", "@visx/visx": "visx",
+  victory: "Victory", "plotly.js": "Plotly", konva: "Konva", "pixi.js": "PixiJS",
+  "mapbox-gl": "Mapbox", "maplibre-gl": "MapLibre", leaflet: "Leaflet", "@deck.gl/core": "deck.gl",
 }
 
 // prettier-ignore
@@ -261,13 +283,74 @@ const AUTH: Table = {
 const TABLES: [string, Table][] = [
   ["frameworks", FRAMEWORKS], ["state", STATE], ["ui", UI], ["connects", CONNECTS],
   ["testing", TESTING], ["build", BUILDERS], ["runtimes", RUNTIME], ["styling", STYLING],
-  ["content", CONTENT], ["observability", OBSERVE], ["auth", AUTH], ["linters", LINTERS],
+  ["content", CONTENT], ["visuals", VISUALS], ["observability", OBSERVE], ["auth", AUTH], ["linters", LINTERS],
   ["formatters", FORMATTERS],
 ]
 
+/** a file whose presence names the host it deploys to */
+// prettier-ignore
+const HOSTED: [RegExp, string][] = [
+  [/^(.*\/)?vercel\.json$/, "Vercel"],
+  [/^(.*\/)?netlify\.toml$/, "Netlify"],
+  [/^(.*\/)?wrangler\.(toml|jsonc?)$/, "Cloudflare"],
+  [/^(.*\/)?fly\.toml$/, "Fly.io"],
+  [/^(.*\/)?railway\.(json|toml)$/, "Railway"],
+  [/^(.*\/)?render\.ya?ml$/, "Render"],
+  [/^(.*\/)?app\.ya?ml$/, "Google Cloud"],
+  [/^(.*\/)?Procfile$/, "Heroku"],
+  [/^(.*\/)?heroku\.ya?ml$/, "Heroku"],
+  [/^(.*\/)?firebase\.json$/, "Firebase"],
+  [/^(.*\/)?amplify\.ya?ml$/, "AWS"],
+  [/^(.*\/)?(template|samconfig)\.(ya?ml|toml)$/, "AWS"],
+  [/^(.*\/)?cdk\.json$/, "AWS"],
+  [/^(.*\/)?sst\.config\.[cm]?ts$/, "AWS"],
+  [/^(.*\/)?serverless\.ya?ml$/, "AWS"],
+  [/^(.*\/)?\.platform\.app\.ya?ml$/, "Platform.sh"],
+  [/^(.*\/)?captain-definition$/, "CapRover"],
+  [/^\.do\/(app|deploy)\.ya?ml$/, "DigitalOcean"],
+  [/^(.*\/)?supabase\/config\.toml$/, "Supabase"],
+  [/^(.*\/)?[\w.-]*cloudbuild[\w.-]*\.ya?ml$/, "Google Cloud"],
+  [/^(.*\/)?\.gcloudignore$/, "Google Cloud"],
+  [/^(.*\/)?buildspec[\w.-]*\.ya?ml$/, "AWS"],
+  [/^(.*\/)?appspec\.(ya?ml|json)$/, "AWS"],
+  [/^\.ebextensions\//, "AWS"],
+  [/^(.*\/)?staticwebapp\.config\.json$/, "Azure"],
+  [/^(.*\/)?skaffold\.ya?ml$/, "Kubernetes"],
+]
+
+/** what a terraform provider, a workflow step or a registry says about the target */
+// prettier-ignore
+const DEPLOYS: [RegExp, string][] = [
+  [/provider\s+"aws"|aws-actions\/|\bamazonaws\.com|\baws\s+(s3|ecs|lambda|ecr)\b/, "AWS"],
+  [/provider\s+"google"|google-github-actions\/|\bgcr\.io|-docker\.pkg\.dev|\bgcloud\s/, "Google Cloud"],
+  [/provider\s+"azurerm"|azure\/login|\bazurecr\.io|\baz\s+(webapp|containerapp)\b/, "Azure"],
+  [/provider\s+"hcloud"|hetznercloud\/|\bhcloud\s/, "Hetzner"],
+  [/provider\s+"digitalocean"|digitalocean\/action|registry\.digitalocean\.com|\bdoctl\s/, "DigitalOcean"],
+  [/provider\s+"scaleway"|\bscw\s/, "Scaleway"],
+  [/cloudflare\/wrangler-action|\bwrangler\s+(deploy|publish)/, "Cloudflare"],
+  [/amondnet\/vercel-action|vercel\/action|\bvercel\s+(deploy|--prod)/, "Vercel"],
+  [/nwtgck\/actions-netlify|netlify\/actions|\bnetlify\s+deploy/, "Netlify"],
+  [/superfly\/flyctl|\bflyctl?\s+deploy/, "Fly.io"],
+  [/bervProject\/railway|\brailway\s+up/, "Railway"],
+  [/johnbeynon\/render-deploy|api\.render\.com/, "Render"],
+  [/akhileshns\/heroku-deploy|\bgit\s+push\s+heroku/, "Heroku"],
+  [/actions\/deploy-pages|peaceiris\/actions-gh-pages/, "GitHub Pages"],
+  [/firebase-tools|FirebaseExtended\/action-hosting-deploy|\bfirebase\s+deploy/, "Firebase"],
+  [/\bkubectl\s+apply|azure\/k8s-deploy|helm\s+upgrade/, "Kubernetes"],
+]
+
+/** a package whose whole job is putting this repo somewhere */
+// prettier-ignore
+const SHIPS: Table = {
+  vercel: "Vercel", wrangler: "Cloudflare", "netlify-cli": "Netlify",
+  "@netlify/functions": "Netlify", "firebase-tools": "Firebase", sst: "AWS", serverless: "AWS",
+  "aws-cdk-lib": "AWS", "@aws-amplify/backend": "AWS", "@google-cloud/functions-framework": "Google Cloud",
+  "@azure/functions": "Azure", "@railway/cli": "Railway",
+}
+
 /** Marker files, matched on the full path or the basename. */
 // prettier-ignore
-const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "terraform", string][] = [
+const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "terraform" | "workspaces", string][] = [
   [/^(.*\/)?pnpm-lock\.yaml$/, "lock", "pnpm"],
   [/^(.*\/)?package-lock\.json$/, "lock", "npm"],
   [/^(.*\/)?yarn\.lock$/, "lock", "yarn"],
@@ -301,6 +384,10 @@ const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "ter
   [/^(.*\/)?openapi\.(ya?ml|json)$/, "apis", "OpenAPI"],
   [/^(.*\/)?swagger\.(ya?ml|json)$/, "apis", "OpenAPI"],
   [/^(.*\/)?components\.json$/, "ui", "shadcn"],
+  [/^(.*\/)?\.gitleaks\.toml$/, "linters", "Gitleaks"],
+  [/^(.*\/)?\.pre-commit-config\.ya?ml$/, "linters", "pre-commit"],
+  [/^(.*\/)?velite\.config\.[cm]?ts$/, "content", "Velite"],
+  [/^pnpm-workspace\.ya?ml$/, "workspaces", "pnpm"],
   [/^(.*\/)?tsconfig(\..+)?\.json$/, "typescript", "tsconfig"],
 ]
 
@@ -463,6 +550,7 @@ function markers(repo: string, paths: string[]) {
   const ports: number[] = []
   const agents: string[] = []
   const agentFiles: Record<string, number> = {}
+  const hosts: string[] = []
 
   const port = (value: number) => {
     if (value > 0 && value < 65536 && !ports.includes(value)) ports.push(value)
@@ -482,6 +570,18 @@ function markers(repo: string, paths: string[]) {
     for (const [match, where] of CONFIGS) {
       if (match.test(path)) add((found[where] ??= []), path.split("/").pop() ?? path)
     }
+    for (const [match, host] of HOSTED) if (match.test(path)) add(hosts, host)
+
+    // a workflow, a terraform file or a compose file can name the target too
+    if (
+      /^\.github\/workflows\/.+\.ya?ml$|\.tf$|\.tfvars$|^(.*\/)?(docker-)?compose(\..+)?\.ya?ml$|^(.*\/)?[Dd]ockerfile(\..+)?$/.test(
+        path,
+      )
+    ) {
+      const text = read(repo, path)
+      for (const [match, host] of DEPLOYS) if (match.test(text)) add(hosts, host)
+    }
+
     for (const [match, tool] of AGENTS) {
       if (!match.test(path)) continue
       add(agents, tool)
@@ -507,7 +607,7 @@ function markers(repo: string, paths: string[]) {
         port(Number(line[1]))
     }
   }
-  return { found, counts, node, env, strict, ports, agents, agentFiles, port }
+  return { found, counts, node, env, strict, ports, agents, agentFiles, hosts, port }
 }
 
 /** a licence beside the manifest speaks for the project, the rest come with vendored code */
@@ -552,6 +652,7 @@ const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro",
 function shipped(
   frameworks: string[],
   connected: boolean,
+  workspaces: boolean,
   manifests: Manifest[],
   boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
 ): string[] {
@@ -560,7 +661,7 @@ function shipped(
   if (frameworks.some((f) => SERVER.includes(f)) || connected) add(parts, "backend")
   if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
     add(parts, "monorepo root")
-  if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
+  if (manifests.some((m) => m.workspaces) || workspaces) add(parts, "monorepo")
   if (manifests.some((m) => m.bin)) add(parts, "cli")
   if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
   if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
@@ -570,7 +671,10 @@ function shipped(
 
 export function stack(repo: string, languages: Node[] = []): Stack {
   const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
-  const { found, counts, node, env, strict, ports, agents, agentFiles, port } = markers(repo, paths)
+  const { found, counts, node, env, strict, ports, agents, agentFiles, hosts, port } = markers(
+    repo,
+    paths,
+  )
   const licenses: string[] = []
   const modules: string[] = []
 
@@ -590,6 +694,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     runtimes: [],
     styling: [],
     content: [],
+    visuals: [],
     observability: [],
     auth: [],
     build: [...(found.build ?? [])],
@@ -615,12 +720,14 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       if (/--turbopack|--turbo\b/.test(body)) add(bundlers, "Turbopack")
       if (/\bwebpack\b/.test(body)) add(bundlers, "webpack")
       if (/\bvite\b/.test(body)) add(bundlers, "Vite")
+      for (const [match, host] of DEPLOYS) if (match.test(body)) add(hosts, host)
       for (const found of body.matchAll(/(?:--port[= ]|-p[= ])(\d{2,5})/g)) port(Number(found[1]))
     }
     for (const [name, range] of Object.entries(m.deps)) {
       names.add(name)
       pinning[pin(String(range))]++
       if (name === "typescript") add(typescript, String(range))
+      add(hosts, label(SHIPS, name))
       for (const [bucket, table] of TABLES) {
         const found = label(table, name)
         if (!found) continue
@@ -652,7 +759,13 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     exts.has("ts") || exts.has("tsx") || exts.has("mts") || (found.typescript?.length ?? 0) > 0
   const hasJs = exts.has("js") || exts.has("jsx") || exts.has("mjs") || exts.has("cjs")
 
-  const parts = shipped(dep.frameworks, dep.connects.length > 0, manifests, counts)
+  const parts = shipped(
+    dep.frameworks,
+    dep.connects.length > 0,
+    !!found.workspaces,
+    manifests,
+    counts,
+  )
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
 
@@ -690,6 +803,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     runtimes: dep.runtimes,
     styling: dep.styling,
     content: dep.content,
+    visuals: dep.visuals,
     observability: dep.observability,
     auth: dep.auth,
     scripts,
@@ -699,6 +813,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     ci: found.ci ?? [],
     bundlers,
     ports: ports.sort((a, b) => a - b),
+    hosts,
     node,
     modules,
     strict,

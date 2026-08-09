@@ -146,3 +146,30 @@ test("strictness is counted per tsconfig, not assumed", () => {
   )
   assert.deepEqual(s.strict, { on: 1, off: 1 })
 })
+
+test("the host is read from whichever evidence the repo leaves", () => {
+  const host = (files: Record<string, string>) => stack(repo(files)).hosts
+  assert.deepEqual(host({ "vercel.json": "{}" }), ["Vercel"], "a config file")
+  assert.deepEqual(host({ "main.tf": 'provider "hcloud" {}' }), ["Hetzner"], "a terraform provider")
+  assert.deepEqual(
+    host({ ".github/workflows/a.yml": "steps:\n  - uses: google-github-actions/auth@v2\n" }),
+    ["Google Cloud"],
+    "a workflow action",
+  )
+  assert.deepEqual(
+    host({ "package.json": '{"scripts":{"ship":"wrangler deploy"}}' }),
+    ["Cloudflare"],
+    "a deploy script",
+  )
+  assert.deepEqual(host({ "cloudbuild.yaml": "steps: []" }), ["Google Cloud"], "a cloud build file")
+  assert.deepEqual(
+    host({ "stable.cloudbuild.yaml": "steps:\n  - name: gcr.io/cloud-builders/docker\n" }),
+    ["Google Cloud"],
+    "a prefixed cloud build file",
+  )
+})
+
+test("using a cloud's services is not the same as deploying there", () => {
+  const s = stack(repo({ "package.json": '{"dependencies":{"@google-cloud/storage":"7.0.0"}}' }))
+  assert.deepEqual(s.hosts, [], "a storage client says nothing about the host")
+})

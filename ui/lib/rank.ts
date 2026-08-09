@@ -15,12 +15,25 @@ const RANK: Record<string, number> = {
   shadcn: 0, MUI: 0, "Ant Design": 0, Chakra: 0, Mantine: 0, HeroUI: 0, NextUI: 0, Fluent: 0,
   Carbon: 0, Blueprint: 0, Bootstrap: 0, Vuetify: 0, Ionic: 0, daisyUI: 0, PrimeReact: 0,
   "Base UI": 1, Radix: 1, "Headless UI": 1, "React Aria": 1, Ariakit: 1, DiceUI: 1,
-  Tailwind: 2, Panda: 2, "styled-components": 2, Emotion: 2, Sass: 2, Less: 2, Stylus: 2,
-  UnoCSS: 2, "vanilla-extract": 2, Stitches: 2, Linaria: 2, "styled-jsx": 2,
+  Tailwind: 1.5, Panda: 1.5, "styled-components": 1.5, Emotion: 1.5, Sass: 1.5, Less: 1.5,
+  Stylus: 1.5, UnoCSS: 1.5, "vanilla-extract": 1.5, Stitches: 1.5, Linaria: 1.5, "styled-jsx": 1.5,
   PostCSS: 3, cva: 3, clsx: 3, classnames: 3, "tailwind-variants": 3,
   cmdk: 4, Sonner: 4, Vaul: 4, Embla: 4, "dnd kit": 4, "TanStack Table": 4, "AG Grid": 4,
   Motion: 5, GSAP: 5, "React Spring": 5,
+  "Floating UI": 2.5, Monaco: 2, Tiptap: 2, CodeMirror: 2, Lexical: 2,
+  "React Hook Form": 2, "TanStack Form": 2, "TanStack Virtual": 4, "next-themes": 5, Fontsource: 6,
   Lucide: 6, Tabler: 6, Phosphor: 6, "React Icons": 6,
+
+  // visuals: the engine, then what is drawn with it
+  "three.js": 0, "React Three Fiber": 0, PixiJS: 0, Konva: 0, D3: 1, "deck.gl": 1,
+  Mapbox: 1, MapLibre: 1, Leaflet: 1, Recharts: 2, "Chart.js": 2, ECharts: 2, Plotly: 2,
+  nivo: 2, visx: 2, Victory: 2, Cytoscape: 2, dagre: 3, Turf: 3,
+
+  // content: the pipeline before the pieces that decorate it
+  Fumadocs: 0, Nextra: 0, Docusaurus: 0, VitePress: 0, Velite: 0, Contentlayer: 0,
+  Sanity: 1, Contentful: 1, Storyblok: 1, Payload: 1, Prismic: 1, Keystatic: 1, TinaCMS: 1,
+  MDX: 2, i18n: 2, Storybook: 2, remark: 3, rehype: 3, "gray-matter": 3,
+  Shiki: 4, Prism: 4, "highlight.js": 4, marked: 4,
 
   // data: the store first, then the client, then the odd service
   Postgres: 0, MySQL: 0, SQLite: 0, MongoDB: 0, Redis: 0, Convex: 0, Supabase: 0, Firebase: 0,
@@ -35,6 +48,11 @@ const RANK: Record<string, number> = {
   tsup: 2, unbuild: 2, tsdown: 2, bunchee: 2, microbundle: 2, SWC: 2, Babel: 2,
   Changesets: 3, "semantic-release": 3, "release-it": 3, Husky: 4, "lint-staged": 4,
   commitlint: 4, "simple-git-hooks": 4, TypeDoc: 4,
+
+  // hosting: the platform it deploys to, then the cluster it lands in
+  Vercel: 0, Netlify: 0, Cloudflare: 0, "Fly.io": 0, Railway: 0, Render: 0, Heroku: 0,
+  AWS: 1, "Google Cloud": 1, Azure: 1, Hetzner: 1, DigitalOcean: 1, Scaleway: 1,
+  Kubernetes: 2, CapRover: 2, "Platform.sh": 2, "GitHub Pages": 2,
 }
 
 /** stable: equal ranks keep the order they were detected in */

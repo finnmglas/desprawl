@@ -58,6 +58,7 @@ const plain = (label: string) => label.toLowerCase().replace(/[^a-z0-9]/g, "")
 const MANUAL: Record<string, string> = {
   OpenAI: "412991", Playwright: "2ead33", "C#": "239120", S3: "569a31", Lambda: "ff9900",
   Codex: "412991", Turbopack: "ef4444", Parcel: "e9a03b",
+  AWS: "ff9900", Azure: "0078d4", Heroku: "430098", Linode: "00a95c",
 }
 
 const found: Record<string, [string, string, string]> = {}

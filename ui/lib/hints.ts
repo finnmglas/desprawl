@@ -42,6 +42,7 @@ export const HINTS: Record<string, string> = {
   State: "how state travels through the app",
   UI: "component and styling layers",
   Content: "documents and content pipelines",
+  Visuals: "charts, maps and drawing libraries",
   Data: "how it reaches other systems",
   Auth: "who the user is proven to be",
   Telemetry: "errors and metrics leaving the app",
@@ -52,6 +53,7 @@ export const HINTS: Record<string, string> = {
   Format: "who owns the whitespace",
   CI: "what runs on a push",
   Containers: "infrastructure files in the tree",
+  Hosting: "where it looks like it deploys, from config, infrastructure, workflows and scripts",
   APIs: "checked in request collections and schemas",
   Config: "what the app expects to be given",
 
