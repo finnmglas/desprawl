@@ -18,16 +18,23 @@ export const FALLBACK: Prefs = {
   scale: "simple",
   curve: "linear",
   region: "auto",
-  brands: "on",
+  brands: "focus",
 }
 
 const KEY = "desprawl-prefs"
 const token = () => new URLSearchParams(location.search).get("t")
 
+/** settings saved before a choice existed, kept meaning what they meant then */
+const mended = (saved: Partial<Prefs>): Partial<Prefs> =>
+  (saved.brands as string) === "on" ? { ...saved, brands: "flashy" } : saved
+
 // localStorage is per origin and the port moves, disk is the real one
 export function readPrefs(): Prefs {
   try {
-    return { ...FALLBACK, ...(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>) }
+    return {
+      ...FALLBACK,
+      ...mended(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>),
+    }
   } catch {
     return FALLBACK
   }
@@ -39,7 +46,7 @@ export async function pullPrefs(): Promise<Prefs | null> {
   try {
     const res = await fetch(`/api/prefs?t=${t}`)
     if (!res.ok) return null
-    const saved = (await res.json()) as Partial<Prefs>
+    const saved = mended((await res.json()) as Partial<Prefs>)
     const merged = { ...readPrefs(), ...saved }
     localStorage.setItem(KEY, JSON.stringify(merged))
     return merged

@@ -114,7 +114,13 @@ export function Settings({
       />
       <Choice
         label="Brand colours"
-        hint={brands === "on" ? "logos and their colours" : "colours that carry meaning only"}
+        hint={
+          brands === "flashy"
+            ? "every logo, in its own colour"
+            : brands === "focus"
+              ? "logos on tools, plain colour swatches on languages"
+              : "colours that carry meaning only"
+        }
         tabs={BRANDINGS}
         value={brands}
         onChange={(next) => change({ brands: next as Brands })}
