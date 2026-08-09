@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Clock, FolderMark } from "./components/icons.tsx"
+import { Blocks, Clock, FolderMark } from "./components/icons.tsx"
 import { Settings } from "./components/settings.tsx"
 import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
@@ -11,6 +11,7 @@ import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
+import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
@@ -22,18 +23,25 @@ import { useView } from "./lib/hash.ts"
 import { attach, isLive, onBusy, token } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
+import type { Graph as Imports } from "../src/graph.ts"
 import type { Stats } from "../src/model.ts"
 
 // desprawl view swaps placeholder for data
 declare global {
   interface Window {
     __DESPRAWL__?: Stats
+    /** a static export carries the graph too, since there is no server to ask */
+    __DESPRAWL_GRAPH__?: Imports
   }
 }
 
-const TABS = ["Overview", "Files", "History"]
+const TABS = ["Overview", "Modules", "Files", "History"]
 
-const MARKS: Record<string, React.ReactNode> = { Files: <FolderMark />, History: <Clock /> }
+const MARKS: Record<string, React.ReactNode> = {
+  Modules: <Blocks />,
+  Files: <FolderMark />,
+  History: <Clock />,
+}
 
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
@@ -161,6 +169,15 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               toast("Opened in History", `${a} to ${b}`)
             }}
             faces={faces}
+          />
+        ) : tab === "Modules" ? (
+          <Modules
+            stats={stats}
+            onTab={(next) => go({ tab: next })}
+            onPath={(path) => {
+              go({ tab: "Files", path })
+              toast("Opened in Files", path.join("/") || "the repo root")
+            }}
           />
         ) : (
           <Explorer

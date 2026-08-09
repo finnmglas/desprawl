@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
 import { git } from "./model.ts"
-import { specifiers } from "./specifiers.ts"
+import { specifiers, symbols, type Symbols } from "./specifiers.ts"
 
 export interface Edge {
   to: string
@@ -17,6 +17,9 @@ export interface Module {
   out: Edge[] // resolved inside the repo
   in: string[]
   packages: string[] // by install name
+  /** what it declares, which is a truer size than its line count */
+  symbols: Symbols
+  lines: number
 }
 
 export interface Missing {
@@ -197,7 +200,17 @@ export function build(repo: string): Graph {
   }
 
   const modules: Record<string, Module> = Object.fromEntries(
-    sources.map((path) => [path, { path, out: [], in: [], packages: [] }]),
+    sources.map((path) => [
+      path,
+      {
+        path,
+        out: [],
+        in: [],
+        packages: [],
+        symbols: { exports: 0, functions: 0, classes: 0 },
+        lines: 0,
+      },
+    ]),
   )
   const packages: Record<string, string[]> = {}
   const missing: Missing[] = []
@@ -216,6 +229,8 @@ export function build(repo: string): Graph {
       continue
     }
 
+    modules[from].symbols = symbols(source)
+    modules[from].lines = source.split("\n").length
     for (const spec of specifiers(source)) {
       seen++
       const target = locate(spec.text, full)

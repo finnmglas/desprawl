@@ -3,11 +3,12 @@
 
 import type { Graph } from "./graph.ts"
 
-/** Tarjan, iterative: a deep file graph would blow the stack on a large repo */
-export function components(graph: Graph, { types = true } = {}): string[][] {
-  const out = (path: string): string[] =>
-    graph.modules[path].out.filter((e) => types || !e.type).map((e) => e.to)
-
+/**
+ * Tarjan, iterative: a deep file graph would blow the stack on a large repo.
+ * Groups come back sinks first, which is reverse topological order and what
+ * levelling depends on.
+ */
+export function scc(nodes: Iterable<string>, out: (node: string) => string[]): string[][] {
   const index = new Map<string, number>()
   const low = new Map<string, number>()
   const onStack = new Set<string>()
@@ -15,7 +16,7 @@ export function components(graph: Graph, { types = true } = {}): string[][] {
   const found: string[][] = []
   let counter = 0
 
-  for (const start of Object.keys(graph.modules)) {
+  for (const start of nodes) {
     if (index.has(start)) continue
     // each frame holds how far through its children it is
     const work: [string, number][] = [[start, 0]]
@@ -58,6 +59,11 @@ export function components(graph: Graph, { types = true } = {}): string[][] {
   }
   return found
 }
+
+export const components = (graph: Graph, { types = true } = {}): string[][] =>
+  scc(Object.keys(graph.modules), (path) =>
+    graph.modules[path].out.filter((e) => types || !e.type).map((e) => e.to),
+  )
 
 /** the tangled ones only, biggest first */
 export const cycles = (graph: Graph, options?: { types?: boolean }): string[][] =>

@@ -23,6 +23,11 @@ export function Onward({
       desc: `${num(stats.code)} loc, ${plural(stats.contributors.length, "dev")}, languages and who wrote them`,
     },
     {
+      to: "Modules",
+      title: "See the structure",
+      desc: "which folders depend on which, the levels they stack into, and the loops that stop any of them being moved",
+    },
+    {
       to: "Files",
       title: "Walk the tree",
       desc: `${num(stats.files)} files in ${plural(folders, "top level folder")}, with the language split per folder and churn beside it`,

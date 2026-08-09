@@ -86,6 +86,39 @@ export function scrub(source: string): { code: string; strings: string[] } {
   return { code, strings }
 }
 
+export interface Symbols {
+  /** what a file hands out, so its api surface rather than its size */
+  exports: number
+  /** declared at the top level, not the callbacks inside them */
+  functions: number
+  classes: number
+}
+
+const NAMED = /export\s*\{([^}]*)\}/g
+const DECLARED =
+  /(^|[\s;}])export\s+(default\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum|abstract)\b/g
+const FUNCTIONS = /(^|[\s;}])(async\s+)?function\b/g
+// a const bound to an arrow, in the first column, which is a declaration and not a callback
+const ARROWS =
+  /^(export\s+)?const\s+[\w$]+[^=\n]*=\s*(async\s+)?(\([^)]*\)|[\w$]+)\s*(:[^=\n]*)?=>/gm
+const CLASSES = /(^|[\s;}])(export\s+|default\s+|abstract\s+)*class\s+[\w$]/g
+
+const count = (text: string, pattern: RegExp) => (text.match(pattern) ?? []).length
+
+/** what a file declares, read off the same scrubbed code the imports came from */
+export function symbols(source: string): Symbols {
+  const { code } = scrub(source)
+  const listed = [...code.matchAll(NAMED)].reduce(
+    (sum, m) => sum + m[1].split(",").filter((name) => name.trim()).length,
+    0,
+  )
+  return {
+    exports: listed + count(code, DECLARED),
+    functions: count(code, FUNCTIONS) + count(code, ARROWS),
+    classes: count(code, CLASSES),
+  }
+}
+
 // read only what survived the scrub
 const STATIC = new RegExp(
   `(?:^|[\\s;})])(import|export)\\s+(type\\s+)?(?:[^${MARK}]*?\\bfrom\\s*)?${MARK}(\\d+)${MARK}`,

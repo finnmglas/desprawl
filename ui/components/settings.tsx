@@ -66,12 +66,12 @@ export function Settings({
       {reload && (
         <MenuItem onClick={reload}>
           <Refresh />
-          refresh
+          refresh contents
         </MenuItem>
       )}
       <MenuItem onClick={share}>
         <Copy />
-        share link
+        copy link to this page
       </MenuItem>
       <MenuItem
         onClick={() => {
@@ -81,7 +81,7 @@ export function Settings({
         }}
       >
         <Download />
-        download stats json
+        git-stats (json)
       </MenuItem>
       {isLive() && (
         <MenuItem
@@ -94,7 +94,7 @@ export function Settings({
           }}
         >
           <Download />
-          download import graph json
+          import-graph (json)
         </MenuItem>
       )}
       <div className="bg-border my-1 h-px" />

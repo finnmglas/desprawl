@@ -35,6 +35,8 @@ export interface DataTableProps<T> {
   total?: T
   /** Rows shown, the rest behind a toggle */
   fold?: number
+  /** the order the reader chose, for anything drawing the same rows elsewhere */
+  onSort?: (sort: Sort | null) => void
 }
 
 export function DataTable<T>({
@@ -49,6 +51,7 @@ export function DataTable<T>({
   className,
   total,
   fold,
+  onSort,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
   const [sort, setSort] = useState<Sort | null>(null)
@@ -134,7 +137,11 @@ export function DataTable<T>({
                 <TH
                   key={col.key}
                   num={col.num}
-                  onClick={() => setSort(cycle(sort, col.key))}
+                  onClick={() => {
+                    const next = cycle(sort, col.key)
+                    setSort(next)
+                    onSort?.(next)
+                  }}
                   className="hover:text-foreground cursor-pointer select-none"
                 >
                   <Tip text={col.hint ?? HINTS[col.label]} side="bottom">

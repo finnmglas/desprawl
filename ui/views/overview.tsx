@@ -4,18 +4,17 @@
 import { useEffect, useState } from "react"
 import { AiCard } from "../components/ai-card.tsx"
 import { Avatar } from "../components/avatar.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
+import { Card, CardContent } from "../components/card.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
+import { Kpi } from "../components/kpi.tsx"
 import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/moved.tsx"
 import { Mark } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/stack-card.tsx"
-import { Tip } from "../components/tip.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
-import { cn } from "../lib/ui.ts"
-import { TONES, commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
+import { commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
 import { allTime } from "../lib/live.ts"
 import type { Timeline } from "../../src/history.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
@@ -124,31 +123,7 @@ export function Overview({
             to: "History",
           },
         ].map((card) => (
-          <Card
-            key={card.label}
-            onClick={() => onTab(card.to)}
-            // no native title here: the browser's own tooltip would cover the badge's
-            aria-label={`Open ${card.to}`}
-            className="hover:border-ring cursor-pointer transition-colors"
-          >
-            <CardHeader className="flex-row items-start gap-2">
-              <CardTitle className="text-muted-foreground">{card.label}</CardTitle>
-              <Tip text={card.verdict.why} side="bottom" className="ml-auto">
-                <span
-                  className={cn(
-                    "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    TONES[card.verdict.tone],
-                  )}
-                >
-                  {card.verdict.label}
-                </span>
-              </Tip>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="text-2xl font-semibold tabular-nums">{card.value}</div>
-              <div className="text-muted-foreground text-xs">{card.sub}</div>
-            </CardContent>
-          </Card>
+          <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to)} />
         ))}
       </div>
 
