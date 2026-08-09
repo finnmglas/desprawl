@@ -18,6 +18,13 @@ import { mainly } from "../lib/tint.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
+// what a line is, since none of the three has a brand colour to borrow
+const SPLIT: Record<string, { paint: string; of: (n: Node) => number }> = {
+  Code: { paint: "var(--chart-1)", of: (n) => n.code },
+  Comments: { paint: "var(--chart-4)", of: (n) => n.comment },
+  Blank: { paint: "var(--muted-foreground)", of: (n) => n.blank },
+}
+
 // files carry no langs map, their one language is the file itself
 const own = (n: Node, lang: string): number =>
   n.children ? (n.langs[lang] ?? 0) : n.lang === lang ? n.code : 0
@@ -36,6 +43,8 @@ export interface ExplorerProps {
 
 export function Explorer({ stats, onTab, path, setPath, lang, setLang }: ExplorerProps) {
   const [filter, setFilter] = useState("")
+  // a line kind shades the rows the same way a language does, and only one at a time
+  const [kind, setKind] = useState("")
   // a served tree is directories only, files arrive on open
   const [fetched, setFetched] = useState<Record<string, Node[]>>({})
 
@@ -55,8 +64,10 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
     [here, filter, fetched, key],
   )
 
-  // share of the picked language inside each row, painted as a bar
+  // share of whatever is picked inside each row, painted as a bar
   const langTotal = lang ? (here.langs[lang] ?? 0) : 0
+  const share = (n: Node) => (kind ? SPLIT[kind].of(n) : own(n, lang))
+  const whole = kind ? SPLIT[kind].of(here) : langTotal
 
   const enter = (node: Node) => {
     if (node.children) return setPath([...path, node.name])
@@ -121,8 +132,8 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           hint={
             here.leaves && !fetched[key]
               ? `loading ${num(here.leaves)} files`
-              : lang
-                ? `shaded by ${lang} share`
+              : lang || kind
+                ? `shaded by ${lang || kind.toLowerCase()} share`
                 : "click a folder to descend"
           }
           columns={columns}
@@ -131,11 +142,11 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           fold={100}
           onRowClick={enter}
           rowStyle={(n) =>
-            lang
+            lang || kind
               ? {
                   backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
                   backgroundRepeat: "no-repeat",
-                  backgroundSize: `${(own(n, lang) / (langTotal || 1)) * 100}% 100%`,
+                  backgroundSize: `${(share(n) / (whole || 1)) * 100}% 100%`,
                 }
               : undefined
           }
@@ -148,12 +159,27 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           />
         </DataTable>
 
-        <Distribution
-          title={path.length ? `${path.join("/")} languages` : "Languages"}
-          langs={here.langs}
-          selected={lang}
-          onSelect={setLang}
-        />
+        <div className="flex flex-col gap-3">
+          <Distribution
+            title={path.length ? `${path.join("/")} languages` : "Languages"}
+            langs={here.langs}
+            selected={lang}
+            onSelect={(next) => {
+              setKind("")
+              setLang(next)
+            }}
+          />
+          <Distribution
+            title="Lines"
+            langs={{ Code: here.code, Comments: here.comment, Blank: here.blank }}
+            paint={(name) => SPLIT[name].paint}
+            selected={kind}
+            onSelect={(next) => {
+              setLang("")
+              setKind(next)
+            }}
+          />
+        </div>
       </div>
 
       <Onward stats={stats} current="Files" onTab={onTab} />

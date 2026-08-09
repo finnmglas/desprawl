@@ -33,6 +33,10 @@ const KEY: [string, string, string][] = [
   [PAINT.quiet, "Inside", "the group against itself, so the imports that never leave it"],
 ]
 
+// a canvas has a size a browser will refuse, and 2000 rows is past it in every
+// direction. Nothing readable lives up there anyway, so the grid stops before it
+const LIMIT = 400
+
 export function Matrix({
   units,
   across,
@@ -66,7 +70,7 @@ export function Matrix({
   const busiest = (list: Unit[], by: (u: Unit) => number) =>
     [...list]
       .sort((a, b) => by(b) - by(a))
-      .slice(0, most)
+      .slice(0, Math.min(most, LIMIT))
       .sort(order ?? ((a, b) => a.level - b.level || a.path.localeCompare(b.path)))
 
   // a group that imports nothing here has an empty row, one nobody imports an empty column
@@ -76,7 +80,8 @@ export function Matrix({
   const cols = busiest(imported, (u) => arriving(u).length)
   const peak = Math.max(1, ...rows.flatMap((u) => Object.values(u.out)))
   const alone = units.filter((u) => !leaving(u).length && !arriving(u).length).length
-  const cell = Math.max(rows.length, cols.length) > 24 ? 12 : 20
+  const widest = Math.max(rows.length, cols.length)
+  const cell = widest > 200 ? 8 : widest > 24 ? 12 : 20
 
   const paint = (row: Unit, col: Unit) => {
     const weight = row.out[col.path] ?? 0
@@ -99,7 +104,8 @@ export function Matrix({
   useEffect(() => {
     const board = canvas.current
     if (!board) return
-    const scale = devicePixelRatio || 1
+    // two is as sharp as a grid of flat squares can look, and it halves the pixels
+    const scale = Math.min(devicePixelRatio || 1, 2)
     board.width = cols.length * cell * scale
     board.height = rows.length * cell * scale
     board.style.width = `${cols.length * cell}px`

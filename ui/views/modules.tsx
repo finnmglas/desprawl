@@ -70,17 +70,25 @@ function Empty({
 /** a row that stays short until asked, like the metadata card */
 function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number }) {
   const [open, setOpen] = useState(false)
-  const hidden = children.length - few
+  // opened, but not into two thousand buttons: the table below is where the rest lives
+  const most = open ? Math.min(children.length, 120) : few
+  const hidden = children.length - most
+  const over = children.length > few
   return (
     <div className="flex flex-wrap items-center gap-1">
-      {open ? children : children.slice(0, few)}
-      {hidden > 0 && (
+      {children.slice(0, most)}
+      {over && (
         <button
           onClick={() => setOpen(!open)}
           className="text-muted-foreground hover:text-foreground cursor-pointer px-1 text-xs"
         >
           {open ? "show less" : `+${num(hidden)} more`}
         </button>
+      )}
+      {open && hidden > 0 && (
+        <span className="text-muted-foreground px-1 text-xs">
+          {num(hidden)} more in the table below
+        </span>
       )}
     </div>
   )
