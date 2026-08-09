@@ -2,14 +2,13 @@
 // goal: one column spec drives render, sort and export
 
 import { useMemo, useState } from "react"
-import { Button } from "./button.tsx"
 import { Card, CardContent } from "./card.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
+import { DownloadButton } from "./download-button.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "./table.tsx"
 import { Tip } from "./tip.tsx"
-import { toast } from "./toast.tsx"
-import { delimit, download } from "../lib/export.ts"
+import { delimit, named } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { backdrop, cycle, pct } from "../lib/format.ts"
 import { effective, shares } from "../lib/scale.ts"
@@ -133,16 +132,11 @@ export function DataTable<T>({
             message={`Copied ${sorted.length} rows`}
             note="Paste straight into a sheet"
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              download(`${slug}.csv`, delimit(matrix(), ","))
-              toast(`${slug}.csv`, `${sorted.length} rows`)
-            }}
-          >
-            csv
-          </Button>
+          <DownloadButton
+            name={named(`${slug}.csv`)}
+            text={() => delimit(matrix(), ",")}
+            note={`${sorted.length} rows`}
+          />
         </div>
       </CardHead>
       <CardContent className="p-0 pt-2">

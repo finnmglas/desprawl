@@ -14,6 +14,19 @@ export const delimit = (rows: (string | number)[][], sep: string): string =>
     )
     .join("\n")
 
+let subject = "repo"
+export const describes = (repo: string): void => {
+  subject = repo.split("/").filter(Boolean).pop() || "repo"
+}
+
+/** 20260809-desprawl-languages.csv, so a downloads folder stays readable */
+export function named(what: string): string {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  return `${stamp}-${subject}-${what}`
+}
+
 export async function copy(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text)

@@ -1,10 +1,11 @@
 // owner: finn
 // goal: everything the header menu offers
 
+import { Copy, Download, Refresh } from "./icons.tsx"
 import { Menu, MenuItem, MenuSection } from "./menu.tsx"
 import { Tabs } from "./tabs.tsx"
 import { toast } from "./toast.tsx"
-import { copy, download } from "../lib/export.ts"
+import { copy, download, named } from "../lib/export.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../lib/locale.ts"
 import {
   BRANDINGS,
@@ -62,14 +63,24 @@ export function Settings({
 
   return (
     <Menu>
-      {reload && <MenuItem onClick={reload}>refresh</MenuItem>}
-      <MenuItem onClick={share}>share link</MenuItem>
+      {reload && (
+        <MenuItem onClick={reload}>
+          <Refresh />
+          refresh
+        </MenuItem>
+      )}
+      <MenuItem onClick={share}>
+        <Copy />
+        share link
+      </MenuItem>
       <MenuItem
         onClick={() => {
-          download("desprawl-stats.json", JSON.stringify(stats, null, 2), "application/json")
-          toast("desprawl-stats.json", "The whole report, tree and series included")
+          const file = named("stats.json")
+          download(file, JSON.stringify(stats, null, 2), "application/json")
+          toast(file, "The whole report, tree and series included")
         }}
       >
+        <Download />
         download stats json
       </MenuItem>
       {isLive() && (
@@ -77,13 +88,12 @@ export function Settings({
           onClick={async () => {
             const graph = await importGraph()
             if (!graph) return
-            download("desprawl-imports.json", JSON.stringify(graph, null, 2), "application/json")
-            toast(
-              "desprawl-imports.json",
-              `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`,
-            )
+            const file = named("imports.json")
+            download(file, JSON.stringify(graph, null, 2), "application/json")
+            toast(file, `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`)
           }}
         >
+          <Download />
           download import graph json
         </MenuItem>
       )}

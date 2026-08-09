@@ -31,7 +31,11 @@ export function view(stats: Stats): string {
   const data = JSON.stringify(stats).replaceAll("<", "\\u003c")
   const html = shell().replace("</head>", `<script>window.__DESPRAWL__=${data}</script></head>`)
 
-  const out = join(tmpdir(), `desprawl-${stats.head}.html`)
+  const name = stats.repo.split(/[\\/]/).filter(Boolean).pop() || "repo"
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
+  const out = join(tmpdir(), `${stamp}-${name}-${stats.head}.html`)
   writeFileSync(out, html)
   open(out)
   return out

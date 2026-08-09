@@ -14,7 +14,7 @@ import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
-import { copy } from "./lib/export.ts"
+import { copy, describes } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
 import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
@@ -74,6 +74,12 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     void loadFaces(stats).then(setFaces)
   }, [stats.repo])
 
+  const name = stats.repo.split("/").filter(Boolean).pop() || "repo"
+  useEffect(() => {
+    describes(stats.repo)
+    document.title = `${name} · desprawl`
+  }, [stats.repo])
+
   const themed = useTheme(prefs.theme, (theme) => change({ theme }))
   useThemeHotkey(themed)
 
@@ -94,7 +100,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
                 onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
                 className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
               >
-                {stats.repo.split("/").filter(Boolean).pop()}
+                {name}
               </button>
               {stats.remotes.map((remote) => (
                 <RemoteLink key={remote.url} remote={remote} />
