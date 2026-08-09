@@ -8,6 +8,8 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
+import { build } from "./graph.ts"
+import type { Graph } from "./graph.ts"
 import { bytesAt, count, detail, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
@@ -78,6 +80,7 @@ export function serve(
   let total = 0
   let allTime: Timeline | null = null
   let sizes: { date: string; bytes: number }[] | null = null
+  let imports: Graph | null = null
 
   const load = (fresh: boolean): Stats => {
     const head = git(repo, "rev-parse", "--short", "HEAD").trim()
@@ -216,6 +219,12 @@ export function serve(
           allTime ||= timeline(repo)
           sizes ||= allTime.samples.map((s) => ({ date: s.date, bytes: bytesAt(repo, s.hash) }))
           return json(sizes)
+        }
+
+        // seconds of work on a big repo, so only on ask
+        if (url.pathname === "/api/graph") {
+          imports ||= build(repo)
+          return json(imports)
         }
 
         // dates and authors only, so the chart spans everything

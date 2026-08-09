@@ -16,6 +16,7 @@ import {
   type Scale,
 } from "../lib/display.tsx"
 import { num } from "../lib/format.ts"
+import { importGraph, isLive } from "../lib/live.ts"
 import type { Prefs } from "../lib/prefs.ts"
 import type { Stats } from "../../src/model.ts"
 
@@ -65,12 +66,27 @@ export function Settings({
       <MenuItem onClick={share}>share link</MenuItem>
       <MenuItem
         onClick={() => {
-          download("desprawl.json", JSON.stringify(stats, null, 2), "application/json")
-          toast("desprawl.json", "The whole report, tree and series included")
+          download("desprawl-stats.json", JSON.stringify(stats, null, 2), "application/json")
+          toast("desprawl-stats.json", "The whole report, tree and series included")
         }}
       >
-        export json
+        download stats json
       </MenuItem>
+      {isLive() && (
+        <MenuItem
+          onClick={async () => {
+            const graph = await importGraph()
+            if (!graph) return
+            download("desprawl-imports.json", JSON.stringify(graph, null, 2), "application/json")
+            toast(
+              "desprawl-imports.json",
+              `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`,
+            )
+          }}
+        >
+          download import graph json
+        </MenuItem>
+      )}
       <div className="bg-border my-1 h-px" />
       <Choice
         label="Number relation"
