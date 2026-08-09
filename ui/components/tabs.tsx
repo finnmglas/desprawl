@@ -2,7 +2,6 @@
 // goal: one view at a time
 // inspo: shadcn
 
-import * as React from "react"
 import { cn } from "../lib/ui.ts"
 
 export interface TabsProps {

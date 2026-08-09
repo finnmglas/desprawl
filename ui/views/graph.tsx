@@ -5,13 +5,14 @@ import { useEffect, useMemo, useState } from "react"
 import { Avatar } from "../components/avatar.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
+import { Card, CardContent } from "../components/card.tsx"
+import { CardHead } from "../components/card-head.tsx"
 import { Input } from "../components/input.tsx"
 import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
+import { Moved } from "../components/moved.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tip } from "../components/tip.tsx"
 import { toast } from "../components/toast.tsx"
-import { locale } from "../lib/locale.ts"
 import { copy } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
@@ -21,6 +22,7 @@ import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
 import type { Detail } from "../../src/history.ts"
+import { place } from "../lib/lanes.ts"
 import type { Commit, Stats } from "../../src/model.ts"
 
 // prettier-ignore
@@ -47,7 +49,6 @@ const SORTS: Record<string, (a: Numbered, b: Numbered) => number> = {
   hash: (a, b) => a.hash.localeCompare(b.hash),
 }
 
-// alignment match
 const HEADS: { key: string; right?: boolean }[] = [
   { key: "#", right: true },
   { key: "subject" },
@@ -63,58 +64,6 @@ const PAGE = 200
 const ROW = 34
 const GAP = 14
 const PAD = 10
-
-interface Placed {
-  commit: Commit
-  lane: number
-  /** drawn through the row */
-  active: number[]
-  /** edges down into the next row */
-  edges: { from: number; to: number }[]
-  /** a child drew in from above */
-  linked: boolean
-}
-
-// lanes, newest first, reused once the child is drawn
-function place(log: Commit[]): Placed[] {
-  const heads: (string | null)[] = [] // lane -> hash it is waiting for
-  const rows: Placed[] = []
-
-  const claim = (hash: string): number => {
-    const open = heads.indexOf(hash)
-    if (open !== -1) return open
-    const free = heads.indexOf(null)
-    if (free !== -1) {
-      heads[free] = hash
-      return free
-    }
-    heads.push(hash)
-    return heads.length - 1
-  }
-
-  for (const commit of log) {
-    const linked = heads.includes(commit.hash) // a child above pointed here
-    const lane = claim(commit.hash)
-    // every lane still waiting on something else is drawn through this row
-    const active = heads.map((h, i) => (h ? i : -1)).filter((i) => i !== -1 && i !== lane)
-    const edges: { from: number; to: number }[] = []
-
-    heads[lane] = null
-    commit.parents.forEach((parent, i) => {
-      // a parent another lane waits for joins that lane, never claimed twice
-      const waiting = heads.indexOf(parent)
-      let to: number
-      if (waiting !== -1) to = waiting
-      else if (i === 0)
-        to = ((heads[lane] = parent), lane) // first parent keeps this lane
-      else to = claim(parent)
-      edges.push({ from: lane, to })
-    })
-
-    rows.push({ commit, lane, active, edges, linked })
-  }
-  return rows
-}
 
 const x = (lane: number) => PAD + lane * GAP
 
@@ -208,18 +157,19 @@ export function Graph({
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <CardHeader className="flex-row items-center gap-2">
-          <div className="flex flex-col gap-0.5">
-            <CardTitle>History</CardTitle>
-            <span className="text-muted-foreground text-xs">
+        <CardHead
+          title="History"
+          hint={
+            <>
               {shown.length !== stats.log.length && `${shown.length} of `}
               {log.length < total
                 ? `latest ${num(log.length)} of ${num(total)}`
                 : `all ${num(total)}`}{" "}
               commits
               {!railed && " · sorted, so the branch rails are hidden"}
-            </span>
-          </div>
+            </>
+          }
+        >
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
             {!railed && (
               <Button
@@ -240,7 +190,7 @@ export function Graph({
               onChange={(e) => setFilter(e.currentTarget.value)}
             />
           </div>
-        </CardHeader>
+        </CardHead>
         <CardContent className="overflow-x-auto p-0 pt-2">
           <div
             style={{ paddingLeft: width, gridTemplateColumns: COLS }}
@@ -342,21 +292,18 @@ export function Graph({
                           </Badge>
                         ))}
                     </span>
-                    <span
-                      className="rounded-sm px-1 text-right text-xs tabular-nums"
-                      style={{ color: ADDED, ...backdrop(commit.insertions, peak, ADDED, curve) }}
-                    >
-                      +{num(commit.insertions)}
-                    </span>
-                    <span
-                      className="rounded-sm px-1 text-right text-xs tabular-nums"
-                      style={{
-                        color: REMOVED,
-                        ...backdrop(commit.deletions, peak, REMOVED, curve),
-                      }}
-                    >
-                      -{num(commit.deletions)}
-                    </span>
+                    <Moved
+                      n={commit.insertions}
+                      kind="ins"
+                      className="rounded-sm px-1 text-right text-xs"
+                      style={backdrop(commit.insertions, peak, ADDED, curve)}
+                    />
+                    <Moved
+                      n={commit.deletions}
+                      kind="del"
+                      className="rounded-sm px-1 text-right text-xs"
+                      style={backdrop(commit.deletions, peak, REMOVED, curve)}
+                    />
                     <span className="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
                       <Avatar
                         name={who(commit).name}

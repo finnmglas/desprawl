@@ -2,7 +2,7 @@
 // goal: analyse a repo you do not have yet
 
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -38,13 +38,20 @@ function downloads(): string {
   return join(process.env.USERPROFILE ?? home, "Downloads")
 }
 
+// windows nfs compatible
+const plain = (part: string): string => part.replace(/[<>:"|?*\\]/g, "-").replace(/\.+$/, "")
+
 /** host and path both, so two repos of one name do not land on each other */
 function place(url: string): string {
-  const clean = url.replace(/\.git$/, "").replace(/\/+$/, "")
+  const clean = url
+    .replace(/[?#].*$/, "")
+    .replace(/\.git$/, "")
+    .replace(/\/+$/, "")
   const parts =
     clean.match(/^\w+:\/\/(?:[^@/]+@)?([^/]+)\/(.+)$/) ?? clean.match(/^[^@]+@([^:]+):(.+)$/)
   const [host, path] = parts ? [parts[1], parts[2]] : ["repo", clean.replace(/\W+/g, "-")]
-  return join(downloads(), "desprawl", host, ...path.split("/"))
+  // a port belongs to the url, not to where the copy lives
+  return join(downloads(), "desprawl", plain(host.split(":")[0]), ...path.split("/").map(plain))
 }
 
 /** Clone it, or bring the copy we already have up to date, and say where it is */
@@ -64,7 +71,10 @@ export function local(asked: string): string {
   } else {
     console.log(`Cloning ${url}\ninto ${dir}\n`)
     mkdirSync(dirname(dir), { recursive: true })
-    git("clone", url, dir)
+    const half = `${dir}.part`
+    rmSync(half, { recursive: true, force: true })
+    git("clone", url, half)
+    renameSync(half, dir)
   }
   console.log()
   return dir

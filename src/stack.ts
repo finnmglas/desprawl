@@ -4,6 +4,8 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
+import { CODE } from "./scan.ts"
+import type { Node } from "./model.ts"
 
 export interface Manifest {
   path: string
@@ -200,6 +202,15 @@ const AUTH: Table = {
   "@supabase/auth-helpers-nextjs": "Supabase Auth", lucia: "Lucia", bcrypt: "bcrypt",
 }
 
+// every dependency table, and the field it fills
+// prettier-ignore
+const TABLES: [string, Table][] = [
+  ["frameworks", FRAMEWORKS], ["state", STATE], ["ui", UI], ["connects", CONNECTS],
+  ["testing", TESTING], ["build", BUILDERS], ["runtimes", RUNTIME], ["styling", STYLING],
+  ["content", CONTENT], ["observability", OBSERVE], ["auth", AUTH], ["linters", LINTERS],
+  ["formatters", FORMATTERS],
+]
+
 /** Marker files, matched on the full path or the basename. */
 // prettier-ignore
 const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "terraform", string][] = [
@@ -293,6 +304,10 @@ const CONFIGS: [RegExp, "linters" | "formatters"][] = [
   [/^(.*\/)?dprint\.jsonc?$/, "formatters"],
 ]
 
+// copies of other people's code, and build output. Neither describes this project
+const VENDORED =
+  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|Godeps|Pods|Carthage|\.yarn|\.pnp|\.gradle|\.tox|\.venv|venv|site-packages|__pycache__|dist|build|out|target|coverage|\.next|\.nuxt|\.output|__fixtures__|fixtures)\/|(^|\/)wwwroot\/lib\//
+
 const read = (repo: string, path: string): string => {
   try {
     return readFileSync(join(repo, path), "utf8")
@@ -384,13 +399,11 @@ function assisted(repo: string): Pick<Ai, "signed" | "scanned" | "capped" | "by"
   return { signed, scanned: commits.length, capped: commits.length >= SIGNED_MAX, by }
 }
 
-export function stack(repo: string): Stack {
-  const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
+/** what the tracked paths alone say: marker files, config, ports, assistants */
+function markers(repo: string, paths: string[]) {
   const found: Record<string, string[]> = {}
   const counts = { dockerfiles: 0, compose: 0, kubernetes: 0, terraform: 0 }
-  const licenses: string[] = []
   const node: string[] = []
-  const modules: string[] = []
   const env: string[] = []
   const strict = { on: 0, off: 0 }
   const ports: number[] = []
@@ -402,6 +415,8 @@ export function stack(repo: string): Stack {
   }
 
   for (const path of paths) {
+    if (VENDORED.test(path)) continue
+
     for (const [match, where, name] of FILES) {
       if (!match.test(path)) continue
       if (where === "docker") counts.dockerfiles++
@@ -421,9 +436,7 @@ export function stack(repo: string): Stack {
       const marker = hit.endsWith("/") ? `${hit.split("/").at(-2)}/` : (hit.split("/").pop() ?? hit)
       agentFiles[marker] = (agentFiles[marker] ?? 0) + 1
     }
-  }
 
-  for (const path of paths) {
     // strictness is the single most useful thing a tsconfig says about a codebase
     if (/^(.*\/)?tsconfig(\..+)?\.json$/.test(path)) {
       const text = read(repo, path)
@@ -440,68 +453,14 @@ export function stack(repo: string): Stack {
         port(Number(line[1]))
     }
   }
+  return { found, counts, node, env, strict, ports, agents, agentFiles, port }
+}
 
-  // every manifest, wherever it sits, so a monorepo is read whole
-  const manifests = paths
-    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !p.includes("node_modules/"))
-    .map((p) => manifest(repo, p))
-    .filter((m): m is Manifest => !!m)
-
-  const frameworks: string[] = []
-  const state: string[] = []
-  const ui: string[] = [...(found.ui ?? [])]
-  const connects: string[] = []
-  const testing: string[] = []
-  const runtimes: string[] = []
-  const styling: string[] = []
-  const content: string[] = []
-  const observability: string[] = []
-  const auth: string[] = []
-  const scripts: string[] = []
-  const bundlers: string[] = []
-  const build: string[] = [...(found.build ?? [])]
-  const linters: string[] = []
-  const formatters: string[] = []
-  const typescript: string[] = []
-  const managers: string[] = [...(found.lock ?? [])]
-  const pinning: Pinning = { exact: 0, caret: 0, tilde: 0, range: 0, linked: 0 }
-  const names = new Set<string>()
-
-  for (const m of manifests) {
-    if (m.license) add(licenses, m.license)
-    if (m.manager) add(managers, m.manager.split("@")[0])
-    if (m.engines?.node) add(node, m.engines.node)
-    if (m.type) add(modules, m.type === "module" ? "esm" : "cjs")
-    for (const [name, body] of Object.entries(m.scripts)) {
-      add(scripts, name)
-      // next --turbopack, vite, and a port given on the command line
-      if (/--turbopack|--turbo\b/.test(body)) add(bundlers, "Turbopack")
-      if (/\bwebpack\b/.test(body)) add(bundlers, "webpack")
-      if (/\bvite\b/.test(body)) add(bundlers, "Vite")
-      for (const found of body.matchAll(/(?:--port[= ]|-p[= ])(\d{2,5})/g)) port(Number(found[1]))
-    }
-    for (const [name, range] of Object.entries(m.deps)) {
-      names.add(name)
-      pinning[pin(String(range))]++
-      if (name === "typescript") add(typescript, String(range))
-      add(frameworks, label(FRAMEWORKS, name))
-      add(state, label(STATE, name))
-      add(ui, label(UI, name))
-      add(connects, label(CONNECTS, name))
-      add(testing, label(TESTING, name))
-      add(build, label(BUILDERS, name))
-      add(runtimes, label(RUNTIME, name))
-      add(styling, label(STYLING, name))
-      add(content, label(CONTENT, name))
-      add(observability, label(OBSERVE, name))
-      add(auth, label(AUTH, name))
-      add(linters, label(LINTERS, name))
-      add(formatters, label(FORMATTERS, name))
-    }
-  }
-
-  // only a licence at the root speaks for the project, the rest come with vendored code
+/** a licence beside the manifest speaks for the project, the rest come with vendored code */
+function licences(repo: string, paths: string[]): { licenses: string[]; vendored: number } {
+  const licenses: string[] = []
   let vendored = 0
+
   for (const path of paths.filter((p) => /^(.*\/)?(LICEN[SC]E|COPYING)(\..+)?$/i.test(p))) {
     if (path.includes("/")) {
       vendored++
@@ -527,8 +486,97 @@ export function stack(repo: string): Stack {
                     : "unknown"
     add(licenses, kind)
   }
+  return { licenses, vendored }
+}
 
-  // the dominant extension names the project's real language, node manifest or not
+// prettier-ignore
+const SERVER = ["Express", "Fastify", "NestJS", "Koa", "Hono", "hapi", "Next.js", "Nuxt", "SvelteKit"]
+// prettier-ignore
+const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt"]
+
+/** what the repo holds, judged by what it depends on and what it ships */
+function shipped(
+  frameworks: string[],
+  connected: boolean,
+  manifests: Manifest[],
+  boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
+): string[] {
+  const parts: string[] = []
+  if (frameworks.some((f) => CLIENT.includes(f))) add(parts, "frontend")
+  if (frameworks.some((f) => SERVER.includes(f)) || connected) add(parts, "backend")
+  if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
+    add(parts, "monorepo root")
+  if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
+  if (manifests.some((m) => m.bin)) add(parts, "cli")
+  if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
+  if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
+  if (boxes.dockerfiles || boxes.compose || boxes.kubernetes || boxes.terraform) add(parts, "infra")
+  return parts
+}
+
+export function stack(repo: string, languages: Node[] = []): Stack {
+  const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
+  const { found, counts, node, env, strict, ports, agents, agentFiles, port } = markers(repo, paths)
+  const licenses: string[] = []
+  const modules: string[] = []
+
+  // every manifest, wherever it sits, so a monorepo is read whole
+  const manifests = paths
+    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !VENDORED.test(p))
+    .map((p) => manifest(repo, p))
+    .filter((m): m is Manifest => !!m)
+
+  // one bucket per table, so adding a category is one line in TABLES and one row in the card
+  const dep: Record<string, string[]> = {
+    frameworks: [],
+    state: [],
+    ui: [...(found.ui ?? [])],
+    connects: [],
+    testing: [],
+    runtimes: [],
+    styling: [],
+    content: [],
+    observability: [],
+    auth: [],
+    build: [...(found.build ?? [])],
+    linters: [],
+    formatters: [],
+  }
+  const scripts: string[] = []
+  const bundlers: string[] = []
+  const typescript: string[] = []
+  const managers: string[] = [...(found.lock ?? [])]
+  const pinning: Pinning = { exact: 0, caret: 0, tilde: 0, range: 0, linked: 0 }
+  const names = new Set<string>()
+
+  for (const m of manifests) {
+    if (m.license) add(licenses, m.license)
+    if (m.manager) add(managers, m.manager.split("@")[0])
+    if (m.engines?.node) add(node, m.engines.node)
+    if (m.type) add(modules, m.type === "module" ? "esm" : "cjs")
+    for (const [name, body] of Object.entries(m.scripts)) {
+      add(scripts, name)
+      // next --turbopack, vite, and a port given on the command line
+      if (/--turbopack|--turbo\b/.test(body)) add(bundlers, "Turbopack")
+      if (/\bwebpack\b/.test(body)) add(bundlers, "webpack")
+      if (/\bvite\b/.test(body)) add(bundlers, "Vite")
+      for (const found of body.matchAll(/(?:--port[= ]|-p[= ])(\d{2,5})/g)) port(Number(found[1]))
+    }
+    for (const [name, range] of Object.entries(m.deps)) {
+      names.add(name)
+      pinning[pin(String(range))]++
+      if (name === "typescript") add(typescript, String(range))
+      for (const [bucket, table] of TABLES) add(dep[bucket], label(table, name))
+    }
+  }
+
+  const { licenses: filed, vendored } = licences(repo, paths)
+  for (const kind of filed) add(licenses, kind)
+
+  // the biggest real language by lines, so 200k lines of generated svg name nothing
+  const primary =
+    [...languages].filter((l) => CODE.has(l.name)).sort((a, b) => b.code - a.code)[0]?.name ?? ""
+
   const tally = new Map<string, number>()
   for (const path of paths) {
     const dot = path.lastIndexOf(".")
@@ -538,47 +586,12 @@ export function stack(repo: string): Stack {
       tally.set(ext, (tally.get(ext) ?? 0) + 1)
     }
   }
-  const primary = [...tally].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ""
   const exts = new Set(tally.keys())
   const hasTs =
     exts.has("ts") || exts.has("tsx") || exts.has("mts") || (found.typescript?.length ?? 0) > 0
   const hasJs = exts.has("js") || exts.has("jsx") || exts.has("mjs") || exts.has("cjs")
 
-  // what the repo actually contains, judged by what it depends on and what it ships
-  const parts: string[] = []
-  const server = [
-    "Express",
-    "Fastify",
-    "NestJS",
-    "Koa",
-    "Hono",
-    "hapi",
-    "Next.js",
-    "Nuxt",
-    "SvelteKit",
-  ]
-  const client = [
-    "React",
-    "Vue",
-    "Svelte",
-    "Angular",
-    "Solid",
-    "Preact",
-    "Astro",
-    "Next.js",
-    "Nuxt",
-  ]
-  if (frameworks.some((f) => client.includes(f))) add(parts, "frontend")
-  if (frameworks.some((f) => server.includes(f)) || connects.length) add(parts, "backend")
-  if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
-    add(parts, "monorepo root")
-  if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
-  if (manifests.some((m) => "bin" in m)) add(parts, "cli")
-  if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
-  if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
-  if (manifests.some((m) => m.bin)) add(parts, "cli")
-  if (counts.dockerfiles || counts.compose || counts.kubernetes || counts.terraform)
-    add(parts, "infra")
+  const parts = shipped(dep.frameworks, dep.connects.length > 0, manifests, counts)
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
 
@@ -607,20 +620,20 @@ export function stack(repo: string): Stack {
     lockfiles: found.lock ?? [],
     pinning,
     dependencies: names.size,
-    build,
-    frameworks,
-    state,
-    ui,
-    connects,
-    testing,
-    runtimes,
-    styling,
-    content,
-    observability,
-    auth,
+    build: dep.build,
+    frameworks: dep.frameworks,
+    state: dep.state,
+    ui: dep.ui,
+    connects: dep.connects,
+    testing: dep.testing,
+    runtimes: dep.runtimes,
+    styling: dep.styling,
+    content: dep.content,
+    observability: dep.observability,
+    auth: dep.auth,
     scripts,
-    linters,
-    formatters,
+    linters: dep.linters,
+    formatters: dep.formatters,
     rules: [...(found.linters ?? []), ...(found.formatters ?? [])],
     ci: found.ci ?? [],
     bundlers,

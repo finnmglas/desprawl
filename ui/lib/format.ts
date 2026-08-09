@@ -3,8 +3,9 @@
 
 import type { Curve } from "./display.tsx"
 import { locale } from "./locale.ts"
+export { nest, pct, tokens } from "../../src/human.ts"
 import { human } from "../../src/human.ts"
-import type { Node, Split } from "../../src/model.ts"
+import type { Node } from "../../src/model.ts"
 
 let abbreviate = true
 
@@ -16,15 +17,12 @@ export const setSimple = (on: boolean) => {
 export const num = (n: number) => (abbreviate ? human(n, 3) : n.toLocaleString(locale()))
 export const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
 
-export const pct = (n: number, of: number) => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 // tables sort on raw iso, this is display only
 export const day = (iso: string) => {
   const date = iso.slice(0, 10)
   if (!date) return "-"
   return locale().startsWith("en") ? date : new Date(date).toLocaleDateString(locale())
 }
-export const tokens = (chars: number) => Math.round(chars / 4)
-export const nest = (s: Split) => (s.code ? (s.indent / s.code).toFixed(1) : "0.0")
 export const churn = (n: Node) => n.insertions + n.deletions
 
 // excel style, a cell against its column's biggest

@@ -1,0 +1,22 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # desprawl reads git history, so a shallow clone is a bad test bed
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # the lockfile is gitignored here, so there is nothing to freeze or cache against
+      - run: pnpm install
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build

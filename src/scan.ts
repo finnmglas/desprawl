@@ -1,7 +1,7 @@
 // owner: finn
 // goal: files to loc
 
-import { readFileSync } from "node:fs"
+import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { blank, git } from "./model.ts"
 import type { Node, Split } from "./model.ts"
@@ -20,7 +20,61 @@ const LANGS: Record<string, string> = {
   md: "Markdown", sh: "Shell", bash: "Shell", flow: "Flow",
 }
 
-const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby"])
+// named, not extended
+// prettier-ignore
+const NAMES: Record<string, string> = {
+  makefile: "Make", "gnumakefile": "Make", dockerfile: "Docker", containerfile: "Docker",
+  justfile: "just", rakefile: "Ruby", gemfile: "Ruby", brewfile: "Ruby", vagrantfile: "Ruby",
+  jenkinsfile: "Groovy", procfile: "Procfile", "cmakelists.txt": "CMake",
+}
+
+// the other way a file says what it is
+const RUNS: Record<string, string> = {
+  sh: "Shell",
+  bash: "Shell",
+  zsh: "Shell",
+  fish: "Shell",
+  python: "Python",
+  python3: "Python",
+  node: "JavaScript",
+  ruby: "Ruby",
+  perl: "Perl",
+}
+
+const shebang = (text: string): string => {
+  const first = text.slice(0, 120)
+  if (!first.startsWith("#!")) return ""
+  return RUNS[first.match(/\b(fish|bash|zsh|sh|python3?|node|ruby|perl)\b/)?.[1] ?? ""] ?? ""
+}
+
+const PEEK = 8192
+
+/** null in the head = binary */
+function head(file: string): Buffer | null {
+  let fd = -1
+  try {
+    // a symlink to a fifo blocks forever on open, and a device is not source either
+    if (!statSync(file).isFile()) return null
+    fd = openSync(file, "r")
+    const buf = Buffer.alloc(PEEK)
+    const read = readSync(fd, buf, 0, PEEK, 0)
+    return buf.subarray(0, read)
+  } catch {
+    return null
+  } finally {
+    if (fd >= 0) closeSync(fd)
+  }
+}
+
+// languages a project can be written in. Assets, data and config are counted but never
+// name the repo, or a folder of generated svg would decide what the project is
+// prettier-ignore
+export const CODE = new Set([
+  ts, js, "Rust", "Python", "Go", "Ruby", "Java", "Kotlin", "C", "C++", "C#", "Swift", "PHP",
+  "Shell", "Vue", "Svelte", "Perl", "Groovy",
+])
+
+const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby", "Make", "Docker", "just"])
 const MARKUP = new Set(["HTML", "Markdown", "Vue", "Svelte", "xml"])
 
 // tab or 2 spaces
@@ -42,7 +96,11 @@ function classify(text: string, lang: string): Split {
   const split: Split = { code: 0, comment: 0, blank: 0, indent: 0 }
   let inBlock = false
 
-  for (const raw of text.split("\n")) {
+  // a trailing newline ends the last line, it does not start a blank one
+  const lines = text ? text.split("\n") : []
+  if (lines.at(-1) === "") lines.pop()
+
+  for (const raw of lines) {
     const line = raw.trim()
     if (inBlock) {
       split.comment++
@@ -62,7 +120,6 @@ function classify(text: string, lang: string): Split {
   return split
 }
 
-// tracked only
 export function scan(repo: string): Node[] {
   const files: Node[] = []
 
@@ -70,19 +127,23 @@ export function scan(repo: string): Node[] {
     const dot = path.lastIndexOf(".")
     const slash = path.lastIndexOf("/")
     const ext = dot > slash + 1 ? path.slice(dot + 1).toLowerCase() : ""
-    if (!ext) continue
 
-    let buf: Buffer
+    const file = join(repo, path)
+    // submodule, symlink and raced delete all come back null
+    const peek = head(file)
+    if (!peek || peek.includes(0)) continue
+
+    // a name we know beats an extension, or CMakeLists.txt would be txt
+    const named = NAMES[path.slice(slash + 1).toLowerCase()]
+    const lang = named ?? (ext ? (LANGS[ext] ?? ext) : shebang(peek.toString("utf8")))
+    if (!lang) continue
+
+    let text: string
     try {
-      buf = readFileSync(join(repo, path))
+      text = readFileSync(file, "utf8")
     } catch {
-      continue // submodule, symlink, raced delete
+      continue // too large to hold as a string
     }
-    // NUL in first 8 KB means binary
-    if (buf.subarray(0, 8192).includes(0)) continue
-
-    const lang = LANGS[ext] ?? ext
-    const text = buf.toString("utf8")
     const split = classify(text, lang)
     files.push({
       ...blank(path.slice(slash + 1), path),

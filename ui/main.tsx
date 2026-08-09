@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Menu, MenuItem, MenuSection } from "./components/menu.tsx"
+import { Settings } from "./components/settings.tsx"
 import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
 import { Tabs } from "./components/tabs.tsx"
@@ -11,15 +11,14 @@ import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Overview } from "./views/overview.tsx"
-import { CHOICES, LABELS, setLocale } from "./lib/locale.ts"
+import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
-import { locale } from "./lib/locale.ts"
-import { copy, download } from "./lib/export.ts"
+import { copy } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
-import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
+import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
-import { attach } from "./lib/live.ts"
+import { attach, isLive, onBusy, token } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
@@ -37,7 +36,9 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang }, go] = useView({ tab: TABS[0], path: [], lang: "" })
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
-  const { scale, curve, region } = prefs
+  const [busy, setBusy] = useState(0)
+  useEffect(() => onBusy(setBusy), [])
+  const { scale, curve } = prefs
   // one writer for every setting
   const change = (next: Partial<Prefs>) => {
     const merged = { ...prefs, ...next }
@@ -72,12 +73,6 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
 
-  const share = async () =>
-    toast(
-      (await copy(location.href)) ? "Link copied" : "Copy blocked by the browser",
-      "Opens on this exact folder and language",
-    )
-
   return (
     <DisplayProvider value={{ scale, curve }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
@@ -111,6 +106,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
             <p className="text-muted-foreground text-xs">
               @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
               {num(stats.commits)} commits · desprawl {stats.version}
+              {busy > 0 && <span className="text-foreground"> · working…</span>}
             </p>
           </div>
           <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -122,48 +118,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
               onChange={(next) => go({ tab: next })}
             />
             <ThemeToggle {...themed} />
-            <Menu>
-              {reload && <MenuItem onClick={reload}>refresh</MenuItem>}
-              <MenuItem onClick={share}>share link</MenuItem>
-              <MenuItem
-                onClick={() => {
-                  download("desprawl.json", JSON.stringify(stats, null, 2), "application/json")
-                  toast("desprawl.json", "The whole report, tree and series included")
-                }}
-              >
-                export json
-              </MenuItem>
-              <div className="bg-border my-1 h-px" />
-              <MenuSection label="Number relation" hint={EXPLAIN[scale]}>
-                <Tabs
-                  grow
-                  tabs={SCALES}
-                  value={scale}
-                  onChange={(next) => change({ scale: next as Scale })}
-                />
-              </MenuSection>
-              <MenuSection
-                label="Bar scale"
-                hint={curve === "log" ? "small values stay visible" : "true proportions"}
-              >
-                <Tabs
-                  grow
-                  tabs={CURVES}
-                  value={curve}
-                  onChange={(next) => change({ curve: next as Curve })}
-                />
-              </MenuSection>
-              <MenuSection label="Numbers and dates" hint={`${locale()} · ${num(1234.5)}`}>
-                <Tabs
-                  grow
-                  tabs={CHOICES.map((c) => LABELS[c])}
-                  value={LABELS[region]}
-                  onChange={(next) =>
-                    change({ region: CHOICES.find((c) => LABELS[c] === next) ?? "auto" })
-                  }
-                />
-              </MenuSection>
-            </Menu>
+            <Settings stats={stats} prefs={prefs} change={change} reload={reload} />
           </div>
         </header>
 
@@ -203,12 +158,12 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
 function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")
-  const token = new URLSearchParams(location.search).get("t")
-  const live = !window.__DESPRAWL__ && !!token
+  const [waited, setWaited] = useState(0)
+  const live = isLive()
 
   const load = () => {
     setError("")
-    fetch(`/api/stats?t=${token}`)
+    fetch(`/api/stats?t=${token()}`)
       // server explains itself in body, status code alone says nothing
       .then(async (r) => {
         const body = await r.json().catch(() => null)
@@ -226,11 +181,21 @@ function Root() {
     if (live) load()
   }, [])
 
+  // large repo passes
+  useEffect(() => {
+    if (stats || error) return
+    const tick = setInterval(() => setWaited((s) => s + 1), 1000)
+    return () => clearInterval(tick)
+  }, [stats, error])
+
   if (error) return <p className="text-destructive p-6 text-sm">Could not load stats: {error}</p>
   if (!stats) {
     return (
       <p className="text-muted-foreground p-6 text-sm">
-        {live ? "Analysing…" : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
+        {live
+          ? `Analysing, ${waited}s so far. Every tracked file is read once, then the history` +
+            (waited > 20 ? ". A repo this size takes a few minutes the first time" : "…")
+          : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
       </p>
     )
   }

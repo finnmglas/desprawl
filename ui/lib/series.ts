@@ -1,7 +1,7 @@
 // owner: finn
 // goal: time chart series
 
-import { transform } from "../components/chart.tsx"
+import { transform } from "./curve.ts"
 import type { Curve } from "./display.tsx"
 import { spans, type Grain } from "./format.ts"
 import type { Timeline } from "../../src/history.ts"
