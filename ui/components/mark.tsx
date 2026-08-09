@@ -1,6 +1,7 @@
 // owner: finn
 // goal: the brand mark for a label, when we have one
 
+import { File, Folder } from "./icons.tsx"
 import { BRANDS } from "../lib/brands.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { tint } from "../lib/tint.ts"
@@ -39,22 +40,17 @@ export function Mark({ label }: { label: string }) {
   )
 }
 
-// a filled folder and a page with a turned corner, drawn here rather than depended on
-const FOLDER = "M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"
-const FILE = "M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V9h5.5L14 3.5Z"
-
 /** what a row is, in the colour of what it holds */
 export function Kind({ folder, lang }: { folder: boolean; lang: string }) {
   const { brands } = useDisplay()
+  const Shape = folder ? Folder : File
   return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-hidden
-      className="size-3.5 shrink-0 opacity-80"
-      style={{ fill: brands === "on" ? tint(lang) : "var(--muted-foreground)" }}
+    <span
+      title={folder ? `mostly ${lang || "mixed"}` : lang || "no known language"}
+      className="flex opacity-80"
+      style={{ color: brands === "on" ? tint(lang) : "var(--muted-foreground)" }}
     >
-      <title>{folder ? `mostly ${lang || "mixed"}` : lang || "no known language"}</title>
-      <path d={folder ? FOLDER : FILE} />
-    </svg>
+      <Shape />
+    </span>
   )
 }
