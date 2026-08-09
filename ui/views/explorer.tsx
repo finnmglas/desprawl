@@ -2,6 +2,7 @@
 // goal: click folders, see loc per language
 
 import { useEffect, useMemo, useState } from "react"
+import { Back } from "../components/back.tsx"
 import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
@@ -83,6 +84,7 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
 
   return (
     <div className="flex flex-col gap-3">
+      <Back onTab={onTab} />
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-1 text-sm">
           <Button variant="ghost" size="sm" onClick={() => setPath([])}>

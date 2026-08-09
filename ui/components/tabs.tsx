@@ -12,9 +12,11 @@ export interface TabsProps {
   className?: string
   /** Share the full width instead of hugging the labels. */
   grow?: boolean
+  /** a mark to the left of a label, where one helps */
+  icons?: Record<string, React.ReactNode>
 }
 
-export function Tabs({ tabs, value, onChange, className, grow }: TabsProps) {
+export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProps) {
   return (
     <div
       className={cn(
@@ -28,11 +30,12 @@ export function Tabs({ tabs, value, onChange, className, grow }: TabsProps) {
           key={tab}
           onClick={() => onChange(tab)}
           className={cn(
-            "cursor-pointer rounded-md px-3 py-1 text-sm font-medium transition-colors",
+            "flex cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors",
             grow && "flex-1",
             tab === value ? "bg-background text-foreground shadow-xs" : "hover:text-foreground",
           )}
         >
+          {icons?.[tab]}
           {tab}
         </button>
       ))}

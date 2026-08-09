@@ -3,6 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
+import { Clock, FolderMark } from "./components/icons.tsx"
 import { Settings } from "./components/settings.tsx"
 import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
@@ -31,6 +32,8 @@ declare global {
 }
 
 const TABS = ["Overview", "Files", "History"]
+
+const MARKS: Record<string, React.ReactNode> = { Files: <FolderMark />, History: <Clock /> }
 
 function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
   // view state lives in the url, so back works and a link carries the place
@@ -118,6 +121,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Tabs
               grow
+              icons={MARKS}
               className="sm:w-auto"
               tabs={TABS}
               value={tab}

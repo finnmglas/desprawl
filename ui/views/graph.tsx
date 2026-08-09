@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Avatar } from "../components/avatar.tsx"
+import { Back } from "../components/back.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
@@ -169,6 +170,7 @@ export function Graph({
 
   return (
     <div className="flex flex-col gap-4">
+      <Back onTab={onTab} />
       <Card>
         <CardHead
           title="History"
