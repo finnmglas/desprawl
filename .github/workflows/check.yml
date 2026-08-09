@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # the tests read history, a shallow clone has none
+          fetch-depth: 0 # desprawl reads git history, so a shallow clone is a bad test bed
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

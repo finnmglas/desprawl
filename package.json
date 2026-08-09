@@ -4,6 +4,7 @@
   "description": "Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.",
   "license": "MIT",
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
   "bin": {
     "desprawl": "dist/cli.js"
   },

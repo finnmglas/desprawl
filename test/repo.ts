@@ -7,11 +7,8 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 /** the developer's own git config must never decide what a test counts */
-const ISOLATED = {
-  ...process.env,
-  GIT_CONFIG_GLOBAL: "/dev/null",
-  GIT_CONFIG_SYSTEM: "/dev/null",
-}
+const NOWHERE = process.platform === "win32" ? "NUL" : "/dev/null"
+const ISOLATED = { ...process.env, GIT_CONFIG_GLOBAL: NOWHERE, GIT_CONFIG_SYSTEM: NOWHERE }
 
 export interface Commit {
   /** path to contents. A value of null makes a symlink instead, see link() */

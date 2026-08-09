@@ -37,7 +37,7 @@ test("binary files are skipped, not counted as text", () => {
   assert.ok(f["a.ts"])
 })
 
-test("a symlink to a fifo cannot hang the scan", () => {
+test("a symlink to a fifo cannot hang the scan", { skip: process.platform === "win32" }, () => {
   const dir = repo({ "a.ts": "x\n" })
   execFileSync("mkfifo", [`${dir}/pipe`])
   execFileSync("ln", ["-s", "pipe", `${dir}/link.ts`])
