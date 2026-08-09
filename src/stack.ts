@@ -202,6 +202,15 @@ const AUTH: Table = {
   "@supabase/auth-helpers-nextjs": "Supabase Auth", lucia: "Lucia", bcrypt: "bcrypt",
 }
 
+// every dependency table, and the field it fills
+// prettier-ignore
+const TABLES: [string, Table][] = [
+  ["frameworks", FRAMEWORKS], ["state", STATE], ["ui", UI], ["connects", CONNECTS],
+  ["testing", TESTING], ["build", BUILDERS], ["runtimes", RUNTIME], ["styling", STYLING],
+  ["content", CONTENT], ["observability", OBSERVE], ["auth", AUTH], ["linters", LINTERS],
+  ["formatters", FORMATTERS],
+]
+
 /** Marker files, matched on the full path or the basename. */
 // prettier-ignore
 const FILES: [RegExp, keyof Stack | "lock" | "docker" | "compose" | "k8s" | "terraform", string][] = [
@@ -455,21 +464,24 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     .map((p) => manifest(repo, p))
     .filter((m): m is Manifest => !!m)
 
-  const frameworks: string[] = []
-  const state: string[] = []
-  const ui: string[] = [...(found.ui ?? [])]
-  const connects: string[] = []
-  const testing: string[] = []
-  const runtimes: string[] = []
-  const styling: string[] = []
-  const content: string[] = []
-  const observability: string[] = []
-  const auth: string[] = []
+  // one bucket per table, so adding a category is one line in TABLES and one row in the card
+  const dep: Record<string, string[]> = {
+    frameworks: [],
+    state: [],
+    ui: [...(found.ui ?? [])],
+    connects: [],
+    testing: [],
+    runtimes: [],
+    styling: [],
+    content: [],
+    observability: [],
+    auth: [],
+    build: [...(found.build ?? [])],
+    linters: [],
+    formatters: [],
+  }
   const scripts: string[] = []
   const bundlers: string[] = []
-  const build: string[] = [...(found.build ?? [])]
-  const linters: string[] = []
-  const formatters: string[] = []
   const typescript: string[] = []
   const managers: string[] = [...(found.lock ?? [])]
   const pinning: Pinning = { exact: 0, caret: 0, tilde: 0, range: 0, linked: 0 }
@@ -492,19 +504,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       names.add(name)
       pinning[pin(String(range))]++
       if (name === "typescript") add(typescript, String(range))
-      add(frameworks, label(FRAMEWORKS, name))
-      add(state, label(STATE, name))
-      add(ui, label(UI, name))
-      add(connects, label(CONNECTS, name))
-      add(testing, label(TESTING, name))
-      add(build, label(BUILDERS, name))
-      add(runtimes, label(RUNTIME, name))
-      add(styling, label(STYLING, name))
-      add(content, label(CONTENT, name))
-      add(observability, label(OBSERVE, name))
-      add(auth, label(AUTH, name))
-      add(linters, label(LINTERS, name))
-      add(formatters, label(FORMATTERS, name))
+      for (const [bucket, table] of TABLES) add(dep[bucket], label(table, name))
     }
   }
 
@@ -578,14 +578,15 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     "Next.js",
     "Nuxt",
   ]
-  if (frameworks.some((f) => client.includes(f))) add(parts, "frontend")
-  if (frameworks.some((f) => server.includes(f)) || connects.length) add(parts, "backend")
+  if (dep.frameworks.some((f) => client.includes(f))) add(parts, "frontend")
+  if (dep.frameworks.some((f) => server.includes(f)) || dep.connects.length) add(parts, "backend")
   if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
     add(parts, "monorepo root")
   if (manifests.some((m) => m.workspaces)) add(parts, "monorepo")
   if (manifests.some((m) => "bin" in m)) add(parts, "cli")
-  if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
-  if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
+  if (dep.frameworks.includes("React Native") || dep.frameworks.includes("Expo"))
+    add(parts, "mobile")
+  if (dep.frameworks.includes("Electron") || dep.frameworks.includes("Tauri")) add(parts, "desktop")
   if (manifests.some((m) => m.bin)) add(parts, "cli")
   if (counts.dockerfiles || counts.compose || counts.kubernetes || counts.terraform)
     add(parts, "infra")
@@ -617,20 +618,20 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     lockfiles: found.lock ?? [],
     pinning,
     dependencies: names.size,
-    build,
-    frameworks,
-    state,
-    ui,
-    connects,
-    testing,
-    runtimes,
-    styling,
-    content,
-    observability,
-    auth,
+    build: dep.build,
+    frameworks: dep.frameworks,
+    state: dep.state,
+    ui: dep.ui,
+    connects: dep.connects,
+    testing: dep.testing,
+    runtimes: dep.runtimes,
+    styling: dep.styling,
+    content: dep.content,
+    observability: dep.observability,
+    auth: dep.auth,
     scripts,
-    linters,
-    formatters,
+    linters: dep.linters,
+    formatters: dep.formatters,
     rules: [...(found.linters ?? []), ...(found.formatters ?? [])],
     ci: found.ci ?? [],
     bundlers,

@@ -22,10 +22,10 @@ const DAY = 86_400_000
 const EARLIEST = 631_152_000
 
 // the window a real commit date falls in, five kernel commits sit outside it
-const sane = (iso: string): boolean => {
-  const at = Date.parse(iso)
-  return at >= EARLIEST * 1000 && at <= Date.now() + DAY
-}
+const believable = (seconds: number): boolean =>
+  seconds >= EARLIEST && seconds * 1000 <= Date.now() + DAY
+
+const sane = (iso: string): boolean => believable(Date.parse(iso) / 1000)
 
 // every day first to last, the axis the series uses
 function days(first: string, last: string): string[] {
@@ -167,7 +167,7 @@ export function timeline(repo: string): Timeline {
     if (!seconds) continue
     total++
     // some committer clocks said 1970, some said 2085
-    if (seconds < EARLIEST || seconds > Date.now() / 1000 + DAY / 1000) continue
+    if (!believable(seconds)) continue
     min = Math.min(min, seconds)
     max = Math.max(max, seconds)
     const stamp = new Date(seconds * 1000).toISOString().slice(0, 10)

@@ -19,7 +19,7 @@ import { num, setSimple } from "./lib/format.ts"
 import { CURVES, DisplayProvider, EXPLAIN, SCALES, type Curve, type Scale } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
-import { attach, onBusy } from "./lib/live.ts"
+import { attach, isLive, onBusy, token } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Stats } from "../src/model.ts"
@@ -207,12 +207,11 @@ function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")
   const [waited, setWaited] = useState(0)
-  const token = new URLSearchParams(location.search).get("t")
-  const live = !window.__DESPRAWL__ && !!token
+  const live = isLive()
 
   const load = () => {
     setError("")
-    fetch(`/api/stats?t=${token}`)
+    fetch(`/api/stats?t=${token()}`)
       // server explains itself in body, status code alone says nothing
       .then(async (r) => {
         const body = await r.json().catch(() => null)

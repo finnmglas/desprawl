@@ -104,6 +104,9 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
         return send(401, "bad token", "text/plain")
       }
 
+      const json = (data: unknown, code = 200) =>
+        send(code, JSON.stringify(data), "application/json")
+
       if (url.pathname === "/") return send(200, html, "text/html")
 
       // the browser holds this open for as long as the tab lives
@@ -157,29 +160,22 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
       try {
         if (url.pathname === "/api/stats") {
           const stats = load(url.searchParams.has("fresh"))
-          return send(
-            200,
-            JSON.stringify({ ...stats, tree: prune(stats.tree) }),
-            "application/json",
-          )
+          return json({ ...stats, tree: prune(stats.tree) })
         }
 
-        // one folder's files
         if (url.pathname === "/api/files") {
           const at = url.searchParams.get("path") ?? ""
           const node = find(load(false).tree, at.split("/").filter(Boolean))
           // an empty list would read as an empty folder, which is a different thing
-          if (!node)
-            return send(404, JSON.stringify({ error: `no folder at ${at}` }), "application/json")
+          if (!node) return json({ error: `no folder at ${at}` }, 404)
           const files = (node.children ?? []).filter((c) => !c.children)
-          return send(200, JSON.stringify(files), "application/json")
+          return json(files)
         }
 
-        // one commit in full, asked for when a row is opened
         if (url.pathname === "/api/commit") {
           const hash = url.searchParams.get("hash") ?? ""
           if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(400, "bad hash", "text/plain")
-          return send(200, JSON.stringify(detail(repo, hash)), "application/json")
+          return json(detail(repo, hash))
         }
 
         // older commits, walked not read whole
@@ -187,31 +183,30 @@ export function serve(repo: string, cap?: number, keep = false, port = PORT): Pr
           const skip = Number(url.searchParams.get("skip")) || 0
           const take = Math.min(Number(url.searchParams.get("count")) || 200, 2000)
           const names = load(false).contributors.map((c) => (c.email || c.name).toLowerCase())
-          return send(200, JSON.stringify(page(repo, skip, take, names)), "application/json")
+          return json(page(repo, skip, take, names))
         }
 
         // slow, so the ui asks after it has painted
         if (url.pathname === "/api/count") {
           total ||= count(repo)
-          return send(200, JSON.stringify({ commits: total }), "application/json")
+          return json({ commits: total })
         }
 
         // measured at even points, not accumulated
         if (url.pathname === "/api/size") {
           allTime ||= timeline(repo)
           sizes ||= allTime.samples.map((s) => ({ date: s.date, bytes: bytesAt(repo, s.hash) }))
-          return send(200, JSON.stringify(sizes), "application/json")
+          return json(sizes)
         }
 
         // dates and authors only, so the chart spans everything
         if (url.pathname === "/api/timeline") {
           allTime ||= timeline(repo)
-          return send(200, JSON.stringify(allTime), "application/json")
+          return json(allTime)
         }
       } catch (err) {
-        // words, because this lands in front of a person
         const said = explain(err) ?? (err instanceof Error ? err.message.trim() : String(err))
-        return send(500, JSON.stringify({ error: said }), "application/json")
+        return json({ error: said }, 500)
       }
       return send(404, "not found", "text/plain")
     })

@@ -82,14 +82,14 @@ export function DataTable<T>({
   }, [columns, rows])
 
   const share = (col: Column<T>) => shares(col, scale)
-  const value = (col: Column<T>, row: T) => effective(col, row, scale, sums)
+  const scaled = (col: Column<T>, row: T) => effective(col, row, scale, sums)
 
   const sorted = useMemo(() => {
     if (!sort) return rows
     const col = columns.find((c) => c.key === sort.key)
     if (!col) return rows
     return [...rows].sort((a, b) => {
-      const [x, y] = [value(col, a), value(col, b)]
+      const [x, y] = [scaled(col, a), scaled(col, b)]
       const cmp =
         typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
@@ -103,8 +103,8 @@ export function DataTable<T>({
       if (!col.num || col.flat) continue
       let peak = 0
       for (const row of rows) {
-        const cell = value(col, row)
-        if (typeof value === "number" && value > peak) peak = value
+        const at = scaled(col, row)
+        if (typeof at === "number" && at > peak) peak = at
       }
       found[col.key] = peak
     }
@@ -118,7 +118,7 @@ export function DataTable<T>({
 
   const matrix = () => [
     columns.map((c) => c.label),
-    ...sorted.map((row) => columns.map((c) => value(c, row))),
+    ...sorted.map((row) => columns.map((c) => scaled(c, row))),
   ]
   const slug = title.toLowerCase().replace(/\W+/g, "-")
 
@@ -178,7 +178,7 @@ export function DataTable<T>({
                 className={cn(onRowClick && "cursor-pointer")}
               >
                 {columns.map((col) => {
-                  const cell = value(col, row)
+                  const cell = scaled(col, row)
                   return (
                     <TD
                       key={col.key}

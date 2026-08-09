@@ -5,8 +5,8 @@
 import { existsSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
-import { human } from "./human.ts"
-import { blank, git, merge, tokens } from "./model.ts"
+import { human, nest, pct, tokens } from "./human.ts"
+import { blank, git, merge } from "./model.ts"
 import { explain, needs } from "./needs.ts"
 import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
@@ -69,11 +69,7 @@ const target = (() => {
 const viewing = command !== "cli" && !values.json
 
 const num = (n: number): string => n.toLocaleString("en-US")
-const pct = (n: number, of: number): string => (of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
-
-// mean nesting lv
-const nest = (b: Split): string => (b.code ? (b.indent / b.code).toFixed(1) : "0.0")
 
 // junk falls back, never NaN
 const int = (v: string | undefined, fallback: number): number =>
@@ -112,7 +108,6 @@ const row = (b: Counts, total: number, label: string, extra: string[] = []): str
 
 const churn = (n: Node): string[] => [num(n.commits), big(n.insertions + n.deletions), day(n.last)]
 
-// header sets widths
 const section = (title: string, head: string[], rows: string[][], total: string[]): string =>
   `\n${table([[title, ...head], ...rows, total])}`
 

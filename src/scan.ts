@@ -116,7 +116,6 @@ function classify(text: string, lang: string): Split {
   return split
 }
 
-// tracked only
 export function scan(repo: string): Node[] {
   const files: Node[] = []
 

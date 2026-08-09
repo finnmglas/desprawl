@@ -48,7 +48,6 @@ const SORTS: Record<string, (a: Numbered, b: Numbered) => number> = {
   hash: (a, b) => a.hash.localeCompare(b.hash),
 }
 
-// alignment match
 const HEADS: { key: string; right?: boolean }[] = [
   { key: "#", right: true },
   { key: "subject" },

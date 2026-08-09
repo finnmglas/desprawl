@@ -114,9 +114,6 @@ export interface Stats extends Split {
   last: string
 }
 
-// estimate
-export const tokens = (chars: number): number => Math.round(chars / 4)
-
 // stderr piped, not inherited, so git's own wording never lands on top of ours.
 // quotePath off, or a path with an umlaut arrives escaped and matches nothing
 export const git = (cwd: string, ...args: string[]): string =>

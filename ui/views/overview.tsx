@@ -8,42 +8,22 @@ import { Avatar } from "../components/avatar.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/card.tsx"
 import { cn } from "../lib/ui.ts"
-import {
-  CURSOR,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  untransform,
-} from "../components/chart.tsx"
+import { CURSOR, ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart.tsx"
+import { untransform } from "../lib/curve.ts"
 import { DataTable, type Column } from "../components/data-table.tsx"
+import { METRICS } from "../lib/columns.ts"
 import { Onward } from "../components/onward.tsx"
 import { StackCard } from "../components/stack-card.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { useDisplay } from "../lib/display.tsx"
-import { GRAINS, churn, day, defaultGrain, nest, num, pct, plural, tokens } from "../lib/format.ts"
+import { GRAINS, day, defaultGrain, num, pct, plural, tokens } from "../lib/format.ts"
 import { allTime, sizeCurve, type Sample } from "../lib/live.ts"
 import type { Timeline } from "../../src/history.ts"
 import { ADDED, GROUPS, REMOVED, SERIES, expand, rows } from "../lib/series.ts"
 import type { Grain } from "../lib/format.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
 
-// a row's own lines, the denominator when reading shares within a row
-const lines = (n: Node) => n.code + n.comment + n.blank
-
-// prettier-ignore
-const LANGS: Column<Node>[] = [
-  { key: "name", label: "Language", get: (l) => l.name },
-  { key: "code", label: "loc", num: true, get: (l) => l.code, cell: (l) => num(l.code), ofRow: lines },
-  { key: "comment", label: "comment", num: true, get: (l) => l.comment, cell: (l) => num(l.comment), ofRow: lines },
-  { key: "blank", label: "blank", num: true, get: (l) => l.blank, cell: (l) => num(l.blank), ofRow: lines },
-  { key: "files", label: "files", num: true, get: (l) => l.files, cell: (l) => num(l.files) },
-  { key: "chars", label: "chars", num: true, get: (l) => l.chars, cell: (l) => num(l.chars) },
-  { key: "tok", label: "~tok", num: true, get: (l) => tokens(l.chars), cell: (l) => num(tokens(l.chars)) },
-  { key: "nest", label: "nest", num: true, get: (l) => Number(nest(l)) },
-  { key: "commits", label: "com", num: true, get: (l) => l.commits, cell: (l) => num(l.commits) },
-  { key: "churn", label: "churn", num: true, get: (l) => churn(l), cell: (l) => num(churn(l)) },
-  { key: "last", label: "last", num: true, get: (l) => l.last, cell: (l) => day(l.last), flat: true },
-]
+const LANGS: Column<Node>[] = [{ key: "name", label: "Language", get: (l) => l.name }, ...METRICS]
 
 // prettier-ignore
 const people = (commits: number, moved: number, faces: Record<string, string>): Column<Contributor>[] => [
@@ -106,9 +86,19 @@ export function Overview({
     }
   }, [all, grained])
 
+  // eighty tree walks, so only once the size series is actually asked for
+  useEffect(() => {
+    if (!picked.includes("size") || sizes.length || sizing) return
+    setSizing(true)
+    void sizeCurve().then((found) => {
+      setSizes(found)
+      setSizing(false)
+    })
+  }, [picked])
+
   const days = useMemo(
-    () => rows(stats, series, grain, curve, all),
-    [stats, picked, grain, curve, all],
+    () => rows(stats, series, grain, curve, all, sizes),
+    [stats, picked, grain, curve, all, sizes],
   )
 
   // dragging across the chart zooms the chart, every other view stays where it was
@@ -139,7 +129,8 @@ export function Overview({
   }
   const config = Object.fromEntries(series.map((k) => [k, SERIES[k]]))
   const share = picked.length > 1
-  const sparse = shown.length <= 14
+  // a line needs two points, below that a bar is the only honest shape
+  const sparse = shown.length < 2
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1

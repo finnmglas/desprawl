@@ -5,7 +5,7 @@ import { toast } from "../components/toast.tsx"
 import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
-const token = () => new URLSearchParams(location.search).get("t")
+export const token = (): string | null => new URLSearchParams(location.search).get("t")
 
 // served mode only, a static file already holds everything
 export const isLive = (): boolean => !!token() && !window.__DESPRAWL__

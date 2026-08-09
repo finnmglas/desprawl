@@ -5,18 +5,12 @@
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
 import { num } from "../lib/format.ts"
+import { transform, untransform } from "../lib/curve.ts"
 import type { Curve } from "../lib/display.tsx"
 import { cn } from "../lib/ui.ts"
 
 // key to label and colour, defaults to --chart-1..5 by order
 export type ChartConfig = Record<string, { label: string; color?: string }>
-
-// log1p keeps zero at zero, a log axis would drop it
-export const transform = (value: number, curve: Curve): number =>
-  curve === "log" ? Math.log1p(value) : value
-
-export const untransform = (value: number, curve: Curve): number =>
-  curve === "log" ? Math.round(Math.expm1(value)) : value
 
 const PALETTE = [
   "var(--chart-1)",
