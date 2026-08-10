@@ -12,6 +12,10 @@ export interface Unit {
   role: Role
   files: number
   lines: number
+  /** what opening the folder would show: files and subfolders directly inside it */
+  spread: number
+  /** how many of those entries are subfolders rather than files */
+  folders: number
   /** what it declares, summed over its files */
   exports: number
   functions: number
@@ -205,6 +209,8 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
           role: "source",
           files: 0,
           lines: 0,
+          spread: 0,
+          folders: 0,
           exports: 0,
           functions: 0,
           classes: 0,
@@ -223,11 +229,22 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
 
   const reached = new Map<string, Set<string>>()
   const roles = new Map<string, Record<Role, number>>()
+  const entries = new Map<string, Map<string, boolean>>()
   for (const module of Object.values(graph.modules)) {
     const from = seen(keyOf(module.path))
     const tally = roles.get(from.path) ?? { source: 0, test: 0, support: 0 }
     tally[roleOf(module.path)]++
     roles.set(from.path, tally)
+    // a remainder group is named for the folder it is the rest of
+    const under = from.path.replace(/\/?\*$/, "")
+    const rest =
+      under && module.path.startsWith(`${under}/`)
+        ? module.path.slice(under.length + 1)
+        : module.path
+    const listed = entries.get(from.path) ?? new Map<string, boolean>()
+    const cut = rest.indexOf("/")
+    listed.set(cut === -1 ? rest : rest.slice(0, cut), cut !== -1)
+    entries.set(from.path, listed)
     from.files++
     from.lines += module.lines
     from.exports += module.symbols.exports
@@ -250,6 +267,9 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   }
 
   for (const unit of units.values()) {
+    const listed = entries.get(unit.path)
+    unit.spread = listed?.size ?? 0
+    unit.folders = listed ? [...listed.values()].filter(Boolean).length : 0
     unit.packages = reached.get(unit.path)?.size ?? 0
     const tally = roles.get(unit.path)
     if (tally)

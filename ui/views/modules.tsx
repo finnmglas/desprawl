@@ -20,7 +20,7 @@ import { Tip } from "../components/tip.tsx"
 import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
-import { layeringOf, tanglesOf } from "../lib/verdict.ts"
+import { layeringOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import { balanced, fold, type Cut, type Layout, type Unit } from "../../src/layers.ts"
 import type { Sort } from "../lib/format.ts"
@@ -218,7 +218,7 @@ export function Modules({
           value={`${(graph.stats.coverage * 100).toFixed(graph.stats.coverage === 1 ? 0 : 2)}%`}
           sub={
             graph.missing.length
-              ? `${plural(graph.missing.length, "import")} name nothing`
+              ? `${plural(graph.missing.length, "import")} are unresolved`
               : "every import found its file"
           }
           verdict={
@@ -630,6 +630,32 @@ const COLUMNS: Column<Unit>[] = [
     get: (u) => Math.round((u.internal / Math.max(1, u.internal + count(u.out))) * 100),
     cell: (u) => <Balance unit={u} />,
     hint: "imports that never leave the group against those reaching another. A group that mostly imports itself can be moved on its own",
+  },
+  {
+    key: "spread",
+    label: "Spread",
+    num: true,
+    flat: true,
+    get: (u) => u.spread,
+    cell: (u) => {
+      const band = spreadOf(u.spread, u.folders)
+      return (
+        <Tip
+          text={
+            <>
+              {band.why}
+              <br />
+              {num(Math.round(u.lines / Math.max(1, u.files)))} lines per file on average
+            </>
+          }
+        >
+          <Badge variant="outline" className={band.tone}>
+            {band.label}
+          </Badge>
+        </Tip>
+      )
+    },
+    hint: "what opening the folder would show: the files and subfolders directly inside it, counted as one list",
   },
   {
     key: "shape",

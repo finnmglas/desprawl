@@ -3,6 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/back.tsx"
+import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
@@ -10,11 +11,13 @@ import { Distribution } from "../components/distribution.tsx"
 import { Input } from "../components/input.tsx"
 import { Kind } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
+import { Tip } from "../components/tip.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { toast } from "../components/toast.tsx"
 import { nest, num, pct } from "../lib/format.ts"
 import { filesIn } from "../lib/live.ts"
 import { mainly } from "../lib/tint.ts"
+import { spreadOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
@@ -24,6 +27,9 @@ const SPLIT: Record<string, { paint: string; of: (n: Node) => number }> = {
   Comments: { paint: "var(--chart-4)", of: (n) => n.comment },
   Blank: { paint: "var(--muted-foreground)", of: (n) => n.blank },
 }
+
+// what opening it would show. A served tree carries directories only, and counts the rest
+const entries = (n: Node) => (n.children ? n.children.length + (n.leaves ?? 0) : 0)
 
 // files carry no langs map, their one language is the file itself
 const own = (n: Node, lang: string): number =>
@@ -69,6 +75,9 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
   const share = (n: Node) => (kind ? SPLIT[kind].of(n) : own(n, lang))
   const whole = kind ? SPLIT[kind].of(here) : langTotal
 
+  // the root is allowed its config and docs, a folder inside it is not
+  const standing = spreadOf(entries(here), undefined, !path.length)
+
   const enter = (node: Node) => {
     if (node.children) return setPath([...path, node.name])
     toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
@@ -88,6 +97,26 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           </span>
         </span>
       ),
+    },
+    {
+      key: "spread",
+      label: "spread",
+      num: true,
+      flat: true,
+      // a served tree carries directories only, and counts the files it left out
+      get: entries,
+      cell: (n) => {
+        if (!n.children) return null
+        const band = spreadOf(entries(n))
+        return (
+          <Tip text={band.why}>
+            <Badge variant="outline" className={band.tone}>
+              {band.label}
+            </Badge>
+          </Tip>
+        )
+      },
+      hint: "what opening the folder would show: the files and subfolders directly inside it",
     },
     // prettier-ignore
     ...withShare({ key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) }),
@@ -151,6 +180,12 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
               : undefined
           }
         >
+          {/* the folder you are standing in, judged like the ones listed inside it */}
+          <Tip text={standing.why}>
+            <Badge variant="outline" className={standing.tone}>
+              {standing.label}
+            </Badge>
+          </Tip>
           <CopyButton
             label="Copies this folder as json"
             text={() => JSON.stringify(here, null, 2)}

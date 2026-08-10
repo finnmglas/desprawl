@@ -107,6 +107,46 @@ export const layeringOf = (levels: number, units: number): Verdict =>
         why: "the longest chain of units that depend on each other. Deep is not worse, it is further to trace",
       }
 
+/**
+ * What opening a folder would show. Both ends say something: a pile of entries with
+ * no substructure is the shape sprawl takes, and a group of two or three may not
+ * have earned a folder of its own.
+ */
+export function spreadOf(
+  entries: number,
+  folders?: number,
+  /** a repo root earns more room: config, docs and manifests all live loose in it */
+  roomy = false,
+): { label: string; tone: string; why: string } {
+  const held =
+    folders === undefined ? "" : folders ? `, ${folders} of them folders` : " and not one subfolder"
+  const allowed = roomy ? ", and a repo root was already allowed more than a folder inside it" : ""
+
+  if (entries >= (roomy ? 100 : 60))
+    return {
+      label: "bloated",
+      tone: "border-red-500/60 text-red-700 dark:text-red-300",
+      why: `${entries} entries side by side${held}. This is not a folder any more, it is a directory listing${allowed}`,
+    }
+  if (entries >= (roomy ? 40 : 26))
+    return {
+      label: "oversize",
+      tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+      why: `${entries} entries${held}. Past what anyone scans at once, though still a list you could sort out in an afternoon${allowed}`,
+    }
+  if (entries >= 4)
+    return {
+      label: "healthy",
+      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+      why: `${entries} entries, a folder you can open and take in at once`,
+    }
+  return {
+    label: "thin",
+    tone: "text-muted-foreground",
+    why: `${entries} entries. Not a problem, but a folder this small may belong inside its neighbour`,
+  }
+}
+
 export const TONES: Record<Verdict["tone"], string> = {
   plain: "bg-muted text-muted-foreground",
   fine: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
