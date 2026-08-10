@@ -13,9 +13,10 @@ export function Glyph({ label, className }: { label: string; className?: string 
   const brand = BRANDS[label]
   const path = brand?.[2]
   if (brands === "off" || !brand) return null
-  // some marks are trademarked out of the icon set, and a coloured dot still names it
+  // some marks are trademarked out of the icon set, and a coloured dot still names it.
+  // flashy already paints the badge that colour, where the dot is just a gap
   if (!path)
-    return (
+    return brands === "flashy" ? null : (
       <span
         aria-hidden
         style={{ background: tint(label) }}

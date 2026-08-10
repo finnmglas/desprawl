@@ -2,6 +2,7 @@
 // goal: the shape the imports actually make, said in plain words
 
 import { useEffect, useMemo, useState } from "react"
+import { Avatar, profileOf } from "../components/avatar.tsx"
 import { Back } from "../components/back.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
@@ -21,6 +22,7 @@ import { Tip } from "../components/tip.tsx"
 import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
+import { hands, worked } from "../lib/people.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import { balanced, fold, type Cut, type Layout, type Unit } from "../../src/layers.ts"
@@ -100,10 +102,12 @@ function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number
 
 export function Modules({
   stats,
+  faces,
   onTab,
   onPath,
 }: {
   stats: Stats
+  faces: Record<string, string>
   onTab: (tab: string) => void
   onPath: (path: string[]) => void
 }) {
@@ -114,6 +118,8 @@ export function Modules({
   // the grid draws the same groups, so it follows whatever order the table was put in
   const [sort, setSort] = useState<Sort | null>(null)
   const [view, setView] = useState(VIEWS[0])
+  // who committed where, folded once rather than per row
+  const where = useMemo(() => worked(stats.tree), [stats.tree])
   // one search over the groups, since the table and the grid draw the same ones
   const [find, setFind] = useState("")
 
@@ -308,7 +314,55 @@ export function Modules({
         }
         rows={[...shown].sort((a, b) => b.files - a.files)}
         id={(u) => u.path}
-        columns={COLUMNS}
+        columns={[
+          ...COLUMNS,
+          {
+            key: "owner",
+            label: "Worked in by",
+            get: (u) => hands(u.path, where, stats.contributors)[0]?.who.name ?? "",
+            cell: (u) => {
+              const crew = hands(u.path, where, stats.contributors)
+              if (!crew.length) return null
+              return (
+                <Tip
+                  className="flex justify-center"
+                  side="bottom"
+                  text={
+                    <>
+                      {crew.slice(0, 5).map((one) => (
+                        <span key={one.who.email} className="flex items-center gap-1.5">
+                          <Avatar
+                            name={one.who.name}
+                            email={one.who.email}
+                            found={faces[one.who.email.toLowerCase()]}
+                          />
+                          <span className="flex-1">{one.who.name}</span>
+                          <span className="tabular-nums">{Math.round(one.share * 100)}%</span>
+                        </span>
+                      ))}
+                      {crew.length > 5 && <span className="block">and {crew.length - 5} more</span>}
+                    </>
+                  }
+                >
+                  <a
+                    href={profileOf(crew[0].who.email) || undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(event) => event.stopPropagation()}
+                    className="block w-fit"
+                  >
+                    <Avatar
+                      name={crew[0].who.name}
+                      email={crew[0].who.email}
+                      found={faces[crew[0].who.email.toLowerCase()]}
+                    />
+                  </a>
+                </Tip>
+              )
+            },
+            hint: "who has committed inside it most, by commits made in that folder",
+          },
+        ]}
         onRowClick={(u) => open(u.path)}
         onSort={setSort}
         fold={12}
@@ -560,7 +614,7 @@ const Balance = ({ unit }: { unit: Unit }) => {
         {/* a zero wide segment still has its padding, so it draws a sliver of a lie */}
         {unit.internal > 0 && (
           <div
-            className="h-full overflow-hidden bg-sky-500 px-1.5 whitespace-nowrap text-white"
+            className="h-full overflow-hidden bg-sky-500 px-1.5 text-left whitespace-nowrap text-white"
             style={{ width: `${share}%` }}
           >
             {share > 22 ? `${label}% in` : share > 9 ? `${label}%` : ""}
@@ -599,6 +653,7 @@ const COLUMNS: Column<Unit>[] = [
     label: "Inside and outside",
     num: true,
     flat: true,
+    left: true,
     get: (u) => Math.round((u.internal / Math.max(1, u.internal + count(u.out))) * 100),
     cell: (u) => <Balance unit={u} />,
     hint: "imports that never leave the group against those reaching another. A group that mostly imports itself can be moved on its own",
@@ -608,6 +663,7 @@ const COLUMNS: Column<Unit>[] = [
     label: "Spread",
     num: true,
     flat: true,
+    left: true,
     get: (u) => u.spread,
     cell: (u) => {
       const band = spreadOf(u.spread, u.folders)
@@ -631,7 +687,7 @@ const COLUMNS: Column<Unit>[] = [
   },
   {
     key: "shape",
-    label: "Reads as",
+    label: "Classification",
     get: (u) => shapeOf(u.internal, count(u.out)).label,
     cell: (u) => {
       const shape = shapeOf(u.internal, count(u.out))

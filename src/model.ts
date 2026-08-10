@@ -33,6 +33,8 @@ export interface Churn {
   insertions: number
   deletions: number
   last: string // newest touch
+  /** commits per contributor index, so a folder can name who works in it */
+  by: Record<number, number>
 }
 
 // tree node
@@ -224,7 +226,7 @@ export const git = (cwd: string, ...args: string[]): string =>
 // prettier-ignore
 export const blank = (name: string, path = ""): Node => ({
   name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
-  commits: 0, insertions: 0, deletions: 0, last: "", langs: {},
+  commits: 0, insertions: 0, deletions: 0, last: "", langs: {}, by: {},
 })
 
 export const merge = (into: Node, f: Node): void => {
@@ -238,6 +240,8 @@ export const merge = (into: Node, f: Node): void => {
   into.insertions += f.insertions
   into.deletions += f.deletions
   if (f.last > into.last) into.last = f.last
+  for (const [who, n] of Object.entries(f.by))
+    into.by[Number(who)] = (into.by[Number(who)] ?? 0) + n
   for (const [lang, loc] of Object.entries(f.langs))
     into.langs[lang] = (into.langs[lang] ?? 0) + loc
 }

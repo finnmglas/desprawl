@@ -11,7 +11,18 @@ import { SITES } from "../lib/sites.ts"
 import { NOTES } from "../../src/notes.ts"
 
 /** "Next.js" and "Claude Code 658" both find the note, and the mark, for Claude Code */
-export function Chip({ label, from }: { label: string; from?: string }) {
+export function Chip({
+  label,
+  from,
+  href: given,
+  note,
+}: {
+  label: string
+  from?: string
+  /** where clicking it goes, when that is not the package or the project's own site */
+  href?: string
+  note?: string
+}) {
   const { brands } = useDisplay()
   const name = BRANDS[label] ? label : label.replace(/\s+\S+$/, "")
   const brand = brands === "flashy" && BRANDS[name]
@@ -21,7 +32,7 @@ export function Chip({ label, from }: { label: string; from?: string }) {
     ? ({ "--brand": `#${brand[0]}`, color: `#${brand[1]}` } as React.CSSProperties)
     : undefined
 
-  const href = from ? `https://www.npmjs.com/package/${from}` : SITES[name]
+  const href = given ?? (from ? `https://www.npmjs.com/package/${from}` : SITES[name])
 
   const badge = (
     <Badge
@@ -40,9 +51,10 @@ export function Chip({ label, from }: { label: string; from?: string }) {
   return (
     <Tip
       text={
-        from
+        note ??
+        (from
           ? `${NOTES[label] ?? NOTES[name] ?? ""} · from ${from}`.trim()
-          : (NOTES[label] ?? NOTES[name])
+          : (NOTES[label] ?? NOTES[name]))
       }
     >
       {href ? (

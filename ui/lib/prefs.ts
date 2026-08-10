@@ -11,6 +11,8 @@ export interface Prefs {
   curve: Curve
   region: Choice
   brands: Brands
+  /** whether the metadata under the architecture card stays open */
+  metadata: boolean
 }
 
 export const FALLBACK: Prefs = {
@@ -18,7 +20,8 @@ export const FALLBACK: Prefs = {
   scale: "simple",
   curve: "linear",
   region: "auto",
-  brands: "focus",
+  brands: "flashy",
+  metadata: false,
 }
 
 const KEY = "desprawl-prefs"

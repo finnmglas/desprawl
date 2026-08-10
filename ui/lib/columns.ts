@@ -18,6 +18,8 @@ export interface Column<T> {
   ofRow?: (row: T) => number
   /** Shown on hover, overriding the shared note for this label */
   hint?: string
+  /** keep it left, even when the values are numbers the table would right align */
+  left?: boolean
 }
 
 /** a row's own lines, the denominator when reading shares within a row */

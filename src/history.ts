@@ -232,6 +232,8 @@ export function history(repo: string, cap = COMMIT_MAX) {
   )
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
   const byPath = new Map<string, Churn>()
+  // path to author key to commits, so a folder can say who actually works in it
+  const byWho = new Map<string, Map<string, number>>()
   // the log runs newest first, so a rename is met before the commits under the old name
   const renamed = new Map<string, string>()
   const now = (path: string): string => {
@@ -314,7 +316,11 @@ export function history(repo: string, cap = COMMIT_MAX) {
       day[1] += ins
       day[2] += del
 
-      const p = byPath.get(path) ?? { commits: 0, insertions: 0, deletions: 0, last: "" }
+      const hands = byWho.get(path) ?? new Map<string, number>()
+      hands.set(key, (hands.get(key) ?? 0) + 1)
+      byWho.set(path, hands)
+
+      const p = byPath.get(path) ?? { commits: 0, insertions: 0, deletions: 0, last: "", by: {} }
       p.commits++
       p.insertions += ins
       p.deletions += del
@@ -357,6 +363,15 @@ export function history(repo: string, cap = COMMIT_MAX) {
     first,
     last,
     byPath,
+    // resolved to the same indices the contributor list uses
+    byWho: new Map(
+      [...byWho].map(([path, hands]) => [
+        path,
+        Object.fromEntries(
+          [...hands].map(([key, n]) => [order.get(key) ?? 0, n] as const),
+        ) as Record<number, number>,
+      ]),
+    ),
     series: spread(byDay, first, last),
   }
 }

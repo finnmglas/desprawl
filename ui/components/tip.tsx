@@ -6,16 +6,27 @@ import { cn } from "../lib/ui.ts"
 
 const EDGE = 8
 
-/** the box that would cut the bubble off: the nearest scrolling parent, or the window */
-function frame(from: HTMLElement | null): { top: number; bottom: number } {
+/** the box that would cut the bubble off, or push a scrollbar under it: the nearest
+ * scrolling parent, or the window when nothing between clips */
+function frame(from: HTMLElement | null): {
+  top: number
+  bottom: number
+  left: number
+  right: number
+} {
   for (let at = from?.parentElement; at; at = at.parentElement) {
     const flow = getComputedStyle(at).overflow
     if (flow !== "visible") {
       const box = at.getBoundingClientRect()
-      return { top: Math.max(0, box.top), bottom: Math.min(innerHeight, box.bottom) }
+      return {
+        top: Math.max(0, box.top),
+        bottom: Math.min(innerHeight, box.bottom),
+        left: Math.max(0, box.left),
+        right: Math.min(innerWidth, box.right),
+      }
     }
   }
-  return { top: 0, bottom: innerHeight }
+  return { top: 0, bottom: innerHeight, left: 0, right: innerWidth }
 }
 
 export function Tip({
@@ -40,13 +51,13 @@ export function Tip({
       const box = bubble.current?.getBoundingClientRect()
       const anchor = host.current?.getBoundingClientRect()
       if (!box || !anchor) return
-      const past = box.right > innerWidth - EDGE ? innerWidth - EDGE - box.right : 0
-      const short = box.left < EDGE ? EDGE - box.left : 0
+      // a table wraps itself in an overflow box: a bubble reaching past its edge is
+      // not only cut off, it widens what the box can scroll to
+      const cut = frame(host.current)
+      const past = box.right > cut.right - EDGE ? cut.right - EDGE - box.right : 0
+      const short = box.left < cut.left + EDGE ? cut.left + EDGE - box.left : 0
       setShift((was) => was + past + short)
 
-      // a table wraps itself in an overflow box, so the row nearest its edge has
-      // nowhere to put a bubble on the side it asked for. Take the side that fits
-      const cut = frame(host.current)
       const needs = box.height + EDGE
       const above = anchor.top - cut.top
       const below = cut.bottom - anchor.bottom

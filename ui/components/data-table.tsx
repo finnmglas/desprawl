@@ -136,7 +136,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <TH
                   key={col.key}
-                  num={col.num}
+                  num={col.num && !col.left}
                   onClick={() => {
                     const next = cycle(sort, col.key)
                     setSort(next)
@@ -167,7 +167,7 @@ export function DataTable<T>({
                   return (
                     <TD
                       key={col.key}
-                      num={col.num}
+                      num={col.num && !col.left}
                       style={
                         typeof cell === "number"
                           ? backdrop(cell, peaks[col.key], "var(--chart-2)", curve)

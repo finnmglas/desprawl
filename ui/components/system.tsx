@@ -1,15 +1,17 @@
 // owner: finn
-// goal: the repo as one picture: what composes, what sprawls, what it stands on
+// goal: the repo as one picture: what composes, what collects, what it stands on
 
+import { Avatar, profileOf } from "./avatar.tsx"
 import { Chip } from "./chip.tsx"
 import { Tip } from "./tip.tsx"
 import { num, plural } from "../lib/format.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { MEANS, isClient, isHost } from "../lib/outside.ts"
+import { hands } from "../lib/people.ts"
 import { shapeOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Unit } from "../../src/layers.ts"
-import type { Stack } from "../../src/model.ts"
+import type { Contributor, Stack } from "../../src/model.ts"
 
 // on its own each of these names nothing, so it takes the folder above with it
 const PLAIN = new Set([
@@ -36,11 +38,10 @@ const PLAIN = new Set([
 
 // every card the same width, so the count that leaves the fewest holes in the fewest
 // rows wins: six go three and three rather than four and two
-const WIDEST = 4
-const columns = (count: number): number => {
+const columns = (count: number, widest: number): number => {
   let best = 1
   let score = Infinity
-  for (let wide = Math.min(WIDEST, count); wide >= 1; wide--) {
+  for (let wide = Math.min(widest, count); wide >= 1; wide--) {
     const holes = (wide - (count % wide)) % wide
     const cost = holes + Math.ceil(count / wide)
     if (cost < score) [score, best] = [cost, wide]
@@ -65,6 +66,21 @@ function title(path: string): string {
   return rest ? `${named} modules` : named
 }
 
+/** the face of whoever works there most, linking to them and explaining nothing on its own */
+function Face({ who, faces }: { who: Contributor; faces: Record<string, string> }) {
+  return (
+    <a
+      href={profileOf(who.email) || undefined}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="block"
+    >
+      <Avatar name={who.name} email={who.email} found={faces[who.email.toLowerCase()]} />
+    </a>
+  )
+}
+
 const BANDS = [
   {
     key: "entry",
@@ -87,12 +103,19 @@ export function System({
   name,
   units,
   stack,
+  people,
+  worked,
+  faces,
   onPick,
 }: {
   /** the repo, since "this repo" says less than its own name does */
   name: string
   units: Unit[]
   stack: Stack
+  people: Contributor[]
+  /** commits per contributor index, by folder */
+  worked: Map<string, Record<number, number>>
+  faces: Record<string, string>
   onPick?: (path: string) => void
 }) {
   const { curve } = useDisplay()
@@ -104,6 +127,8 @@ export function System({
       unit.internal,
       Object.values(unit.out).reduce((sum, n) => sum + n, 0),
     )
+
+  const crew = (unit: Unit) => hands(unit.path, worked, people)
 
   const rows = BANDS.map((band) => ({
     ...band,
@@ -124,7 +149,7 @@ export function System({
   const clients = named.filter((s) => isClient(s.label))
 
   const Side = ({ side, of }: { side: "left" | "right"; of: typeof named }) => (
-    <div className="flex w-full flex-col lg:w-60 lg:shrink-0">
+    <div className="hidden shrink-0 flex-col sm:flex sm:w-36 lg:w-60">
       <div className="flex flex-1 flex-col justify-center gap-3">
         {of.map((one) => {
           const means = MEANS[one.label]
@@ -174,7 +199,7 @@ export function System({
   )
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch lg:gap-0">
+    <div className="flex items-stretch gap-2 sm:gap-0">
       {hosts.length > 0 && <Side side="left" of={hosts} />}
 
       {/* the wall: everything inside it is code this repo holds */}
@@ -218,10 +243,15 @@ export function System({
               </span>
             </Tip>
             <div
-              className="grid gap-1.5"
-              style={{
-                gridTemplateColumns: `repeat(${columns(row.held.length)}, minmax(0, 1fr))`,
-              }}
+              // one count per width, since a phone fits two of these and a laptop four
+              className="grid grid-cols-[repeat(var(--tight),minmax(0,1fr))] gap-1.5 sm:grid-cols-[repeat(var(--some),minmax(0,1fr))] lg:grid-cols-[repeat(var(--wide),minmax(0,1fr))]"
+              style={
+                {
+                  "--tight": columns(row.held.length, 2),
+                  "--some": columns(row.held.length, 3),
+                  "--wide": columns(row.held.length, 4),
+                } as React.CSSProperties
+              }
             >
               {row.held.map((unit) => {
                 const shape = read(unit)
@@ -234,11 +264,25 @@ export function System({
                       <>
                         <span className="font-mono">{unit.path}</span>
                         <br />
-                        {shape.label}: {shape.why}
-                        <br />
-                        {plural(unit.files, "file")}, {num(unit.lines)} lines,{" "}
+                        {shape.label} · {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
                         {plural(unit.packages, "package")}
-                        {unit.tangle >= 0 && <> · caught in a loop</>}
+                        {unit.tangle >= 0 && <> · in a loop</>}
+                        {crew(unit)
+                          .slice(0, 5)
+                          .map((one) => (
+                            <span key={one.who.email} className="mt-1 flex items-center gap-1.5">
+                              <Avatar
+                                name={one.who.name}
+                                email={one.who.email}
+                                found={faces[one.who.email.toLowerCase()]}
+                              />
+                              <span className="flex-1">{one.who.name}</span>
+                              <span className="tabular-nums">{Math.round(one.share * 100)}%</span>
+                            </span>
+                          ))}
+                        {crew(unit).length > 5 && (
+                          <span className="mt-1 block">and {crew(unit).length - 5} more</span>
+                        )}
                       </>
                     }
                   >
@@ -253,7 +297,12 @@ export function System({
                         unit.tangle >= 0 && "border-amber-500/60",
                       )}
                     >
-                      <span className="truncate text-xs font-medium">{title(unit.path)}</span>
+                      <span className="flex items-center gap-1">
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                          {title(unit.path)}
+                        </span>
+                        {crew(unit)[0] && <Face who={crew(unit)[0].who} faces={faces} />}
+                      </span>
                       <span className="text-muted-foreground truncate font-mono text-[10px]">
                         {unit.path}
                       </span>

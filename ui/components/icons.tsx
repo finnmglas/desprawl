@@ -90,6 +90,10 @@ export const Blocks = ({ className }: { className?: string }) => (
   />
 )
 
+export const Caret = ({ className }: { className?: string }) => (
+  <Line className={className} d="m6 9 6 6 6-6" />
+)
+
 // where the repo is hosted
 const HOSTS: Record<string, string> = {
   github:

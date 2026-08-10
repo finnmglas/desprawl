@@ -109,7 +109,7 @@ export const layeringOf = (levels: number, units: number): Verdict =>
 
 /**
  * What opening a folder would show. Both ends say something: a pile of entries with
- * no substructure is the shape sprawl takes, and a group of two or three may not
+ * no substructure is what a pile looks like, and a group of two or three may not
  * have earned a folder of its own.
  */
 export function spreadOf(
@@ -181,7 +181,7 @@ export function shapeOf(
     }
   if (share >= 30)
     return {
-      label: "Sprawl",
+      label: "Collection",
       band: "middle",
       tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
       why: "half in, half out. It is neither a module nor a composition layer, which is what makes it hard to move or to name",

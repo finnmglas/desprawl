@@ -162,6 +162,8 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         ) : tab === "Overview" ? (
           <Overview
             stats={stats}
+            metadata={prefs.metadata}
+            onMetadata={(open) => change({ metadata: open })}
             onLang={explore}
             onTab={(next) => go({ tab: next })}
             onCommits={(a, b) => {
@@ -173,6 +175,7 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
         ) : tab === "Modules" ? (
           <Modules
             stats={stats}
+            faces={faces}
             onTab={(next) => go({ tab: next })}
             onPath={(path) => {
               go({ tab: "Files", path })

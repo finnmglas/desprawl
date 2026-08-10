@@ -1,7 +1,7 @@
 // owner: finn
 // goal: show data
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AiCard } from "../components/ai-card.tsx"
 import { Avatar } from "../components/avatar.tsx"
 import { Card, CardContent } from "../components/card.tsx"
@@ -18,6 +18,7 @@ import { System } from "../components/system.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
 import { commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
 import { allTime, importGraph } from "../lib/live.ts"
+import { worked } from "../lib/people.ts"
 import { balanced, fold } from "../../src/layers.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Timeline } from "../../src/history.ts"
@@ -72,6 +73,8 @@ export function Overview({
   onTab,
   onCommits,
   faces,
+  metadata,
+  onMetadata,
 }: {
   stats: Stats
   onLang: (lang: string) => void
@@ -79,8 +82,13 @@ export function Overview({
   /** hand the zoomed window to the history view */
   onCommits: (from: string, to: string) => void
   faces: Record<string, string>
+  /** the metadata fold, kept in the saved settings so a reload does not close it */
+  metadata: boolean
+  onMetadata: (open: boolean) => void
 }) {
   const [all, setAll] = useState<Timeline | null>(null)
+  // who committed where, folded once rather than per card
+  const where = useMemo(() => worked(stats.tree), [stats.tree])
   // the picture below needs the imports, which the modules tab would otherwise fetch alone
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
   useEffect(() => {
@@ -147,13 +155,16 @@ export function Overview({
 
       <Card>
         <CardHead
-          title="System"
+          title="Project architecture"
           hint="the modules this repo holds, what each depends on, and the services it reaches outside itself"
         />
         <CardContent>
           {graph ? (
             <System
               name={stats.repo.split("/").filter(Boolean).pop() ?? "this repo"}
+              people={stats.contributors}
+              worked={where}
+              faces={faces}
               units={fold(graph, balanced(graph)).units.filter((u) => u.role === "source")}
               stack={stats.stack}
               onPick={() => onTab("Modules")}
@@ -161,10 +172,9 @@ export function Overview({
           ) : (
             <p className="text-muted-foreground text-sm">Reading every import in the repo.</p>
           )}
+          <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
         </CardContent>
       </Card>
-
-      <StackCard stack={stats.stack} />
 
       <OverTime stats={stats} all={all} onCommits={onCommits} />
 

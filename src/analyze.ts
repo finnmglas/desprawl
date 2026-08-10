@@ -40,8 +40,8 @@ export function analyze(repo: string, cap?: number): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
   const files = scan(root)
-  const { byPath, ...hist } = history(root, cap)
-  for (const f of files) Object.assign(f, byPath.get(f.path))
+  const { byPath, byWho, ...hist } = history(root, cap)
+  for (const f of files) Object.assign(f, byPath.get(f.path), { by: byWho.get(f.path) ?? {} })
 
   const languages = fold(files, (f) => f.lang ?? "")
   const tree = grow(files)

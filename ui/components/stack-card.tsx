@@ -3,6 +3,7 @@
 
 import { useState } from "react"
 import { Badge } from "./badge.tsx"
+import { Caret } from "./icons.tsx"
 import { Card, CardContent } from "./card.tsx"
 import { Chip } from "./chip.tsx"
 import { CardHead } from "./card-head.tsx"
@@ -13,6 +14,7 @@ import { named } from "../lib/export.ts"
 import { num } from "../lib/format.ts"
 import { HINTS } from "../lib/hints.ts"
 import { byWeight } from "../lib/rank.ts"
+import { cn } from "../lib/ui.ts"
 import type { Stack } from "../../src/model.ts"
 
 type Items = (string | number | false | 0 | undefined)[]
@@ -128,7 +130,16 @@ function Row({
       </Tip>
       <span className="flex flex-wrap gap-1">
         {(all ? sorted : sorted.slice(0, SHOWN)).map((item) => (
-          <Chip key={item} label={item} from={from[item]} />
+          <Chip
+            key={item}
+            label={item}
+            from={from[item]}
+            // a port is somewhere you can actually go, as long as the thing is running
+            href={label === "Ports" ? `http://localhost:${item}` : undefined}
+            note={
+              label === "Ports" ? `opens http://localhost:${item}, if it is running` : undefined
+            }
+          />
         ))}
         {hidden > 0 && (
           <Badge
@@ -160,7 +171,21 @@ function Group({ title, rows, from }: Section & { from: Record<string, string> }
   )
 }
 
-export function StackCard({ stack }: { stack: Stack }) {
+export function StackCard({
+  stack,
+  folded,
+  open: told,
+  onOpen,
+}: {
+  stack: Stack
+  folded?: boolean
+  /** kept by the caller when it should outlive a reload */
+  open?: boolean
+  onOpen?: (open: boolean) => void
+}) {
+  const [own, setOwn] = useState(!folded)
+  const open = told ?? own
+  const setOpen = (next: boolean) => (onOpen ? onOpen(next) : setOwn(next))
   const sections = describe(stack)
   const identity = [
     stack.name,
@@ -182,47 +207,101 @@ export function StackCard({ stack }: { stack: Stack }) {
       ),
     ].join("\n")
 
+  const badges = (
+    // centred on the card, not on the gap left between the title and the button
+    <div className="order-last flex w-full flex-wrap justify-center gap-1 sm:absolute sm:inset-x-0 sm:order-none sm:mx-auto sm:w-fit">
+      {stack.parts.map((part) => (
+        <Tip key={part} text={HINTS[part]} side="bottom">
+          <Badge variant="outline">{part}</Badge>
+        </Tip>
+      ))}
+    </div>
+  )
+
+  const buttons = (
+    <div className="ml-auto flex items-center gap-1">
+      <CopyButton text={asText} message="Metadata copied" note="Every detected fact, as text" />
+      <DownloadButton
+        name={named("project-metadata.json")}
+        text={() => JSON.stringify(stack, null, 2)}
+        note="Every detected fact, as json"
+      />
+    </div>
+  )
+
+  const head = folded ? (
+    <div className="relative flex flex-row flex-wrap items-center gap-2">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex cursor-pointer items-center gap-1 text-sm leading-none"
+        >
+          Project metadata
+          <Caret className={cn("transition-transform", !open && "-rotate-90")} />
+        </button>
+        <span className="text-muted-foreground text-xs">{identity}</span>
+      </div>
+      {badges}
+      {buttons}
+    </div>
+  ) : (
+    <CardHead
+      title={
+        folded ? (
+          <button onClick={() => setOpen(!open)} className="flex cursor-pointer items-center gap-1">
+            Project metadata
+            <Caret className={cn("transition-transform", !open && "-rotate-90")} />
+          </button>
+        ) : (
+          "Project metadata"
+        )
+      }
+      hint={identity}
+      wrap
+    >
+      {badges}
+      {buttons}
+    </CardHead>
+  )
+
+  const body = (
+    <>
+      {stack.kind === "none" && (
+        <p className="text-muted-foreground mb-3 text-xs">
+          No package manifest or tsconfig here, so this is not a node project.{" "}
+          {stack.primary ? (
+            <>
+              Its largest language is <span className="font-medium">{stack.primary}</span>.
+            </>
+          ) : (
+            "Nothing tracked here is a language desprawl recognises."
+          )}
+        </p>
+      )}
+
+      <div className="grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
+        {sections.map((section) => (
+          <Group key={section.title} {...section} from={stack.from} />
+        ))}
+      </div>
+    </>
+  )
+
+  if (folded)
+    // the rule runs the whole width of the card, the content inside it does not
+    return (
+      <div className="-mx-4 mt-4 border-t px-4 pt-4">
+        <div className="flex flex-col gap-3">
+          {head}
+          {open && body}
+        </div>
+      </div>
+    )
+
   return (
     <Card>
-      <CardHead title="Project metadata" hint={identity} wrap>
-        {/* centred on the card, not on the gap left between the title and the button */}
-        <div className="order-last flex w-full flex-wrap justify-center gap-1 sm:absolute sm:inset-x-0 sm:order-none sm:mx-auto sm:w-fit">
-          {stack.parts.map((part) => (
-            <Tip key={part} text={HINTS[part]} side="bottom">
-              <Badge variant="outline">{part}</Badge>
-            </Tip>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-1">
-          <CopyButton text={asText} message="Metadata copied" note="Every detected fact, as text" />
-          <DownloadButton
-            name={named("project-metadata.json")}
-            text={() => JSON.stringify(stack, null, 2)}
-            note="Every detected fact, as json"
-          />
-        </div>
-      </CardHead>
-
-      <CardContent className="pt-1">
-        {stack.kind === "none" && (
-          <p className="text-muted-foreground mb-3 text-xs">
-            No package manifest or tsconfig here, so this is not a node project.{" "}
-            {stack.primary ? (
-              <>
-                Its largest language is <span className="font-medium">{stack.primary}</span>.
-              </>
-            ) : (
-              "Nothing tracked here is a language desprawl recognises."
-            )}
-          </p>
-        )}
-
-        <div className="grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
-          {sections.map((section) => (
-            <Group key={section.title} {...section} from={stack.from} />
-          ))}
-        </div>
-      </CardContent>
+      {head}
+      <CardContent className="pt-1">{body}</CardContent>
     </Card>
   )
 }
