@@ -9,7 +9,7 @@ export interface Specifier {
   names: { local: string; name: string }[]
 }
 
-/** `import Thing, { a as b } from "x"` binds Thing and b, which came in as default and a */
+/** the names it binds, and what each came in as */
 export function bound(clause: string): { local: string; name: string }[] {
   const out: { local: string; name: string }[] = []
   const text = clause.replace(/\bfrom\s*$/, "").trim()
@@ -114,7 +114,7 @@ export function scrub(source: string): { code: string; strings: string[] } {
 export interface Symbols {
   /** what a file hands out, so its api surface rather than its size */
   exports: number
-  /** declared at the top level, not the callbacks inside them */
+  /** top level, not the callbacks inside */
   functions: number
   classes: number
 }
@@ -123,14 +123,14 @@ const NAMED = /export\s*\{([^}]*)\}/g
 const DECLARED =
   /(^|[\s;}])export\s+(default\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum|abstract)\b/g
 const FUNCTIONS = /(^|[\s;}])(async\s+)?function\b/g
-// a const bound to an arrow, in the first column, which is a declaration and not a callback
+// a const bound to an arrow in the first column: a declaration
 const ARROWS =
   /^(export\s+)?const\s+[\w$]+[^=\n]*=\s*(async\s+)?(\([^)]*\)|[\w$]+)\s*(:[^=\n]*)?=>/gm
 const CLASSES = /(^|[\s;}])(export\s+|default\s+|abstract\s+)*class\s+[\w$]/g
 
 const count = (text: string, pattern: RegExp) => (text.match(pattern) ?? []).length
 
-/** what a file declares, read off the same scrubbed code the imports came from */
+/** what a file declares, off the same scrubbed code */
 export function symbols(source: string): Symbols {
   const { code } = scrub(source)
   const listed = [...code.matchAll(NAMED)].reduce(
@@ -151,7 +151,7 @@ const STATIC = new RegExp(
 )
 const CALLS = new RegExp(`\\b(import|require)\\s*\\(\\s*${MARK}(\\d+)${MARK}`, "g")
 
-/** every module specifier in a file, reusing a scrub when the caller already did one */
+/** every specifier, reusing a scrub the caller did */
 export function specifiers(source: string, done?: ReturnType<typeof scrub>): Specifier[] {
   const { code, strings } = done ?? scrub(source)
   const found: Specifier[] = []

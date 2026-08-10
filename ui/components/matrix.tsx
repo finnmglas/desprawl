@@ -38,13 +38,13 @@ export function Matrix({
   onPick,
 }: {
   units: Unit[]
-  /** what the columns may hold, when the rows have been narrowed and the targets have not */
+  /** what the columns may hold when the rows are narrowed */
   across?: Unit[]
-  /** rows and columns to draw, busiest first: past a screenful a grid says nothing */
+  /** rows and columns to draw, busiest first */
   most?: number
-  /** "from to" for every import the cut list names, so a loop shows where to open it */
+  /** the imports the cut list names */
   cuts?: Set<string>
-  /** an order chosen elsewhere, since the same groups are listed in more than one place */
+  /** an order chosen elsewhere */
   order?: (a: Unit, b: Unit) => number
   onPick?: (path: string) => void
 }) {
@@ -63,7 +63,7 @@ export function Matrix({
       .slice(0, Math.min(most, LIMIT))
       .sort(order ?? ((a, b) => a.level - b.level || a.path.localeCompare(b.path)))
 
-  // a group that imports nothing here has an empty row, one nobody imports an empty column
+  // no row for a group that imports nothing here
   const importers = units.filter((u) => leaving(u).length)
   const imported = targets.filter((u) => arriving(u).length)
   const rows = busiest(importers, (u) => leaving(u).length)

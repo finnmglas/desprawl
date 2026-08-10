@@ -3,11 +3,7 @@
 
 import type { Graph } from "./graph.ts"
 
-/**
- * Tarjan, iterative: a deep file graph would blow the stack on a large repo.
- * Groups come back sinks first, which is reverse topological order and what
- * levelling depends on.
- */
+/** Tarjan, iterative, sinks first: recursion would blow the stack and levelling needs that order */
 export function scc(nodes: Iterable<string>, out: (node: string) => string[]): string[][] {
   const index = new Map<string, number>()
   const low = new Map<string, number>()

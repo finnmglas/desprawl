@@ -71,7 +71,7 @@ export const contextOf = (tokens: number): Verdict => ({
   why: "roughly how many model contexts the whole repo would fill, at four characters a token",
 })
 
-/** a folder importing one that imports it back cannot be moved, tested or read apart */
+/** a folder that imports its own importer cannot be moved */
 export const tanglesOf = (n: number, units: number): Verdict =>
   n === 0
     ? {
@@ -89,7 +89,7 @@ export const tanglesOf = (n: number, units: number): Verdict =>
         why: `${n} groups of units import each other in a loop, out of ${units}. Neither side can move, be tested or be understood without the other`,
       }
 
-/** how many steps of dependency separate the entry points from the leaves */
+/** steps from the entry points to the leaves */
 export const layeringOf = (levels: number, units: number): Verdict =>
   units > 3 && levels < 3
     ? {
@@ -107,15 +107,11 @@ export const layeringOf = (levels: number, units: number): Verdict =>
         why: "the longest chain of units that depend on each other. Deep is not worse, it is further to trace",
       }
 
-/**
- * What opening a folder would show. Both ends say something: a pile of entries with
- * no substructure is what a pile looks like, and a group of two or three may not
- * have earned a folder of its own.
- */
+/** what opening it would show: a pile with no substructure, or too small to be a folder */
 export function spreadOf(
   entries: number,
   folders?: number,
-  /** a repo root earns more room: config, docs and manifests all live loose in it */
+  /** a root earns more room: config and docs live loose in it */
   roomy = false,
 ): { label: string; tone: string; why: string } {
   const held =
@@ -147,11 +143,7 @@ export function spreadOf(
   }
 }
 
-/**
- * What the balance says a group is. A folder that only imports itself is a module
- * whatever it is called, and one that only imports others is composition. The stars
- * are the near misses, which is where the work usually is.
- */
+/** only imports itself: a module. Only imports others: composition. A star is the near miss */
 export function shapeOf(
   inside: number,
   out: number,

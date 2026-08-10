@@ -26,10 +26,7 @@ export const day = (iso: string) => {
   if (!date) return "-"
   return locale().startsWith("en") ? date : new Date(date).toLocaleDateString(locale())
 }
-/**
- * Long paths lose their middle, never their ends: the first folder says where it
- * lives and the last says what it is, and both are what a reader matches on.
- */
+/** a long path loses its middle: the ends say where it lives and what it is */
 export function shortPath(path: string, max = 38): string {
   if (path.length <= max) return path
   const parts = path.split("/")

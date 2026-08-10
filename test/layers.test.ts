@@ -185,7 +185,7 @@ test("a top folder is a group however small, since it is what the repo is made o
 
 test("the heaviest folder is the one that gets opened", () => {
   const files: Record<string, string> = { "small/one.ts": "export const one = 1\n" }
-  // one branch holds nearly everything, so auto has to go inside it rather than name it once
+  // one branch holds nearly everything, so auto has to go inside it
   for (let i = 0; i < 30; i++) files[`app/heavy/f${i}.ts`] = `export const f${i} = 1\n`
   for (let i = 0; i < 3; i++) files[`app/light/f${i}.ts`] = `export const f${i} = 1\n`
   const groups = new Set(Object.values(balanced(build(repo(files)))))

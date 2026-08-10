@@ -1,5 +1,5 @@
 // owner: finn
-// goal: a call edge exists because a name was resolved, never because it was spelled the same
+// goal: an edge exists because a name resolved, not because it matched
 
 import assert from "node:assert/strict"
 import { test } from "node:test"

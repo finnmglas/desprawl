@@ -1,10 +1,7 @@
 // owner: finn
 // goal: a system, or the library that speaks to it
 
-/**
- * A client ships inside the repo and speaks a protocol: axios sends the request, the
- * thing that answers is the system. Only a system belongs outside the wall.
- */
+/** axios sends the request, the thing that answers is the system. Only that is outside */
 const CLIENT = new Set([
   "axios",
   "Axios",

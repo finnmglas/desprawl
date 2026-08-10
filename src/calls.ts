@@ -8,25 +8,25 @@ import { packageOf } from "./graph.ts"
 import { MARK, scrub, specifiers } from "./specifiers.ts"
 
 export interface Symbol {
-  /** file#name, which is unique because a file cannot declare a name twice */
+  /** file#name, unique: a file declares a name once */
   id: string
   file: string
   name: string
   kind: "function" | "class" | "component"
   line: number
-  /** lines its body spans, so size is measured rather than guessed */
+  /** lines its body spans */
   lines: number
   exported: boolean
-  /** ids it reaches, and the ones that reach it */
+  /** what it reaches, and what reaches it */
   calls: string[]
   callers: string[]
-  /** packages it calls into, by the name that would be installed */
+  /** packages it calls into */
   packages: string[]
 }
 
 export interface Calls {
   symbols: Record<string, Symbol>
-  /** a name called that resolved to nothing here: a builtin, a global, or dynamic */
+  /** resolved to nothing: a global, or dynamic */
   unresolved: { from: string; name: string }[]
   stats: {
     files: number
@@ -37,11 +37,11 @@ export interface Calls {
     /** calls between symbols in this repo */
     edges: number
     external: number
-    /** calls into what the runtime provides, which is placed but not ours */
+    /** into what the runtime provides */
     builtin: number
-    /** share of call sites that named something we could place */
+    /** call sites we could place */
     coverage: number
-    /** declared here and called by nothing here, which for an entry point is normal */
+    /** called by nothing here, which an entry point is */
     uncalled: number
     lines: number
   }
@@ -163,10 +163,7 @@ const ASSIGNED =
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
-/**
- * How far a declaration reaches: the first brace outside the parameter list, matched.
- * An arrow returning an expression has none and ends where its statement stops wrapping.
- */
+/** the first brace outside the parameter list, matched. An arrow ends with its line */
 function span(code: string, from: number): number {
   let depth = 0
   for (let at = from; at < code.length; at++) {

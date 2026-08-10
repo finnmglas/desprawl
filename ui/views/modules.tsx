@@ -1,5 +1,5 @@
 // owner: finn
-// goal: the shape the imports actually make, said in plain words
+// goal: import modules analyzed
 
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/back.tsx"
@@ -31,8 +31,6 @@ import type { Sort } from "../lib/format.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
 
-// auto picks its own folders, the rest cut every path at the same depth:
-// src/ui/lib/thing.ts as src, src/ui, src/ui/lib, or the file itself
 const AUTO = "auto"
 const GROUPS = [AUTO, "top folder", "folder", "subfolder", "file"]
 const DEPTH: Record<string, number> = { "top folder": 1, folder: 2, subfolder: 3, file: 99 }
@@ -40,14 +38,10 @@ const JOINS: Record<string, string> = {
   "top folder": "src",
   folder: "src/ui",
   subfolder: "src/ui/lib",
-  file: "the file itself",
+  file: "file itself",
 }
 const KEEP = ["source only", "all folders"]
-
-// the same dependencies, read as a table or as a ring
 const VIEWS = ["grid", "circle"]
-
-// a wall of anything says less than a count does
 const FEW = 6
 
 const real = (unit: Unit) => unit.role === "source"
@@ -74,10 +68,9 @@ function Empty({
   )
 }
 
-/** a row that stays short until asked, like the metadata card */
+// expandable
 function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number }) {
   const [open, setOpen] = useState(false)
-  // opened, but not into two thousand buttons: the table below is where the rest lives
   const most = open ? Math.min(children.length, 120) : few
   const hidden = children.length - most
   const over = children.length > few
@@ -94,7 +87,7 @@ function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number
       )}
       {open && hidden > 0 && (
         <span className="text-muted-foreground px-1 text-xs">
-          {num(hidden)} more in the table below
+          {num(hidden)} more in table below
         </span>
       )}
     </div>
@@ -116,12 +109,11 @@ export function Modules({
   const [group, setGroup] = useState("")
   const [keep, setKeep] = useState(KEEP[0])
   const [wide, setWide] = useState(false)
-  // the grid draws the same groups, so it follows whatever order the table was put in
+
   const [sort, setSort] = useState<Sort | null>(null)
   const [view, setView] = useState(VIEWS[0])
-  // who committed where, folded once rather than per row
+
   const where = useMemo(() => worked(stats.tree), [stats.tree])
-  // one search over the groups, since the table and the grid draw the same ones
   const [find, setFind] = useState("")
 
   useEffect(() => {
@@ -144,11 +136,7 @@ export function Modules({
         <Back onTab={onTab} />
         <Card>
           <CardContent className="p-4">
-            <Waiting
-              what="Reading every import in the repo,"
-              slow="A large repo takes a few seconds. The answer is held after that."
-              rows={4}
-            />
+            <Waiting what="Reading all imports," slow="Large repo takes a few seconds." rows={4} />
           </CardContent>
         </Card>
         <Onward stats={stats} current="Modules" onTab={onTab} />
@@ -158,8 +146,7 @@ export function Modules({
   if (!layout || !units.length)
     return (
       <Empty stats={stats} onTab={onTab}>
-        Nothing here imports anything. There is no typescript or javascript source tracked in this
-        repo, so it has no import structure to read.
+        No imports, possibly no TS/JS here.
       </Empty>
     )
 
@@ -172,7 +159,7 @@ export function Modules({
   const levels = Math.max(...units.map((u) => u.level)) + 1
   const files = units.reduce((sum, u) => sum + u.files, 0)
   const dropped = layout.units.length - units.length
-  // a grid this size still reads at a glance, so nothing is worth hiding behind a button
+  // grid size still understandable, nothing hidden
   const hunted = find.trim().toLowerCase()
   const shown = hunted ? units.filter((u) => u.path.toLowerCase().includes(hunted)) : units
   const crowded = shown.length > 50
@@ -189,8 +176,7 @@ export function Modules({
     : undefined
   const cuts = new Set(loops.flatMap((l) => l.cut.map((c) => `${c.from} ${c.to}`)))
   const folder = (path: string) => !/\.[a-z]+$/.test(path)
-  // a remainder group is named for its folder with a star on the end, and the star
-  // is not a directory anyone can open
+  // remainder group = "/*"
   const open = (path: string) => {
     const at = path.replace(/\/?\*$/, "")
     if (folder(at)) onPath(at ? at.split("/") : [])
@@ -208,36 +194,35 @@ export function Modules({
         />
       </div>
 
-      {/* the graph itself, which no grouping below can change */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Kpi
-          label="Import graph files"
+          label="Importing files"
           value={num(graph.stats.files)}
           sub={`reaching ${plural(Object.keys(graph.packages).length, "installed package")}`}
           verdict={{
-            label: "in the graph",
+            label: "in graph",
             tone: "plain",
-            why: "every typescript or javascript file git tracks, with bundled output and declaration files left out",
+            why: "every ts, js file git tracks",
           }}
         />
         <Kpi
-          label="File imports"
+          label="Imports"
           value={num(graph.stats.edges)}
-          sub={`and ${num(graph.stats.external)} more into packages`}
+          sub={`${num(graph.stats.external)} more into packages`}
           verdict={{
             label: "file to file",
             tone: "plain",
-            why: "imports that resolve to another file in this repo. The ones reaching installed packages are counted apart",
+            why: "imports resolve to other files in repo.",
           }}
         />
         <Kpi
-          label="Imports / file"
+          label="Imports/file"
           value={(graph.stats.edges / Math.max(1, graph.stats.files)).toFixed(1)}
-          sub="imports the average file makes"
+          sub="imports per average file"
           verdict={{
             label: "average",
             tone: "plain",
-            why: "file to file imports over files. A high number means little stands on its own, a low one that the repo is loosely tied",
+            why: "High means little standalone, low that repo is loosely tied",
           }}
         />
         <Kpi
@@ -246,25 +231,24 @@ export function Modules({
           sub={
             graph.missing.length
               ? `${plural(graph.missing.length, "import")} are unresolved`
-              : "every import found its file"
+              : "every imported file found"
           }
           verdict={
             graph.missing.length
               ? {
-                  label: "some missing",
+                  label: "partial",
                   tone: "watch",
-                  why: "an import that names nothing is either broken in the code or something this resolver cannot follow. Either way the graph is missing an edge",
+                  why: "some faulty or non-resolvable imports",
                 }
               : {
                   label: "complete",
                   tone: "fine",
-                  why: "every import in the repo resolved to a file, a package, or something on disk. Nothing below is guesswork",
+                  why: "every file + package found",
                 }
           }
         />
       </div>
 
-      {/* above the numbers it decides, since every one of them answers to it */}
       <div className="flex flex-wrap items-center gap-1">
         <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
         <Tabs className="ml-auto" tabs={GROUPS} value={at} onChange={setGroup} />
@@ -280,20 +264,18 @@ export function Modules({
             tone: "plain",
             why:
               at === AUTO
-                ? "folders picked by weight, opening the heaviest until no group holds a tenth of the repo. Never a single file, and every file lands in exactly one group"
-                : `every file counts as its ${at}, so src/ui/lib/thing.ts joins ${JOINS[at]}`,
+                ? "folders picked by code size, trying to evenly cluster them"
+                : `every file counts as its ${at}, so src/ui/lib/thing.ts is bucketed ${JOINS[at]}`,
           }}
         />
         <Kpi
-          label="Relation depth"
+          label="Depth"
           value={num(levels)}
-          sub={
-            levels > 1 ? "steps from the top down to the leaves" : "everything sits side by side"
-          }
+          sub={levels > 1 ? "steps from top to bottom" : "everything side by side"}
           verdict={layeringOf(levels, units.length)}
         />
         <Kpi
-          label="Loops/Cycles"
+          label="Loops"
           value={num(loops.length)}
           sub={
             loops.length
@@ -301,34 +283,32 @@ export function Modules({
                   loops.reduce((sum, loop) => sum + loop.edges, 0),
                   "import",
                 )} caught in them`
-              : "nothing imports its own importer"
+              : "no bi-directional dependency"
           }
           verdict={tanglesOf(loops.length, units.length)}
         />
         <Kpi
-          label="Deduplicated linkage"
+          label="Module links"
           value={num(links)}
           sub={`from ${num(graph.stats.edges)} imports between files`}
           verdict={{
             label: `${(links / units.length).toFixed(1)} each`,
             tone: "plain",
-            why: "one link is one group importing another, however many files did it",
+            why: "Link = 1+ files in a group importing another",
           }}
         />
       </div>
 
       <DataTable
         title="Module groups"
-        hint={
-          at === AUTO ? "the folders auto picked, and how each sits" : `every group at ${at} level`
-        }
+        hint={at === AUTO ? "auto-detected structure" : `groups by ${at}`}
         rows={[...shown].sort((a, b) => b.files - a.files)}
         id={(u) => u.path}
         columns={[
           ...COLUMNS,
           {
             key: "owner",
-            label: "Worked in by",
+            label: "Dev",
             get: (u) => hands(u.path, where, stats.contributors)[0]?.who.name ?? "",
             cell: (u) => {
               const crew = hands(u.path, where, stats.contributors)
@@ -343,7 +323,7 @@ export function Modules({
                 </Tip>
               )
             },
-            hint: "who has committed inside it most, by commits made in that folder",
+            hint: "who committed most to contained files",
           },
         ]}
         onRowClick={(u) => open(u.path)}
@@ -359,16 +339,12 @@ export function Modules({
       </DataTable>
 
       <Card>
-        <CardHead
-          title="Dependency Grid (auto-adjusts to module sorts)"
-          hint="Row imports column, sorted by depending count"
-          wrap
-        >
+        <CardHead title="Dependency Grid" hint="Row imports column, module sort applies" wrap>
           <div className="ml-auto flex items-center gap-1">
             <Tabs tabs={VIEWS} value={view} onChange={setView} />
             {crowded && view === VIEWS[0] && (
               <Button variant="outline" size="sm" onClick={() => setWide(!wide)}>
-                {wide ? "hide more" : "show all"}
+                {wide ? "hide some" : "show all"}
               </Button>
             )}
           </div>
@@ -390,10 +366,7 @@ export function Modules({
       </Card>
 
       <Card>
-        <CardHead
-          title="Dependency levels"
-          hint="a group's level is how far its own dependencies reach: level 0 imports nothing else here, and everything above it only leans downward"
-        />
+        <CardHead title="Dependency levels" hint="L0 imports nothing, L1 at least L0 etc" />
         <CardContent className="flex flex-col gap-2">
           {Array.from({ length: levels }, (_, i) => levels - 1 - i).map((level) => {
             const here = units.filter((u) => u.level === level)
@@ -419,7 +392,7 @@ export function Modules({
                             <br />
                             leans on {plural(Object.keys(unit.out).length, "group")}, carried by{" "}
                             {plural(Object.keys(unit.in).length, "group")}
-                            {unit.tangle >= 0 && <> · caught in a loop</>}
+                            {unit.tangle >= 0 && <> · in loop</>}
                           </>
                         }
                       >
@@ -443,8 +416,8 @@ export function Modules({
           })}
           {dropped > 0 && (
             <p className="text-muted-foreground border-t pt-2 text-xs">
-              {plural(dropped, "group")} left out, because tests, config and scripts are not the
-              architecture. Switch to everything to see them.
+              {plural(dropped, "group")} left out tests, config, scripts for the source-only
+              setting.
             </p>
           )}
         </CardContent>
@@ -454,7 +427,7 @@ export function Modules({
         <Card>
           <CardHead
             title="Internal dependency loops"
-            hint="groups that import each other (bad, as it doesnt allow abstractions and isolation)"
+            hint="groups bi-directional importing (bad, blocks abstraction and isolation)"
           >
             <CopyButton
               className="ml-auto"
@@ -474,7 +447,7 @@ export function Modules({
                   .join("\n\n")
               }
               message={`Copied ${loops.length === 1 ? "1 loop" : `${loops.length} loops`}`}
-              note="Members, size, and every import to remove"
+              note="Members, size, every import to remove"
             />
           </CardHead>
           <CardContent className="flex flex-col gap-5">
@@ -500,16 +473,15 @@ export function Modules({
                     {plural(loop.units.length, "group")} holding {plural(held, "file")}, tied
                     together by {plural(loop.edges, "import")}.{" "}
                     {loop.runtime ? (
-                      "It is there when the code runs, so it decides load order too."
+                      "There in runtime, decides load order."
                     ) : (
-                      <Tip text="every import that closes it carries only types, and typescript erases those. The loop is real in the source and gone in the build">
+                      <Tip text="real in source, gone in builds">
                         <span className="underline decoration-dotted">
-                          Only types close it, so nothing loops at runtime.
+                          Type import loop, nothing loops at runtime.
                         </span>
                       </Tip>
                     )}{" "}
-                    Removing {plural(loop.cut.length, "import")} of them leaves nothing looping,
-                    listed below, and it is one set that works rather than the only one.
+                    Removing {plural(loop.cut.length, "import")} of them fixes it, see below..
                   </p>
                 </div>
               )
@@ -521,7 +493,7 @@ export function Modules({
       {loops.length > 0 && (
         <DataTable
           title="Imports to remove"
-          hint="every import that has to go for the loops above to open, cheapest first"
+          hint="every import to remove loops, cheapest first"
           rows={loops.flatMap((loop, id) => loop.cut.map((edge) => ({ ...edge, loop: id + 1 })))}
           id={(edge) => `${edge.from} ${edge.to}`}
           columns={CUTS}
@@ -537,29 +509,29 @@ export function Modules({
 type Removal = Cut & { loop: number }
 
 const CUTS: Column<Removal>[] = [
-  { key: "from", label: "Remove from", get: (edge) => edge.from },
-  { key: "to", label: "Its import of", get: (edge) => edge.to },
+  { key: "from", label: "Remove in", get: (edge) => edge.from },
+  { key: "to", label: "import of", get: (edge) => edge.to },
   {
     key: "imports",
     label: "Files doing it",
     num: true,
     get: (edge) => edge.imports,
-    hint: "how many files in the group make that import, so how much there is to move",
+    hint: "how many files = ca. how much work",
   },
   {
     key: "kind",
     label: "Costs",
-    get: (edge) => (edge.types === edge.imports ? "a type move" : "real work"),
+    get: (edge) => (edge.types === edge.imports ? "type move" : "manual"),
     cell: (edge) =>
       edge.types === edge.imports ? (
         <Tip text="typescript erases these, so moving the type is usually the whole fix">
-          <span className="text-muted-foreground">a type move</span>
+          <span className="text-muted-foreground">type move</span>
         </Tip>
       ) : (
         <Tip text="this one is there when the code runs, so removing it is a real change">
           <span className="flex items-center gap-1">
             <Refresh className="size-3" />
-            real work
+            manual
           </span>
         </Tip>
       ),
@@ -582,7 +554,7 @@ const CUTS: Column<Removal>[] = [
   { key: "loop", label: "Loop", num: true, flat: true, get: (edge) => edge.loop },
 ]
 
-/** the split every group is really judged on: what it keeps in against what it reaches out for */
+/** what it keeps in against what it reaches out for */
 const Balance = ({ unit }: { unit: Unit }) => {
   const out = count(unit.out)
   const whole = Math.max(1, unit.internal + out)
@@ -594,7 +566,6 @@ const Balance = ({ unit }: { unit: Unit }) => {
       text={`${plural(unit.internal, "import")} never leave ${unit.path}, ${plural(out, "import")} reach another group`}
     >
       <div className="bg-muted flex h-5 w-40 overflow-hidden rounded-sm text-[10px] leading-5 font-medium">
-        {/* a zero wide segment still has its padding, so it draws a sliver of a lie */}
         {unit.internal > 0 && (
           <div
             className="h-full overflow-hidden bg-sky-500 px-1.5 text-left whitespace-nowrap text-white"

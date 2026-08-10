@@ -17,9 +17,9 @@ export interface Module {
   out: Edge[] // resolved inside the repo
   in: string[]
   packages: string[] // by install name
-  /** the specifier each resolved import was written as, so a name can be traced back */
+  /** how each resolved import was written */
   imports: Record<string, string>
-  /** what it declares, which is a truer size than its line count */
+  /** what it declares */
   symbols: Symbols
   lines: number
 }
@@ -63,7 +63,7 @@ const BUNDLED = /(\.min\.[cm]?jsx?$)|(\.[0-9a-f]{8,}\.[cm]?jsx?$)|(^|\/)[\w.-]*-
 // bundler runtime, left at the top of its own output
 const RUNTIME = /parcelRequire|webpackJsonp|__webpack_require__|System\.register|sourceMappingURL=/
 
-/** a bundle's requires are ids inside itself, not paths */
+/** its requires are ids, not paths */
 function bundled(file: string): boolean {
   try {
     const head = readFileSync(file, "utf8").slice(0, 4096)
@@ -75,7 +75,7 @@ function bundled(file: string): boolean {
   }
 }
 
-/** json with comments. A regex cannot do it: `"@/*": ["./*"]` opens a block comment */
+/** json with comments: a regex reads `"@/*"` as one */
 export function jsonc(text: string): unknown {
   let out = ""
   let i = 0

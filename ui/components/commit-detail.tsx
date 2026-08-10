@@ -14,7 +14,7 @@ export function CommitDetail({
   onFile,
 }: {
   commit: Detail | null
-  /** a saved page carries the log but not the diffs, and should say so rather than spin */
+  /** a saved page has the log, not the diffs */
   live?: boolean
   onFile: (path: string) => void
 }) {

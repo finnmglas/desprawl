@@ -33,10 +33,7 @@ export function shell(): string {
 /** past this the call graph is minutes of work and a file too big to send anywhere */
 const HEAVY = 1500
 
-/**
- * One file holding the page and everything it could otherwise ask a server for.
- * The graphs are taken when a caller already has them, since a server does.
- */
+/** the page and everything it would ask a server for, reusing what a caller holds */
 export function page(
   stats: Stats,
   held?: { graph?: Graph; called?: Calls | null; viewer?: string },

@@ -81,24 +81,21 @@ export function Overview({
   stats: Stats
   onLang: (lang: string) => void
   onTab: (tab: string) => void
-  /** hand the zoomed window to the history view */
   onCommits: (from: string, to: string) => void
   faces: Record<string, string>
-  /** the metadata fold, kept in the saved settings so a reload does not close it */
   metadata: boolean
   onMetadata: (open: boolean) => void
 }) {
   const [all, setAll] = useState<Timeline | null>(null)
-  // who committed where, folded once rather than per card
   const where = useMemo(() => worked(stats.tree), [stats.tree])
 
-  // the picture below needs the imports, which the modules tab would otherwise fetch alone
+  // picture below needs the imports
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
   useEffect(() => {
     if (!graph) void importGraph().then(setGraph)
   }, [])
 
-  // grouped once, so the window below can be folded onto the same groups
+  // group once, so a window folds onto the same groups
   const assign = useMemo(() => (graph ? balanced(graph) : null), [graph])
   const units = useMemo(
     () => (graph && assign ? fold(graph, assign).units.filter((u) => u.role === "source") : []),
@@ -107,10 +104,9 @@ export function Overview({
   const [range, setRange] = useState<[string, string] | null>(null)
   const [changed, setChanged] = useState<Map<string, Move>>(new Map())
   const [asking, setAsking] = useState(false)
-  // the same window, folded onto the people panel: who was actually there then
+  // the same window, on the people panel
   const [did, setDid] = useState<Contributor[] | null>(null)
   useEffect(() => {
-    // a file has no server to ask what moved, so it keeps the picture it was made with
     if (!range || !assign || !isLive()) {
       setDid(null)
       return setChanged(new Map())
@@ -144,7 +140,7 @@ export function Overview({
     })
   }, [range, assign])
 
-  // a second pass, so it lands after paint
+  // second pass so it lands after paint
   useEffect(() => {
     if (stats.truncated) void allTime().then(setAll)
   }, [stats.truncated])
@@ -157,7 +153,6 @@ export function Overview({
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {/* each card opens its tab */}
         {[
           {
             label: "Lines of code",
@@ -197,8 +192,7 @@ export function Overview({
       {stats.files === 0 && (
         <Card>
           <CardContent className="text-muted-foreground p-6 text-sm">
-            Nothing countable here. Every tracked file is binary, or has neither a known extension
-            nor a name desprawl recognises, so there are no lines to report.
+            Nothing countable. Binaries or missing data?
           </CardContent>
         </Card>
       )}
@@ -211,12 +205,12 @@ export function Overview({
               <Working on={asking} />
             </span>
           }
-          hint="the modules this repo holds, what each depends on, and the services it reaches outside itself"
+          hint="modules and services, generated from repo"
         />
         <CardContent>
           {graph ? (
             <System
-              name={stats.repo.split("/").filter(Boolean).pop() ?? "this repo"}
+              name={stats.repo.split("/").filter(Boolean).pop() ?? "Repo"}
               moved={range && isLive() ? changed : undefined}
               people={stats.contributors}
               worked={where}
@@ -226,16 +220,10 @@ export function Overview({
               onPick={() => onTab("Modules")}
             />
           ) : (
-            <Waiting
-              what="Reading every import in the repo,"
-              slow="A large repo takes a few seconds. The answer is held after that."
-            />
+            <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
           )}
           {range && !isLive() && (
-            <p className="text-muted-foreground mt-3 text-xs">
-              A window needs the repo to answer for those days, and a saved page has no server. Run
-              desprawl on the repo to paint one.
-            </p>
+            <p className="text-muted-foreground mt-3 text-xs">Needs live npx desprawl server.</p>
           )}
           <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
         </CardContent>
@@ -250,7 +238,7 @@ export function Overview({
 
       <DataTable
         title="Languages"
-        hint="Click one to see where it lives"
+        hint="Click to see files"
         columns={LANGS}
         rows={stats.languages}
         id={(l) => l.name}
@@ -269,7 +257,7 @@ export function Overview({
         hint={
           did
             ? `${plural(did.length, "person")} committed between ${range?.[0]} and ${range?.[1]}`
-            : `${stats.contributors.length} identities, merged by mailmap email`
+            : `${stats.contributors.length} identities by email`
         }
         file={did ? "contributors-in-range" : "contributors"}
         columns={people(

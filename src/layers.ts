@@ -4,7 +4,7 @@
 import { scc } from "./cycles.ts"
 import type { Graph } from "./graph.ts"
 
-/** what a unit is for, since a config file is not architecture and should not read as it */
+/** what it is for: config is not architecture */
 export type Role = "source" | "test" | "support"
 
 export interface Unit {
@@ -12,30 +12,30 @@ export interface Unit {
   role: Role
   files: number
   lines: number
-  /** what opening the folder would show: files and subfolders directly inside it */
+  /** what opening the folder would show */
   spread: number
-  /** how many of those entries are subfolders rather than files */
+  /** of those, the subfolders */
   folders: number
-  /** what it declares, summed over its files */
+  /** declared, over its files */
   exports: number
   functions: number
   classes: number
-  /** installed packages it reaches for, counted once each */
+  /** packages it reaches for */
   packages: number
-  /** and which ones, so a service can be traced to the module that talks to it */
+  /** and which, to trace a service to its module */
   installs: string[]
-  /** units it imports, and how many file imports back each one */
+  /** what it imports, weighed by files */
   out: Record<string, number>
   in: Record<string, number>
-  /** of those imports, the ones that are type only and vanish at build time */
+  /** of those, the type only ones */
   types: Record<string, number>
-  /** imports that never leave it, the cohesion a folder earns */
+  /** never leaves it: cohesion */
   internal: number
-  /** how deep its dependencies go, 0 for a unit that imports nothing here */
+  /** how deep its dependencies go */
   level: number
-  /** martin's instability, 0 is depended upon, 1 leans on everything */
+  /** martin's instability: 0 depended upon, 1 leans on everything */
   instability: number
-  /** the tangle it belongs to, -1 when it stands alone */
+  /** its tangle, -1 when alone */
   tangle: number
 }
 
@@ -43,18 +43,18 @@ export interface Cut {
   from: string
   to: string
   imports: number
-  /** how many of them are type only, which is the cheap kind to move */
+  /** of those, the cheap kind to move */
   types: number
-  /** removing this one, on its own, already breaks the loop apart */
+  /** breaks the loop alone */
   alone: boolean
 }
 
 export interface Tangle {
   units: string[]
   edges: number
-  /** whether it is still a loop once type only imports are dropped */
+  /** still a loop without the types */
   runtime: boolean
-  /** one set of edges whose removal opens the loop, not proven minimal */
+  /** one set that opens the loop, not proven minimal */
   cut: Cut[]
 }
 
@@ -62,10 +62,10 @@ export interface Layout {
   units: Unit[]
   levels: number
   tangles: Tangle[]
-  /** edges between units, and the ones no levelling can explain */
+  /** and the ones levelling cannot explain */
   edges: number
   feedback: number
-  /** the folder depth these units were folded at, 0 when the grouping picked its own */
+  /** the depth folded at, 0 when auto picked */
   depth: number
 }
 
@@ -80,13 +80,13 @@ const LOOSE = /^[^/]+\.[cm]?[jt]sx?$/
 export const roleOf = (path: string): Role =>
   TEST.test(path) ? "test" : SUPPORT.test(path) || LOOSE.test(path) ? "support" : "source"
 
-/** the folder a file answers to, or the file itself */
+/** the folder it answers to */
 export const unitOf = (path: string, depth: number): string => {
   const parts = path.split("/")
   return parts.length <= depth ? path : parts.slice(0, depth).join("/")
 }
 
-/** a group named for a folder that has chosen folders below it, so this is the remainder */
+/** the rest of a folder that has chosen folders below it */
 export const LOOSE_FILES = "*"
 
 interface Branch {
@@ -97,11 +97,7 @@ interface Branch {
   files: string[]
 }
 
-/**
- * A cut through the folder tree. A group is a folder, a file belongs to the deepest
- * chosen folder above it, and the heaviest group keeps opening until it is not.
- * Never a single file: that is what the file grain is for.
- */
+/** a file belongs to the deepest chosen folder above it, and the heaviest keeps opening */
 export function balanced(
   graph: Graph,
   { ideal = 10, least = 4, max = 128, share = 6 } = {},
@@ -344,7 +340,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   }
 }
 
-/** whether dropping one import already splits the group, which is checkable rather than claimed */
+/** whether dropping one already splits the group */
 function opens(group: string[], out: (path: string) => string[], edge: [string, string]): boolean {
   const inside = new Set(group)
   const left = scc(group, (path) =>
@@ -353,12 +349,7 @@ function opens(group: string[], out: (path: string) => string[], edge: [string, 
   return left.every((part) => part.length < group.length)
 }
 
-/**
- * Eades, Lin and Smyth: lay the tangle out in the order that fits it best, taking
- * sources from the front and sinks from the back, and the edges still pointing
- * backwards are the ones to cut. Not a proven smallest set, but far smaller than
- * the back edges of a walk, which depend on where the walk happened to start.
- */
+/** Eades, Lin and Smyth: sources front, sinks back, what still points back is the cut */
 function cut(group: string[], out: (path: string) => string[]): [string, string][] {
   const inside = new Set(group)
   const to = new Map(group.map((u) => [u, out(u).filter((v) => inside.has(v) && v !== u)]))

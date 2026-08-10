@@ -14,7 +14,7 @@ import type { Unit } from "../../src/layers.ts"
 import type { Move } from "../../src/history.ts"
 import type { Contributor, Stack } from "../../src/model.ts"
 
-// takes the folder above, saying nothing alone
+// says nothing alone
 const PLAIN = new Set([
   "lib",
   "libs",
@@ -55,7 +55,7 @@ const said = (part: string) =>
     .replace(/[-_.]+/g, " ")
     .trim()
 
-/** src/app/(application) reads as Application, convex/lib as Convex lib, convex/* as Convex modules */
+/** convex/lib reads as Convex lib, convex/* as Convex modules */
 function title(path: string): string {
   const parts = path.split("/")
   const rest = parts.at(-1) === "*"
@@ -111,8 +111,8 @@ export function System({
   const weigh = (lines: number) =>
     Math.min(100, (curve === "log" ? Math.log1p(lines) / Math.log1p(peak) : lines / peak) * 100)
 
-  // added up, removed down, against the biggest either way
-  // drawn modules only, or a hidden folder sets the scale
+  // added up, removed down
+  // drawn modules only
   const swing = Math.max(
     1,
     ...units.flatMap((unit) => {
@@ -206,7 +206,7 @@ export function System({
       <div
         className={cn(
           "border-foreground/40 flex min-w-0 flex-1 flex-col rounded-xl border-2",
-          // nothing outside it on either side, so it keeps the middle rather than the whole width
+          // nothing beside it, so it keeps the middle
           !hosts.length && !services.length && "lg:mx-auto lg:max-w-3xl",
         )}
       >

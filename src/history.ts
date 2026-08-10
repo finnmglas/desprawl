@@ -217,18 +217,15 @@ export const bytesAt = (repo: string, hash: string): number => {
 }
 
 // the true total behind a capped read, slow, ask once
-/**
- * What moved inside a window, per file. The same rename following as the whole
- * history pass, so a file carries its own past rather than appearing twice.
- */
+/** what moved in a window, per file, renames followed */
 export interface Move {
   up: number
   down: number
-  /** commits per contributor index, so a window can name who did the moving */
+  /** commits per contributor, to name who moved it */
   by: Record<number, number>
 }
 
-/** what one person did inside the window, which is not what they have done overall */
+/** what one person did in the window */
 export interface Did {
   commits: number
   insertions: number
@@ -238,7 +235,7 @@ export interface Did {
 
 export interface Moved {
   paths: Record<string, Move>
-  /** by contributor index, for the people panel to answer for the same days */
+  /** by contributor index, for the same days */
   people: Record<number, Did>
 }
 

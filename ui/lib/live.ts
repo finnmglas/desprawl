@@ -49,7 +49,7 @@ async function ask<T>(path: string, fallback: T): Promise<T> {
   return fallback
 }
 
-/** holds a stream open, so the server sees the tab close */
+/** held open, so the server sees the tab close */
 export function attach(): void {
   // a static file has no server to tell, and must never try to reach one
   if (!isLive()) return
@@ -68,19 +68,19 @@ export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
 
 export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/api/timeline", null)
 
-/** built on the first ask and held by the server, or carried by a static page already */
+/** built on the first ask, or carried by a static page */
 export const importGraph = (): Promise<Graph | null> =>
   window.__DESPRAWL_GRAPH__
     ? Promise.resolve(window.__DESPRAWL_GRAPH__)
     : ask<Graph | null>("/api/graph", null)
 
-/** every declaration and what calls it, which takes longer again than the imports */
+/** every declaration and what calls it */
 export const callGraph = (): Promise<Calls | null> =>
   window.__DESPRAWL_CALLS__
     ? Promise.resolve(window.__DESPRAWL_CALLS__)
     : ask<Calls | null>("/api/calls", null)
 
-/** the whole thing as one file, built by the server that is already holding the pieces */
+/** the whole thing as one file, built by the server */
 export async function staticPage(): Promise<string | null> {
   const t = token()
   if (!t) return null
@@ -94,7 +94,7 @@ export async function staticPage(): Promise<string | null> {
   return null
 }
 
-/** what moved per file between two days, who moved it, and what each of them did */
+/** what moved between two days, and who moved it */
 export const movedIn = (from: string, to: string): Promise<Moved> =>
   ask<Moved>(`/api/moved?from=${from}&to=${to}`, { paths: {}, people: {} })
 
