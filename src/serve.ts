@@ -12,7 +12,7 @@ import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
 import type { Graph } from "./graph.ts"
-import { bytesAt, count, detail, page, timeline } from "./history.ts"
+import { bytesAt, count, detail, moved, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
@@ -241,6 +241,16 @@ export function serve(
           imports ||= build(repo)
           called ||= calls(repo, imports)
           return json(called)
+        }
+
+        // what moved between two dates, per file, for painting a window on the picture
+        if (url.pathname === "/api/moved") {
+          const from = url.searchParams.get("from") ?? ""
+          const to = url.searchParams.get("to") ?? ""
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+            return send(400, "bad dates", "text/plain")
+          const names = load(false).contributors.map((c) => (c.email || c.name).toLowerCase())
+          return json(moved(repo, from, to, names))
         }
 
         // the whole thing as one file, using whatever this run has already built

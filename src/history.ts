@@ -217,6 +217,82 @@ export const bytesAt = (repo: string, hash: string): number => {
 }
 
 // the true total behind a capped read, slow, ask once
+/**
+ * What moved inside a window, per file. The same rename following as the whole
+ * history pass, so a file carries its own past rather than appearing twice.
+ */
+export interface Move {
+  up: number
+  down: number
+  /** commits per contributor index, so a window can name who did the moving */
+  by: Record<number, number>
+}
+
+/** what one person did inside the window, which is not what they have done overall */
+export interface Did {
+  commits: number
+  insertions: number
+  deletions: number
+  files: number
+}
+
+export interface Moved {
+  paths: Record<string, Move>
+  /** by contributor index, for the people panel to answer for the same days */
+  people: Record<number, Did>
+}
+
+export function moved(repo: string, from: string, to: string, names: string[] = []): Moved {
+  const log = git(
+    repo,
+    "log",
+    "-M",
+    `--since=${from}`,
+    `--until=${to} 23:59:59`,
+    "--numstat",
+    "--pretty=format:%x01%aN%x1f%aE",
+  )
+  const seat = new Map(names.map((n, i) => [n, i]))
+  const renamed = new Map<string, string>()
+  const now = (path: string): string => {
+    let at = path
+    for (let hops = 0; renamed.has(at) && hops < 20; hops++) at = renamed.get(at)!
+    return at
+  }
+  const found: Record<string, Move> = {}
+  const people: Record<number, Did> = {}
+  const touched = new Map<number, Set<string>>()
+  let who = -1
+  for (const line of log.split("\n")) {
+    if (line.startsWith("\x01")) {
+      const [name, email] = line.slice(1).split("\x1f")
+      who = seat.get((email || name).toLowerCase()) ?? -1
+      if (who >= 0) {
+        const did = (people[who] ??= { commits: 0, insertions: 0, deletions: 0, files: 0 })
+        did.commits++
+      }
+      continue
+    }
+    const [added, deleted, raw] = line.split("\t")
+    if (raw === undefined) continue
+    const path = now(target(raw))
+    if (raw.includes(" => ")) renamed.set(source(raw), path)
+    const at = (found[path] ??= { up: 0, down: 0, by: {} })
+    at.up += Number(added) || 0
+    at.down += Number(deleted) || 0
+    if (who < 0) continue
+    at.by[who] = (at.by[who] ?? 0) + 1
+    const did = people[who]
+    did.insertions += Number(added) || 0
+    did.deletions += Number(deleted) || 0
+    const mine = touched.get(who) ?? new Set<string>()
+    mine.add(path)
+    touched.set(who, mine)
+  }
+  for (const [at, paths] of touched) people[at].files = paths.size
+  return { paths: found, people }
+}
+
 export const count = (repo: string): number =>
   Number(git(repo, "rev-list", "--count", "HEAD").trim()) || 0
 

@@ -10,13 +10,13 @@ import { Card, CardContent } from "../components/card.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { CURSOR, ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart.tsx"
 import { Tabs } from "../components/tabs.tsx"
+import { Working } from "../components/working.tsx"
 import { delimit, named } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
-import { GRAINS, defaultGrain, endsAt, num, startsAt } from "../lib/format.ts"
+import { GRAINS, defaultGrain, endsAt, num, stamp, startsAt } from "../lib/format.ts"
 
-const day = (at: Date) => at.toISOString().slice(0, 10)
-import { sizeCurve, type Sample } from "../lib/live.ts"
+import { isLive, sizeCurve, type Sample } from "../lib/live.ts"
 import { GROUPS, SERIES, expand, rows } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Grain } from "../lib/format.ts"
@@ -27,10 +27,13 @@ export function OverTime({
   stats,
   all,
   onCommits,
+  onZoom,
 }: {
   stats: Stats
   all: Timeline | null
   onCommits: (from: string, to: string) => void
+  /** the window on screen, so another panel can answer for the same days */
+  onZoom?: (from: string, to: string) => void
 }) {
   const { curve } = useDisplay()
   const total = all?.total ?? stats.commits
@@ -68,6 +71,10 @@ export function OverTime({
   // the zoom is kept as an instant, not as bucket labels, so changing the granularity
   // keeps the window you chose instead of throwing it away
   const [zoom, setZoom] = useState<[number, number] | null>(null)
+  useEffect(() => {
+    // iso, not the reading format: a german locale would hand over 7.7.2025
+    onZoom?.(zoom ? stamp(new Date(zoom[0])) : "", zoom ? stamp(new Date(zoom[1])) : "")
+  }, [zoom])
   const [drag, setDrag] = useState<[string, string] | null>(null)
 
   const shown = useMemo(() => {
@@ -151,11 +158,12 @@ export function OverTime({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onCommits(day(new Date(zoom[0])), day(new Date(zoom[1])))}
+              onClick={() => onCommits(stamp(new Date(zoom[0])), stamp(new Date(zoom[1])))}
             >
               view commits
             </Button>
           )}
+          <Working on={sizing} />
           <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />
           <CopyButton
             text={records}
@@ -226,7 +234,8 @@ export function OverTime({
 
         {/* the legend is the control */}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {GROUPS.map((group) => {
+          {/* the size curve is eighty tree walks on the repo, which a saved page cannot do */}
+          {GROUPS.filter((group) => group.key !== "size" || isLive()).map((group) => {
             const on = picked.includes(group.key)
             return (
               <button

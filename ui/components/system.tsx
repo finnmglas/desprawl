@@ -7,10 +7,11 @@ import { Tip } from "./tip.tsx"
 import { num, plural } from "../lib/format.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { MEANS, isClient, isHost } from "../lib/outside.ts"
-import { hands } from "../lib/people.ts"
+import { hands, handsOf } from "../lib/people.ts"
 import { shapeOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Unit } from "../../src/layers.ts"
+import type { Move } from "../../src/history.ts"
 import type { Contributor, Stack } from "../../src/model.ts"
 
 // on its own each of these names nothing, so it takes the folder above with it
@@ -105,6 +106,7 @@ export function System({
   stack,
   people,
   worked,
+  moved,
   faces,
   onPick,
 }: {
@@ -115,6 +117,8 @@ export function System({
   people: Contributor[]
   /** commits per contributor index, by folder */
   worked: Map<string, Record<number, number>>
+  /** what moved inside a chosen window, and who moved it, by group */
+  moved?: Map<string, Move>
   faces: Record<string, string>
   onPick?: (path: string) => void
 }) {
@@ -122,13 +126,27 @@ export function System({
   const peak = Math.max(1, ...units.map((u) => u.lines))
   const weigh = (lines: number) =>
     Math.min(100, (curve === "log" ? Math.log1p(lines) / Math.log1p(peak) : lines / peak) * 100)
+
+  // in a window the bar stops saying how big a module is: added grows up from the
+  // middle and removed grows down, both against the biggest either way anywhere here
+  // measured against the drawn modules only: a support folder nobody sees here would
+  // otherwise set the scale and flatten everything that is on screen
+  const swing = Math.max(
+    1,
+    ...units.flatMap((unit) => {
+      const one = moved?.get(unit.path)
+      return one ? [one.up, one.down] : []
+    }),
+  )
   const read = (unit: Unit) =>
     shapeOf(
       unit.internal,
       Object.values(unit.out).reduce((sum, n) => sum + n, 0),
     )
 
-  const crew = (unit: Unit) => hands(unit.path, worked, people)
+  // in a window, whoever did the moving then, rather than whoever owns it overall
+  const crew = (unit: Unit) =>
+    moved ? handsOf(moved.get(unit.path)?.by, people) : hands(unit.path, worked, people)
 
   const rows = BANDS.map((band) => ({
     ...band,
@@ -288,25 +306,47 @@ export function System({
                   >
                     <button
                       onClick={() => onPick?.(unit.path)}
-                      style={{
-                        backgroundImage: `linear-gradient(to top, color-mix(in oklch, var(--chart-2) 20%, transparent) ${weigh(unit.lines)}%, transparent ${weigh(unit.lines)}%)`,
-                      }}
+                      style={
+                        moved
+                          ? undefined
+                          : {
+                              backgroundImage: `linear-gradient(to top, color-mix(in oklch, var(--chart-2) 20%, transparent) ${weigh(unit.lines)}%, transparent ${weigh(unit.lines)}%)`,
+                            }
+                      }
                       className={cn(
                         // the card tone on dark, where the page background reads as a hole
-                        "bg-background hover:border-ring dark:bg-card flex w-full min-w-0 cursor-pointer flex-col rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                        "bg-background hover:border-ring dark:bg-card relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-md border px-2.5 py-1.5 text-left transition-colors",
                         unit.tangle >= 0 && "border-amber-500/60",
                       )}
                     >
-                      <span className="flex items-center gap-1">
+                      {moved && (
+                        <>
+                          <span
+                            aria-hidden
+                            style={{
+                              height: `${Math.min(50, ((moved.get(unit.path)?.up ?? 0) / swing) * 50)}%`,
+                            }}
+                            className="pointer-events-none absolute inset-x-0 bottom-1/2 bg-emerald-500/25"
+                          />
+                          <span
+                            aria-hidden
+                            style={{
+                              height: `${Math.min(50, ((moved.get(unit.path)?.down ?? 0) / swing) * 50)}%`,
+                            }}
+                            className="pointer-events-none absolute inset-x-0 top-1/2 bg-red-500/25"
+                          />
+                        </>
+                      )}
+                      <span className="relative flex items-center gap-1">
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">
                           {title(unit.path)}
                         </span>
                         {crew(unit)[0] && <Face who={crew(unit)[0].who} faces={faces} />}
                       </span>
-                      <span className="text-muted-foreground truncate font-mono text-[10px]">
+                      <span className="text-muted-foreground relative truncate font-mono text-[10px]">
                         {unit.path}
                       </span>
-                      <span className="text-muted-foreground text-[10px] tabular-nums">
+                      <span className="text-muted-foreground relative text-[10px] tabular-nums">
                         {num(unit.files)} files · {num(unit.lines)} lines
                       </span>
                     </button>

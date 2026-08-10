@@ -18,6 +18,9 @@ export const num = (n: number) => (abbreviate ? human(n, 3) : n.toLocaleString(l
 export const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ? "" : "s"}`
 
 // tables sort on raw iso, this is display only
+/** the date a filter or an api compares, unlike day() below, which is for reading */
+export const stamp = (at: Date): string => at.toISOString().slice(0, 10)
+
 export const day = (iso: string) => {
   const date = iso.slice(0, 10)
   if (!date) return "-"

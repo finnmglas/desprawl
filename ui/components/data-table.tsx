@@ -20,7 +20,7 @@ import { cn } from "../lib/ui.ts"
 export type { Column }
 
 export interface DataTableProps<T> {
-  title: string
+  title: React.ReactNode
   hint?: string
   columns: Column<T>[]
   rows: T[]
@@ -37,6 +37,8 @@ export interface DataTableProps<T> {
   fold?: number
   /** the order the reader chose, for anything drawing the same rows elsewhere */
   onSort?: (sort: Sort | null) => void
+  /** what an export is called, when the title is not plain words */
+  file?: string
 }
 
 export function DataTable<T>({
@@ -51,6 +53,7 @@ export function DataTable<T>({
   className,
   total,
   fold,
+  file,
   onSort,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
@@ -110,7 +113,10 @@ export function DataTable<T>({
     columns.map((c) => c.label),
     ...sorted.map((row) => columns.map((c) => scaled(c, row))),
   ]
-  const slug = title.toLowerCase().replace(/\W+/g, "-")
+  // a title can carry a mark beside it, so the file name comes from its words only
+  const slug = (typeof title === "string" ? title : (file ?? "table"))
+    .toLowerCase()
+    .replace(/\W+/g, "-")
 
   return (
     <Card className={className}>

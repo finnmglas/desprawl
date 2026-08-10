@@ -10,15 +10,22 @@ export const DETAIL = 200
 
 export function CommitDetail({
   commit,
+  live,
   onFile,
 }: {
   commit: Detail | null
+  /** a saved page carries the log but not the diffs, and should say so rather than spin */
+  live?: boolean
   onFile: (path: string) => void
 }) {
   return (
     <div style={{ height: DETAIL }} className="bg-muted/30 overflow-auto border-y px-3 py-2">
       {!commit ? (
-        <span className="text-muted-foreground text-xs">loading…</span>
+        <span className="text-muted-foreground text-xs">
+          {live
+            ? "loading…"
+            : "A saved page carries the log, not the diffs. Run desprawl on the repo to open a commit."}
+        </span>
       ) : (
         <div className="flex flex-col gap-2">
           <div className="text-muted-foreground text-xs">

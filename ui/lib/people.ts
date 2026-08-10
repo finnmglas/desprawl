@@ -22,12 +22,14 @@ export function worked(tree: Node): Map<string, Record<number, number>> {
 }
 
 /** who has committed there, most first. A remainder group answers for its folder */
-export function hands(
+export const hands = (
   at: string,
   where: Map<string, Record<number, number>>,
   people: Contributor[],
-): Hand[] {
-  const by = where.get(at.replace(/\/?\*$/, ""))
+): Hand[] => handsOf(where.get(at.replace(/\/?\*$/, "")), people)
+
+/** the same, from a tally already in hand */
+export function handsOf(by: Record<number, number> | undefined, people: Contributor[]): Hand[] {
   const found = Object.entries(by ?? {})
     .map(([seat, commits]) => ({ who: people[Number(seat)], commits }))
     .filter((one) => one.who)

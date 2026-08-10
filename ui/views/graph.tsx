@@ -14,6 +14,7 @@ import { CommitDetail, DETAIL } from "../components/commit-detail.tsx"
 import { Moved } from "../components/moved.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tip } from "../components/tip.tsx"
+import { Working } from "../components/working.tsx"
 import { toast } from "../components/toast.tsx"
 import { copy, named } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
@@ -199,7 +200,12 @@ export function Graph({
       </div>
       <Card>
         <CardHead
-          title="History"
+          title={
+            <span className="flex items-center gap-1">
+              History
+              <Working on={loading} />
+            </span>
+          }
           hint={
             <>
               {shown.length !== stats.log.length && `${shown.length} of `}
@@ -381,6 +387,7 @@ export function Graph({
                   {open === commit.hash && (
                     <CommitDetail
                       commit={detail}
+                      live={isLive()}
                       onFile={(path) => onPath(path.split("/").slice(0, -1))}
                     />
                   )}

@@ -4,7 +4,7 @@
 import { toast } from "./toast.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Graph } from "../../src/graph.ts"
-import type { Detail, Timeline } from "../../src/history.ts"
+import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
 export const token = (): string | null => new URLSearchParams(location.search).get("t")
@@ -93,6 +93,10 @@ export async function staticPage(): Promise<string | null> {
   toast("Could not build the file", "the server did not answer", "error")
   return null
 }
+
+/** what moved per file between two days, who moved it, and what each of them did */
+export const movedIn = (from: string, to: string): Promise<Moved> =>
+  ask<Moved>(`/api/moved?from=${from}&to=${to}`, { paths: {}, people: {} })
 
 export interface Sample {
   date: string
