@@ -21,9 +21,8 @@ import { page as onePage, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
-// long enough for a reload, a sleeping laptop or a network blip to reconnect,
-// short enough that closing the tab feels like it ended the command
-const GRACE = 15_000
+// long enough for a reload to reconnect, short enough that closing the tab ends the command
+const GRACE = 2_000
 
 // fixed port, one origin, so the browser keeps its storage
 const PORT = 7423
@@ -70,10 +69,8 @@ export function serve(
   cap?: number,
   keep = false,
   port = PORT,
-  /** the page to hand out, given rather than read when a caller has one */
   viewer?: string,
 ): Promise<string> {
-  // closing the last tab ends the run
   const tabs = new Set<ServerResponse>()
   let farewell: NodeJS.Timeout | undefined
 
@@ -154,9 +151,7 @@ export function serve(
           tabs.delete(res)
           if (keep || tabs.size) return
           farewell = setTimeout(() => {
-            console.log(
-              "\n\nLast tab closed, so desprawl stopped. Pass --keep to leave it running.\n",
-            )
+            console.log("\n\nTab closed, so desprawl stopped. Pass --keep to leave it running.\n")
             process.exit(0)
           }, GRACE)
         })

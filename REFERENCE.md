@@ -75,7 +75,7 @@ desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--comm
 | `--commits N` | commits read from the log, default 10,000               |
 | `--digits N`  | digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
 | `--static`    | write standalone file rather than server                |
-| `--keep`      | keep server after the last tab closes                   |
+| `--keep`      | keep server after the tab closes                        |
 | `--raw`       | exact numbers instead of scaled ones                    |
 | `--json`      | machine readable, numbers exact                         |
 

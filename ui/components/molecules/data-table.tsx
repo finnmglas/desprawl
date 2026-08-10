@@ -74,6 +74,18 @@ export function DataTable<T>({
     return found
   }, [columns, rows])
 
+  // num means the column is right aligned, not that it holds numbers: a date is a string
+  // sitting in one, and a string column adds up to nothing without anything being wrong
+  const counted = useMemo(
+    () =>
+      new Set(
+        columns
+          .filter((col) => col.num && rows.some((row) => typeof col.get(row) === "number"))
+          .map((col) => col.key),
+      ),
+    [columns, rows],
+  )
+
   const share = (col: Column<T>) => shares(col, scale)
   const scaled = (col: Column<T>, row: T) => effective(col, row, scale, sums)
 
@@ -158,7 +170,7 @@ export function DataTable<T>({
                   </Tip>
                   {/* a column of nothing but zeros is usually a number that could not be
                       read, not a column of real zeros, and either way it says nothing */}
-                  {col.num && rows.length > 0 && sums[col.key] === 0 && (
+                  {counted.has(col.key) && sums[col.key] === 0 && (
                     <Tip
                       text="every row reads 0 here, so either there is nothing to count or the number could not be read at all"
                       side="bottom"
