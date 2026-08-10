@@ -45,12 +45,22 @@ export interface ExplorerProps {
   setPath: (path: string[]) => void
   lang: string
   setLang: (lang: string) => void
+  /** a line kind shades the rows the same way a language does, and only one at a time */
+  kind: string
+  setKind: (kind: string) => void
 }
 
-export function Explorer({ stats, onTab, path, setPath, lang, setLang }: ExplorerProps) {
+export function Explorer({
+  stats,
+  onTab,
+  path,
+  setPath,
+  lang,
+  setLang,
+  kind,
+  setKind,
+}: ExplorerProps) {
   const [filter, setFilter] = useState("")
-  // a line kind shades the rows the same way a language does, and only one at a time
-  const [kind, setKind] = useState("")
   // a served tree is directories only, files arrive on open
   const [fetched, setFetched] = useState<Record<string, Node[]>>({})
 
@@ -154,9 +164,11 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      {/* a grid cell is as wide as its content unless told otherwise, and a wide table
+          would push the page sideways rather than scroll inside its own card */}
+      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
         <DataTable
-          className="lg:col-span-2"
+          className="min-w-0 lg:col-span-2"
           title={path.length ? path.join("/") : "/"}
           hint={
             here.leaves && !fetched[key]
@@ -194,7 +206,7 @@ export function Explorer({ stats, onTab, path, setPath, lang, setLang }: Explore
           />
         </DataTable>
 
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
           <Distribution
             title={path.length ? `${path.join("/")} languages` : "Languages"}
             langs={here.langs}

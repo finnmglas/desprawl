@@ -60,10 +60,11 @@ function App({
   reload?: () => void
 }) {
   // view state lives in the url, so back works and a link carries the place
-  const [{ tab, path, lang, from, to }, go] = useView({
+  const [{ tab, path, lang, kind, from, to }, go] = useView({
     tab: TABS[0],
     path: [],
     lang: "",
+    kind: "",
     from: "",
     to: "",
   })
@@ -87,8 +88,14 @@ function App({
   }, [stats.repo])
 
   const explore = (picked: string) => {
-    go({ lang: picked, path: [], tab: "Files" })
+    go({ lang: picked, kind: "", path: [], tab: "Files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
+  }
+
+  // a kpi opens the tab that answers it, shading the tree by the very number that was clicked
+  const opened = (next: string, shade?: string) => {
+    go(next === "Files" ? { tab: next, kind: shade ?? "", lang: "" } : { tab: next })
+    if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
 
   return (
@@ -160,7 +167,7 @@ function App({
             metadata={prefs.metadata}
             onMetadata={(open) => change({ metadata: open })}
             onLang={explore}
-            onTab={(next) => go({ tab: next })}
+            onTab={opened}
             onCommits={(a, b) => {
               go({ tab: "History", from: a, to: b })
               toast("Opened in History", `${a} to ${b}`)
@@ -184,7 +191,9 @@ function App({
             path={path}
             setPath={(next) => go({ path: next })}
             lang={lang}
-            setLang={(next) => go({ lang: next })}
+            setLang={(next) => go({ lang: next, kind: "" })}
+            kind={kind}
+            setKind={(next) => go({ kind: next, lang: "" })}
           />
         )}
       </div>

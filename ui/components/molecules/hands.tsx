@@ -4,7 +4,15 @@
 import { Avatar, profileOf } from "../atoms/avatar.tsx"
 import type { Hand } from "../../lib/people.ts"
 
-export function Face({ of, faces }: { of: Hand[]; faces: Record<string, string> }) {
+export function Face({
+  of,
+  faces,
+  className,
+}: {
+  of: Hand[]
+  faces: Record<string, string>
+  className?: string
+}) {
   const [main] = of
   if (!main) return null
   return (
@@ -19,6 +27,7 @@ export function Face({ of, faces }: { of: Hand[]; faces: Record<string, string> 
         name={main.who.name}
         email={main.who.email}
         found={faces[main.who.email.toLowerCase()]}
+        className={className}
       />
     </a>
   )

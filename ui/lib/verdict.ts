@@ -152,10 +152,14 @@ export function shapeOf(
   /** how many groups it leans on, since one dependency repeated is not breadth */
   reach = 2,
 ): { label: string; band: "entry" | "middle" | "base"; tone: string; why: string } {
+  // a hue per shape, and a star is its neighbour: near misses read as near, never as the same
   const MODULE = "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
-  const NEAR = "border-sky-500/50 text-sky-700 dark:text-sky-300"
-  const ENTRY = "border-violet-500/50 text-violet-700 dark:text-violet-300"
+  const NEAR = "border-lime-500/60 text-lime-700 dark:text-lime-300"
+  const FLOOR = "border-sky-500/50 text-sky-700 dark:text-sky-300"
+  const EVEN = "border-cyan-500/50 text-cyan-700 dark:text-cyan-300"
   const MIDDLE = "border-amber-500/60 text-amber-700 dark:text-amber-300"
+  const ENTRY = "border-violet-500/50 text-violet-700 dark:text-violet-300"
+  const TOP = "border-fuchsia-500/50 text-fuchsia-700 dark:text-fuchsia-300"
   if (!inside && !out)
     return {
       label: "Module",
@@ -188,7 +192,7 @@ export function shapeOf(
     return {
       label: "Shared",
       band: "base",
-      tone: MODULE,
+      tone: FLOOR,
       why: `${Math.round(arriving)}% of its edges arrive, so it is what the rest stands on`,
     }
   // half of it is its own and it leans on one group: a leaf hanging off the tree, and
@@ -211,7 +215,7 @@ export function shapeOf(
     return {
       label: "Entrypoint*",
       band: "entry",
-      tone: ENTRY,
+      tone: TOP,
       why: `${Math.round(arriving)}% of its edges arrive, the rest leave, so it mostly composes`,
     }
   if (arriving < 45)
@@ -224,7 +228,7 @@ export function shapeOf(
   return {
     label: "Shared*",
     band: "middle",
-    tone: NEAR,
+    tone: EVEN,
     why: `${Math.round(arriving)}% of its edges arrive, which is even. Nearly a foundation, and it would take little to make it one`,
   }
 }

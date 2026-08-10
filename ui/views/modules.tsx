@@ -613,7 +613,8 @@ const Balance = ({ unit }: { unit: Unit }) => {
       <div className="bg-muted flex h-5 w-40 overflow-hidden rounded-sm text-[10px] leading-5 font-medium">
         {unit.internal > 0 && (
           <div
-            className="h-full overflow-hidden bg-sky-500 px-1.5 text-left whitespace-nowrap text-white"
+            // full saturation glares on a dark page, the same way a brand chip does
+            className="h-full overflow-hidden bg-sky-500 px-1.5 text-left whitespace-nowrap text-white dark:bg-[color-mix(in_oklab,var(--color-sky-500),black_28%)] dark:text-sky-50"
             style={{ width: `${share}%` }}
           >
             {share > 22 ? `${label}% in` : share > 9 ? `${label}%` : ""}
@@ -621,7 +622,7 @@ const Balance = ({ unit }: { unit: Unit }) => {
         )}
         {out > 0 && (
           <div
-            className="h-full overflow-hidden bg-amber-500 px-1.5 text-right whitespace-nowrap text-amber-950"
+            className="h-full overflow-hidden bg-amber-500 px-1.5 text-right whitespace-nowrap text-amber-950 dark:bg-[color-mix(in_oklab,var(--color-amber-500),black_28%)] dark:text-amber-50"
             style={{ width: `${100 - share}%` }}
           >
             {100 - share > 22 ? `${num(out)} out` : 100 - share > 9 ? num(out) : ""}

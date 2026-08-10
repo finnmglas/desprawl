@@ -2,7 +2,16 @@
 // goal: the chart, and the controls that shape it
 
 import { useEffect, useMemo, useState } from "react"
-import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, XAxis, YAxis } from "recharts"
+import {
+  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceArea,
+  XAxis,
+  YAxis,
+} from "recharts"
 import { Button } from "../components/atoms/button.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { DownloadButton } from "../components/molecules/download-button.tsx"
@@ -46,8 +55,8 @@ export function OverTime({
   const [grained, setGrained] = useState(false)
   const [sizes, setSizes] = useState<Sample[]>([])
   const [sizing, setSizing] = useState(false)
-  // the pair that shows how a repo grew
-  const [picked, setPicked] = useState<string[]>(["changes", "lines"])
+  // how a repo grew, and who was there while it did
+  const [picked, setPicked] = useState<string[]>(["changes", "lines", "devs"])
   const series = expand(picked)
   // the old default is too fine once the span is known
   useEffect(() => {
@@ -199,9 +208,21 @@ export function OverTime({
               cursor={CURSOR}
               content={<ChartTooltipContent config={config} curve={curve} />}
             />
-            {/* moved lines as bars, the rest as areas */}
+            {/* moved lines as bars, a headcount as a bare line, the rest as areas */}
             {series.map((key) =>
-              SERIES[key].group === "changes" || sparse ? (
+              SERIES[key].heads && !sparse ? (
+                <Line
+                  key={key}
+                  dataKey={key}
+                  type="monotone"
+                  stroke={SERIES[key].color}
+                  strokeWidth={2}
+                  strokeDasharray="3 3"
+                  dot={false}
+                  activeDot={{ r: 3, strokeWidth: 0 }}
+                  isAnimationActive={false}
+                />
+              ) : SERIES[key].group === "changes" || sparse ? (
                 <Bar
                   key={key}
                   dataKey={key}

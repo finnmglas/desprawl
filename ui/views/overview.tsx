@@ -80,7 +80,8 @@ export function Overview({
 }: {
   stats: Stats
   onLang: (lang: string) => void
-  onTab: (tab: string) => void
+  /** a shade names the line kind the files tree should paint with, when the card is about one */
+  onTab: (tab: string, shade?: string) => void
   onCommits: (from: string, to: string) => void
   faces: Record<string, string>
   metadata: boolean
@@ -160,6 +161,7 @@ export function Overview({
             sub: `${num(stats.files)} files${stats.stack.primary ? `, primarily ${stats.stack.primary}` : ""}`,
             verdict: sizeOf(stats.code),
             to: "Files",
+            shade: "Code",
           },
           {
             label: "Comments",
@@ -167,6 +169,7 @@ export function Overview({
             sub: `${pct(stats.comment, source)} of source`,
             verdict: commentsOf(stats.comment, source),
             to: "Files",
+            shade: "Comments",
           },
           {
             label: "Tokens",
@@ -184,8 +187,8 @@ export function Overview({
             verdict: historyOf(total),
             to: "History",
           },
-        ].map((card) => (
-          <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to)} />
+        ].map(({ shade, ...card }) => (
+          <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to, shade)} />
         ))}
       </div>
 

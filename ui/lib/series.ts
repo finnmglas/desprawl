@@ -17,6 +17,8 @@ export interface Spec {
   group: string
   /** Drawn below the axis. */
   down?: boolean
+  /** a headcount is not a volume, so it is a line with nothing filled under it */
+  heads?: boolean
 }
 
 // one definition, the tables use these too
@@ -63,9 +65,11 @@ export const SERIES: Record<string, Spec> = {
   },
   devs: {
     label: "devs",
-    color: "#f97316",
+    // grey, since orange beside the red of removed lines reads as another warning
+    color: "var(--muted-foreground)",
     group: "devs",
     how: "distinct",
+    heads: true,
     about: "different people who committed, counted once per bucket",
   },
 }

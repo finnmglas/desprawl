@@ -8,34 +8,12 @@ import { num, plural } from "../../lib/format.ts"
 import { useDisplay } from "../../lib/display.tsx"
 import { MEANS, isClient, isHost } from "../../lib/outside.ts"
 import { hands, handsOf } from "../../lib/people.ts"
+import { isId, namesOf } from "../../lib/naming.ts"
 import { shapeOf } from "../../lib/verdict.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Unit } from "../../../src/layers.ts"
 import type { Move } from "../../../src/history.ts"
 import type { Contributor, Stack } from "../../../src/model.ts"
-
-// says nothing alone
-const PLAIN = new Set([
-  "lib",
-  "libs",
-  "utils",
-  "util",
-  "helpers",
-  "common",
-  "core",
-  "shared",
-  "src",
-  "app",
-  "components",
-  "hooks",
-  "types",
-  "api",
-  "ui",
-  "config",
-  "internal",
-  "modules",
-  "packages",
-])
 
 // same width each: six go 3+3, not 4+2
 const columns = (count: number, widest: number): number => {
@@ -47,23 +25,6 @@ const columns = (count: number, widest: number): number => {
     if (cost < score) [score, best] = [cost, wide]
   }
   return best
-}
-
-const said = (part: string) =>
-  part
-    .replace(/^[([]|[)\]]$/g, "")
-    .replace(/[-_.]+/g, " ")
-    .trim()
-
-/** convex/lib reads as Convex lib, convex/* as Convex modules */
-function title(path: string): string {
-  const parts = path.split("/")
-  const rest = parts.at(-1) === "*"
-  const own = said((rest ? parts.at(-2) : parts.at(-1)) ?? path)
-  const above = said(parts.at(rest ? -3 : -2) ?? "")
-  const whole = PLAIN.has(own.toLowerCase()) && above ? `${above} ${own}` : own
-  const named = whole.charAt(0).toUpperCase() + whole.slice(1)
-  return rest ? `${named} modules` : named
 }
 
 const BANDS = [
@@ -128,12 +89,16 @@ export function System({
   const crew = (unit: Unit) =>
     moved ? handsOf(moved.get(unit.path)?.by, people) : hands(unit.path, worked, people)
 
+  const called = namesOf(units)
   const rows = BANDS.map((band) => ({
     ...band,
-    // deepest first
+    // deepest first, and a folder named after a uuid says nothing, so it goes last
     held: units
       .filter((u) => read(u).band === band.key)
-      .sort((a, b) => b.level - a.level || b.lines - a.lines),
+      .sort(
+        (a, b) =>
+          Number(isId(a.path)) - Number(isId(b.path)) || b.level - a.level || b.lines - a.lines,
+      ),
   })).filter((row) => row.held.length)
 
   const named = [...new Set([...stack.hosts, ...stack.apis, ...stack.connects])].map((label) => ({
@@ -147,7 +112,7 @@ export function System({
   const clients = named.filter((s) => isClient(s.label))
 
   const Side = ({ side, of }: { side: "left" | "right"; of: typeof named }) => (
-    <div className="hidden shrink-0 flex-col sm:flex sm:w-36 lg:w-60">
+    <div className="hidden shrink-0 flex-col sm:flex sm:w-32 lg:w-44">
       <div className="flex flex-1 flex-col justify-center gap-3">
         {of.map((one) => {
           const means = MEANS[one.label]
@@ -209,7 +174,8 @@ export function System({
         )}
       >
         <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
-          <span className="text-sm font-medium">{name}</span>
+          {/* the wall is the repo, so its name outranks the chips beside it */}
+          <span className="text-base font-semibold">{name}</span>
           {stack.frameworks.slice(0, 4).map((name) => (
             <Chip key={name} label={name} from={stack.from[name]} />
           ))}
@@ -260,6 +226,8 @@ export function System({
                     className="min-w-0"
                     text={
                       <>
+                        <span className="font-medium">{called.get(unit.path)}</span>
+                        <br />
                         <span className="font-mono">{unit.path}</span>
                         <br />
                         {shape.label} · {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
@@ -275,13 +243,14 @@ export function System({
                         moved
                           ? undefined
                           : {
-                              backgroundImage: `linear-gradient(to top, color-mix(in oklch, var(--chart-2) 20%, transparent) ${weigh(unit.lines)}%, transparent ${weigh(unit.lines)}%)`,
+                              backgroundImage: `linear-gradient(to top, color-mix(in oklch, var(--chart-2) var(--wash), transparent) ${weigh(unit.lines)}%, transparent ${weigh(unit.lines)}%)`,
                             }
                       }
                       className={cn(
                         // the card tone on dark, where the page background reads as a hole
+                        // a loop is named in the tip already, so it stays out of a picture
+                        // meant to be read at a glance
                         "bg-background hover:border-ring dark:bg-card relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-md border px-2.5 py-1.5 text-left transition-colors",
-                        unit.tangle >= 0 && "border-amber-500/60",
                       )}
                     >
                       {moved && (
@@ -302,17 +271,17 @@ export function System({
                           />
                         </>
                       )}
-                      <span className="relative flex items-center gap-1">
-                        <span className="min-w-0 flex-1 truncate text-xs font-medium">
-                          {title(unit.path)}
-                        </span>
-                        <Face of={crew(unit)} faces={faces} />
+                      {/* the corner, as far from the top as from the right */}
+                      <span className="absolute top-1.5 right-1.5">
+                        <Face of={crew(unit)} faces={faces} className="size-5" />
                       </span>
-                      <span className="text-muted-foreground relative truncate font-mono text-[10px]">
-                        {unit.path}
+                      <span className="relative truncate pr-6 text-xs font-medium">
+                        {called.get(unit.path)}
                       </span>
+                      {/* the path is in the tip and one click away, so the card keeps the name */}
+                      {/* files and lines say the same thing, so only the one anyone reasons in */}
                       <span className="text-muted-foreground relative text-[10px] tabular-nums">
-                        {num(unit.files)} files · {num(unit.lines)} lines
+                        {num(unit.lines)} lines
                       </span>
                     </button>
                   </Tip>

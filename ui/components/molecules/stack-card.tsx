@@ -219,7 +219,11 @@ export function StackCard({
   )
 
   const buttons = (
-    <div className="ml-auto flex items-center gap-1">
+    // the negative margin keeps the row's height: this is padding to miss into, not spacing
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="-m-2 ml-auto flex cursor-default items-center gap-1 p-2"
+    >
       <CopyButton text={asText} message="Metadata copied" note="Every detected fact, as text" />
       <DownloadButton
         name={named("project-metadata.json")}
@@ -230,15 +234,16 @@ export function StackCard({
   )
 
   const head = folded ? (
-    <div className="relative flex flex-row flex-wrap items-center gap-2">
+    // the whole row opens it, since a caret is a small target and the rest of the row does nothing
+    <div
+      onClick={() => setOpen(!open)}
+      className="relative flex cursor-pointer flex-row flex-wrap items-center gap-2"
+    >
       <div className="flex min-w-0 flex-col gap-0.5">
-        <button
-          onClick={() => setOpen(!open)}
-          className="flex cursor-pointer items-center gap-1 text-sm leading-none"
-        >
+        <span className="flex items-center gap-1 text-sm leading-none">
           Project metadata
           <Caret className={cn("transition-transform", !open && "-rotate-90")} />
-        </button>
+        </span>
         <span className="text-muted-foreground text-xs">{identity}</span>
       </div>
       {badges}

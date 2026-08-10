@@ -9,6 +9,7 @@ import { place } from "../ui/lib/lanes.ts"
 import { effective, shares } from "../ui/lib/scale.ts"
 import { bucket, defaultGrain } from "../ui/lib/format.ts"
 import { expand, rows } from "../ui/lib/series.ts"
+import { isId, nameOf, namesOf } from "../ui/lib/naming.ts"
 import { shapeOf } from "../ui/lib/verdict.ts"
 import { repo } from "./repo.ts"
 
@@ -120,4 +121,41 @@ test("a group is placed by which way its edges lean, not by how often one is rep
     "a route folder keeps nothing inside, so it stays a top",
   )
   assert.equal(shape(24, 7, 1963, 1), "Shared", "what everything stands on is never a leaf")
+})
+
+test("a group is named the way a person would say it, not the way it is typed", () => {
+  const name = (path: string, folders = 0) => nameOf(path, folders)
+  assert.equal(name("src/lib"), "Source library", "an abbreviation is read out in full")
+  assert.equal(name("convex/lib"), "Convex library", "a word saying nothing takes the one above")
+  assert.equal(name("ui/lib"), "UI library", "an acronym stays one")
+  assert.equal(name("convex/grading"), "Grading", "a word that stands alone is left alone")
+  assert.equal(name("src/app/(application)/*", 6), "Application [modules]", "a group opens further")
+  assert.equal(name("src/app/(application)/courses/*", 0), "Courses [files]", "this one does not")
+  assert.equal(name("*"), "Repo root [files]")
+})
+
+test("a route parameter is named for what it is a detail of", () => {
+  assert.equal(nameOf("src/app/courses/[course_id]"), "Course [detail]", "trailing id drops")
+  assert.equal(nameOf("src/pages/[owner]/*"), "Owner [detail]")
+  assert.equal(nameOf("modname/[slug]"), "Modname [detail]", "a slug names only its parent")
+  assert.equal(nameOf("blog/[...rest]"), "Blog [detail]", "and so does a catch all")
+})
+
+test("a folder named after a uuid is left as written, and sorts last", () => {
+  assert.equal(isId("b7e2c4a9-1f6d-8a3e-2026q2"), true)
+  assert.equal(nameOf("src/app/(preview)/b7e2c4a9-1f6d-8a3e-2026q2"), "b7e2c4a9-1f6d-8a3e-2026q2")
+  assert.equal(isId("exercise-rework-specification"), false, "three words are not a hash")
+  assert.equal(isId("lucide-animated"), false)
+  assert.equal(isId("professor-exercises"), false)
+})
+
+test("two groups called the same thing both take their parent", () => {
+  const named = namesOf([
+    { path: "ui/components/data", folders: 0 },
+    { path: "ui/lib/data", folders: 0 },
+    { path: "ui/views", folders: 0 },
+  ])
+  assert.equal(named.get("ui/components/data"), "Components data")
+  assert.equal(named.get("ui/lib/data"), "Library data")
+  assert.equal(named.get("ui/views"), "Views", "what does not clash stays short")
 })
