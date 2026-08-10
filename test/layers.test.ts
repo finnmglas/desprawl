@@ -233,3 +233,18 @@ test("an import through a barrel costs a path, not a refactor", () => {
   const edge = loop.cut.find((c) => c.from === "x" && c.to === "y")!
   assert.equal(edge.glue, 1, "the import lands on the barrel, so naming the file removes it")
 })
+
+test("a group says whether one file is carrying its shape", () => {
+  const files: Record<string, string> = {
+    // everything outside imports one file here, the rest of the folder imports outward
+    "hub/everyone.ts": "export const shared = 1\n",
+    "lib/thing.ts": "export const thing = 1\n",
+  }
+  for (let i = 0; i < 6; i++) files[`hub/top${i}.ts`] = 'import "../lib/thing"\n'
+  for (let i = 0; i < 12; i++) files[`user/u${i}.ts`] = 'import "../hub/everyone"\n'
+  const layout = fold(build(repo(files)), 1)
+  const hub = at(layout, "hub")
+  assert.equal(hub.loudest, "hub/everyone.ts", "the file the most imports arrive at")
+  assert.equal(hub.without.into, 0, "and without it nothing arrives at the group at all")
+  assert.equal(hub.without.out, 6, "while the rest still reaches out")
+})

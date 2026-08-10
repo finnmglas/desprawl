@@ -41,6 +41,10 @@ export interface Unit {
   instability: number
   /** its tangle, -1 when alone */
   tangle: number
+  /** the file the most imports arrive at, since one file can carry a whole group's shape */
+  loudest: string
+  /** the same measures without that file, so a verdict resting on it can be told apart */
+  without: { internal: number; out: number; into: number; reach: number }
 }
 
 export interface Cut {
@@ -228,6 +232,8 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
           level: 0,
           instability: 0,
           tangle: -1,
+          loudest: "",
+          without: { internal: 0, out: 0, into: 0, reach: 0 },
         }),
       )
     return unit
@@ -286,6 +292,41 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     const leaving = Object.keys(unit.out).length
     const arriving = Object.keys(unit.in).length
     unit.instability = leaving + arriving ? leaving / (leaving + arriving) : 0
+  }
+
+  // a group named for a folder still has to answer for its files, and one file that
+  // everything imports can decide the whole group's shape while describing only itself
+  const inside = new Map<string, string[]>()
+  for (const path of Object.keys(graph.modules)) {
+    const group = keyOf(path)
+    inside.set(group, [...(inside.get(group) ?? []), path])
+  }
+  for (const unit of units.values()) {
+    const files = inside.get(unit.path) ?? []
+    if (files.length < 2) continue
+    const pull = (path: string) =>
+      graph.modules[path].in.filter((from) => keyOf(from) !== unit.path).length
+    unit.loudest = files.reduce((a, b) => (pull(b) > pull(a) ? b : a))
+    if (!pull(unit.loudest)) {
+      unit.loudest = ""
+      continue
+    }
+    const reach = new Set<string>()
+    for (const path of files) {
+      if (path === unit.loudest) continue
+      for (const edge of graph.modules[path].out) {
+        const to = keyOf(edge.to)
+        if (!graph.modules[edge.to]) continue
+        if (to === unit.path) {
+          if (edge.to !== unit.loudest) unit.without.internal++
+        } else {
+          unit.without.out++
+          reach.add(to)
+        }
+      }
+      for (const from of graph.modules[path].in) if (keyOf(from) !== unit.path) unit.without.into++
+    }
+    unit.without.reach = reach.size
   }
 
   // an import that only carries a type is gone by the time anything runs

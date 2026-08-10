@@ -143,15 +143,24 @@ export function spreadOf(
   }
 }
 
+export interface Shape {
+  label: string
+  band: "entry" | "middle" | "base"
+  tone: string
+  why: string
+  /** no single import could move it elsewhere, so the label is not a coin flip */
+  sure: boolean
+  /** what it was decided on, so four imports never read like four thousand */
+  edges: number
+}
+
 /** only imports itself: a module. Otherwise placed by which way its edges lean, entry to foundation */
-export function shapeOf(
+function read(
   inside: number,
   out: number,
-  /** imports arriving from other groups, without which a leaf reads as an entry point */
-  into = 0,
-  /** how many groups it leans on, since one dependency repeated is not breadth */
-  reach = 2,
-): { label: string; band: "entry" | "middle" | "base"; tone: string; why: string } {
+  into: number,
+  reach: number,
+): Omit<Shape, "sure" | "edges"> & { firm?: boolean } {
   // a hue per shape, and a star is its neighbour: near misses read as near, never as the same
   const MODULE = "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
   const NEAR = "border-lime-500/60 text-lime-700 dark:text-lime-300"
@@ -165,6 +174,7 @@ export function shapeOf(
       label: "Module",
       band: "base",
       tone: MODULE,
+      firm: true,
       why: into
         ? "it imports nothing at all and the rest imports it, so it stands on its own"
         : "it imports nothing and nothing imports it, so it stands apart from the repo",
@@ -176,6 +186,7 @@ export function shapeOf(
       label: "Module",
       band: "base",
       tone: MODULE,
+      firm: true,
       why: "every import stays inside it, so it can be lifted out as it stands",
     }
   if (kept >= 80)
@@ -209,6 +220,7 @@ export function shapeOf(
       label: "Entrypoint",
       band: "entry",
       tone: ENTRY,
+      firm: true,
       why: "nothing here imports it, and it imports the rest. A top of the stack",
     }
   if (arriving < 10)
@@ -230,6 +242,28 @@ export function shapeOf(
     band: "middle",
     tone: EVEN,
     why: `${Math.round(arriving)}% of its edges arrive, which is even. Nearly a foundation, and it would take little to make it one`,
+  }
+}
+
+/**
+ * The shape, and whether it is worth trusting. A label decided on four imports sits a
+ * single import away from another one, which is checked rather than guessed at from a
+ * sample size: move one import each way and see whether the answer holds.
+ */
+export function shapeOf(inside: number, out: number, into = 0, reach = 2): Shape {
+  const { firm, ...shape } = read(inside, out, into, reach)
+  const less = (n: number) => Math.max(0, n - 1)
+  const nearby = [
+    read(inside + 1, less(out), into, reach),
+    read(less(inside), out + 1, into, reach),
+    read(inside, out + 1, less(into), reach),
+    read(inside, less(out), into + 1, reach),
+  ]
+  return {
+    ...shape,
+    // an exact answer is not a near miss: nothing imports it, or nothing leaves it
+    sure: !!firm || nearby.every((one) => one.label === shape.label),
+    edges: inside + out + into,
   }
 }
 

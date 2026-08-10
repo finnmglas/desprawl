@@ -24,7 +24,7 @@ import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
-import { layeringOf, shapeOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
+import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import {
   balanced,
@@ -58,6 +58,22 @@ const count = (edges: Record<string, number>) => Object.values(edges).reduce((su
 
 /** how many groups it leans on, which one dependency imported by every file is not */
 const reach = (unit: Unit) => Object.keys(unit.out).length
+
+/** a tilde says the label sits one import away from another one */
+const shaped = (shape: Shape) => (shape.sure ? shape.label : `~${shape.label}`)
+
+/** the label the rest of the group would get without the file the most imports arrive at */
+const carried = (unit: Unit, shape: Shape) => {
+  if (!unit.loudest || !shape.sure) return null
+  const { internal, out, into, reach } = unit.without
+  const less = shapeOf(internal, out, into, reach)
+  return less.label === shape.label ? null : less
+}
+
+const sureness = (shape: Shape) =>
+  shape.sure
+    ? `Decided on ${plural(shape.edges, "import")}, and no single one of them would move it elsewhere`
+    : `Decided on only ${plural(shape.edges, "import")}, and moving one of them would land it on another label`
 
 /** the deepest folder holding every file of a ring, which is where the fix lives */
 const shared = (paths: string[]): string => {
@@ -793,18 +809,36 @@ const COLUMNS: Column<Unit>[] = [
   {
     key: "shape",
     label: "Classification",
-    get: (u) => shapeOf(u.internal, count(u.out), count(u.in), reach(u)).label,
+    get: (u) => shaped(shapeOf(u.internal, count(u.out), count(u.in), reach(u))),
     cell: (u) => {
       const shape = shapeOf(u.internal, count(u.out), count(u.in), reach(u))
+      const rests = carried(u, shape)
       return (
-        <Tip text={shape.why}>
+        <Tip
+          text={
+            <>
+              {shape.why}
+              <br />
+              {sureness(shape)}
+              {rests && (
+                <>
+                  <br />
+                  Almost all of that lands on <span className="font-mono">{u.loudest}</span>.
+                  Without it the other {plural(u.files - 1, "file")} here read as {rests.label}, so
+                  the label describes that one file more than the group
+                </>
+              )}
+            </>
+          }
+        >
           <Badge variant="outline" className={shape.tone}>
-            {shape.label}
+            {shaped(shape)}
+            {rests && <span className="ml-1 opacity-60">·1 file</span>}
           </Badge>
         </Tip>
       )
     },
-    hint: "read off Inside, Leaves and Arrives together: what it keeps, what it needs, and who needs it. A star is the near miss",
+    hint: "read off Inside, Leaves and Arrives together: what it keeps, what it needs, and who needs it. A star is the near miss, a tilde means one import would move it elsewhere",
   },
   {
     key: "exports",

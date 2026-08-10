@@ -22,15 +22,11 @@ Defaults to UI, CLI available.
 
 Analyze git-tracked repos (files, history, imports, calls):
 
-- **loc, comment, blank** per language, folder, split by line kind
-- **chars and ~tok**, est 4 characters per token, for ai cost estimation
-- **nest**, mean indentation depth of code lines
-- **com, churn, last**, commits + lines moved per folder
-- **contributors**, merged by email (with renames followed)
-- **project metadata**, the stack read off manifests and marker files: language, packages and pinning, frameworks, what it connects to, build, ci and containers
-- **assistance**, which ai coding tools left a trace, from checked in rules and from commit signatures
-- **imports**, every module specifier resolved to the file it names, with aliases, workspace packages and the `.js` to `.ts` rewrite followed
-- **structure**, those imports folded into groups: the levels they stack into, what stays inside a group against what leaves, and the loops that stop any of them being moved
+- **commits** tracked and classified per time and module, loc split into code, comment, blank, nesting
+- **tokens** estimated to predict ai cost
+- **contributors** listed traceably (also ai)
+- **stack** from manifests and marker files, frameworks etc
+- **imports** are graphed, mapped and structured into groups logically to show module structure
 
 ```
 /home/you/desprawl  @3982e3d
@@ -55,33 +51,33 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
-|                          |                                              |
-| ------------------------ | -------------------------------------------- |
-| `desprawl`               | open the explorer on the current directory   |
-| `desprawl ../other-repo` | open it on another repo                      |
-| `desprawl <git url>`     | clone it to your downloads, then open that   |
-| `desprawl cli`           | print the report in the terminal instead     |
-| `desprawl --static`      | open one self contained html file, no server |
-| `desprawl --json`        | whole report, tree + time series             |
+|                          |                                      |
+| ------------------------ | ------------------------------------ |
+| `desprawl`               | open interface on current directory  |
+| `desprawl ../other-repo` | open another repo                    |
+| `desprawl <git url>`     | clone to downloads, then open        |
+| `desprawl cli`           | print report in cli                  |
+| `desprawl --static`      | open static html file, no server     |
+| `desprawl --json`        | whole cli report, tree + time series |
 
-| flag          |                                                                     |
-| ------------- | ------------------------------------------------------------------- |
-| `--depth N`   | how deep the tree goes, default 1                                   |
-| `--top N`     | contributors shown, default 10                                      |
-| `--commits N` | commits read from the log, default 10,000                           |
-| `--digits N`  | significant digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
-| `--static`    | write a standalone file rather than serving                         |
-| `--keep`      | keep serving after the last tab closes                              |
-| `--raw`       | exact numbers instead of scaled ones                                |
-| `--json`      | machine readable, every number exact                                |
+| flag          |                                                         |
+| ------------- | ------------------------------------------------------- |
+| `--depth N`   | how deep tree goes, default 1                           |
+| `--top N`     | contributors shown, default 10                          |
+| `--commits N` | commits read from the log, default 10,000               |
+| `--digits N`  | digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
+| `--static`    | write standalone file rather than server                |
+| `--keep`      | keep server after the last tab closes                   |
+| `--raw`       | exact numbers instead of scaled ones                    |
+| `--json`      | machine readable, numbers exact                         |
 
-`desprawl` serves the explorer locally and opens it, reanalysing on request so `refresh` picks up new commits without a restart. It binds `127.0.0.1:7423`, falling back to a free port when that one is taken, and every request needs a token minted for that run, because any page in your browser can otherwise reach localhost. One fixed origin means the browser keeps your display settings between runs. Closing the last tab ends the run, so nothing is left listening, and `--keep` turns that off.
+`desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 
-Given a git url instead of a path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses that, or fast forwards the copy it already has. The https and ssh forms of one url land in the same place.
+Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses, or uses the copy it already has.
 
-The **Modules** view reads the import graph rather than the tree. Files are grouped into folders, `auto` picking them by weight so no group holds more than a tenth of the repo and no group is a single file, or by a fixed depth if you prefer. Each group gets a level from how far its own dependencies reach, a share of imports that never leave it, and a place in a grid of every dependency at once. Groups that import each other are reported as loops, together with a set of imports whose removal opens them, each marked as type only or real work.
+Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.
 
-`desprawl --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
+`desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone - or served as a website.
 
 ## Continue
 

@@ -89,6 +89,13 @@ export function System({
   const crew = (unit: Unit) =>
     moved ? handsOf(moved.get(unit.path)?.by, people) : hands(unit.path, worked, people)
 
+  // a group whose shape would change without one file is describing that file, not itself
+  const rests = (unit: Unit, shape: ReturnType<typeof shapeOf>) => {
+    if (!unit.loudest || !shape.sure) return false
+    const { internal, out, into, reach } = unit.without
+    return shapeOf(internal, out, into, reach).label !== shape.label
+  }
+
   const called = namesOf(units)
   const rows = BANDS.map((band) => ({
     ...band,
@@ -230,9 +237,17 @@ export function System({
                         <br />
                         <span className="font-mono">{unit.path}</span>
                         <br />
-                        {shape.label} · {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
+                        {shape.sure ? shape.label : `~${shape.label}`} ·{" "}
+                        {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
                         {plural(unit.packages, "package")}
                         {unit.tangle >= 0 && <> · in a loop</>}
+                        {rests(unit, shape) && (
+                          <>
+                            <br />
+                            reads that way because of{" "}
+                            <span className="font-mono">{unit.loudest}</span>
+                          </>
+                        )}
                         <Hands of={crew(unit)} faces={faces} />
                       </>
                     }

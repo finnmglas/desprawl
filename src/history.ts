@@ -73,14 +73,15 @@ export interface Parsed {
 
 const FORMAT = "--pretty=format:%x01%h%x1f%p%x1f%aN%x1f%aE%x1f%aI%x1f%D%x1f%s"
 
-function* parse(log: string): Generator<Parsed> {
+function* parse(log: string, thin = false): Generator<Parsed> {
   for (const chunk of log.split("\x01")) {
     if (!chunk.trim()) continue
     const [header, ...rest] = chunk.split("\n")
     const [hash, parents, name, email, date, refs, subject] = header.split("\x1f")
     if (!name) continue
     const files = []
-    for (const line of rest) {
+    for (const raw_ of rest) {
+      const line = thin ? counted(raw_) : raw_
       if (!line) continue
       const [added, deleted, raw] = line.split("\t")
       if (raw === undefined) continue
@@ -135,9 +136,18 @@ export function detail(repo: string, hash: string): Detail {
 
 // older commits, to walk back without reading everything
 export function page(repo: string, skip: number, count: number, names: string[]): Commit[] {
-  const log = git(repo, "log", "-M", `--skip=${skip}`, `-n${count}`, "--numstat", FORMAT)
+  const thin = thinly(repo)
+  const log = git(
+    repo,
+    "log",
+    "-M",
+    `--skip=${skip}`,
+    `-n${count}`,
+    thin ? "--name-status" : "--numstat",
+    FORMAT,
+  )
   const seat = new Map(names.map((n, i) => [n, i]))
-  return [...parse(log)].map((c) => ({
+  return [...parse(log, thin)].map((c) => ({
     hash: c.hash,
     parents: c.parents,
     insertions: c.files.reduce((a, f) => a + f.ins, 0),
@@ -294,13 +304,34 @@ export const count = (repo: string): number =>
   Number(git(repo, "rev-list", "--count", "HEAD").trim()) || 0
 
 // authors, output, loc, ...
+/**
+ * A blobless clone has the commits and the trees but not the contents. Asking it for
+ * --numstat makes git fetch every blob in the history back over the network, one round
+ * trip at a time, which never finishes. Names it still knows for free.
+ */
+function thinly(repo: string): boolean {
+  try {
+    return !!git(repo, "config", "--get", "remote.origin.partialclonefilter").trim()
+  } catch {
+    return false
+  }
+}
+
+/** name-status carries no counts, so it is reshaped into the numstat the parser knows */
+const counted = (line: string): string => {
+  const parts = line.split("\t")
+  if (parts.length < 2) return ""
+  return parts.length > 2 ? `0\t0\t${parts[1]} => ${parts[2]}` : `0\t0\t${parts[1]}`
+}
+
 export function history(repo: string, cap = COMMIT_MAX) {
+  const thin = thinly(repo)
   const log = git(
     repo,
     "log",
     "-M",
     `-n${cap}`,
-    "--numstat",
+    thin ? "--name-status" : "--numstat",
     "--pretty=format:%x01%h%x1f%p%x1f%aN%x1f%aE%x1f%aI%x1f%D%x1f%s",
   )
   const by = new Map<string, Contributor & { paths: Set<string>; names: Map<string, number> }>()
@@ -371,7 +402,8 @@ export function history(repo: string, cap = COMMIT_MAX) {
     const who = whoByDay.get(stamp) ?? new Set<string>()
     who.add(key)
     whoByDay.set(stamp, who)
-    for (const line of rest) {
+    for (const raw_ of rest) {
+      const line = thin ? counted(raw_) : raw_
       if (!line) continue
       const [added, deleted, raw] = line.split("\t")
       if (raw === undefined) continue
@@ -430,6 +462,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
   return {
     commits,
     truncated: commits >= cap,
+    thin,
     contributors,
     log: history,
     active,

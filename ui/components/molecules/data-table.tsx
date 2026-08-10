@@ -156,6 +156,16 @@ export function DataTable<T>({
                       {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}
                     </span>
                   </Tip>
+                  {/* a column of nothing but zeros is usually a number that could not be
+                      read, not a column of real zeros, and either way it says nothing */}
+                  {col.num && rows.length > 0 && sums[col.key] === 0 && (
+                    <Tip
+                      text="every row reads 0 here, so either there is nothing to count or the number could not be read at all"
+                      side="bottom"
+                    >
+                      <span className="ml-1 cursor-help">⚠️</span>
+                    </Tip>
+                  )}
                 </TH>
               ))}
             </TR>

@@ -131,6 +131,15 @@ function App({
             <p className="text-muted-foreground text-xs">
               @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
               {num(stats.commits)} commits · desprawl {stats.version}
+              {stats.thin && (
+                <span
+                  className="text-amber-600 dark:text-amber-400"
+                  title="cloned with --filter=blob:none, so git holds no file contents to diff. Commits, authors, dates and renames are right, every added or removed line reads 0"
+                >
+                  {" "}
+                  · partial clone, no line counts
+                </span>
+              )}
               {busy > 0 && <span className="text-foreground"> · working…</span>}
             </p>
           </div>

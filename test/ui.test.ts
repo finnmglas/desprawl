@@ -159,3 +159,14 @@ test("two groups called the same thing both take their parent", () => {
   assert.equal(named.get("ui/lib/data"), "Library data")
   assert.equal(named.get("ui/views"), "Views", "what does not clash stays short")
 })
+
+test("a label decided on a handful of imports says so, an exact one does not", () => {
+  const sure = (inside: number, out: number, into: number, reach = 2) =>
+    shapeOf(inside, out, into, reach).sure
+  assert.equal(sure(0, 2, 2), false, "four imports, and one of them would move it")
+  assert.equal(sure(32, 30, 25), false, "45% arriving sits on the line whatever the size")
+  assert.equal(sure(781, 1337, 1279), true, "the same balance over thousands does not move")
+  assert.equal(sure(35, 0, 54), true, "every import inside is exact, not a near miss")
+  assert.equal(sure(0, 22, 0), true, "nothing importing it is exact too")
+  assert.equal(sure(0, 0, 0), true, "and so is importing nothing at all")
+})

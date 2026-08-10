@@ -37,6 +37,6 @@ Star this repo, then [fork it](https://github.com/finnmglas/desprawl/fork). See 
 
 MIT ⚖️
 
-> _This is truely free software: **no tracking, no costs, no ads, truely yours**!\
+> _This is truely free software: **no analytics, no tracking, no costs, no ads, truely yours**!\
 > Save it, ⭐ it & unfuck projects._
 > _\- Cheers, Julia & Finn_

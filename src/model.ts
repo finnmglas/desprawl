@@ -196,6 +196,8 @@ export interface Stats extends Split {
   commits: number
   /** True when more commits exist than were read, so churn covers a window */
   truncated: boolean
+  /** a partial clone holds no file contents, so every line count here is 0 */
+  thin: boolean
   contributors: Contributor[]
   log: Commit[]
   /** Per day, the contributor indices who committed */
