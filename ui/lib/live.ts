@@ -2,6 +2,7 @@
 // goal: parts too big to ship up front, asked for once the ui is painted
 
 import { toast } from "./toast.ts"
+import type { Calls } from "../../src/calls.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -69,6 +70,9 @@ export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/ap
 
 /** built on the first ask, held by the server after */
 export const importGraph = (): Promise<Graph | null> => ask<Graph | null>("/api/graph", null)
+
+/** every declaration and what calls it, which takes longer again than the imports */
+export const callGraph = (): Promise<Calls | null> => ask<Calls | null>("/api/calls", null)
 
 export interface Sample {
   date: string

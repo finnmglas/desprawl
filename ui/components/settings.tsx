@@ -17,7 +17,7 @@ import {
   type Scale,
 } from "../lib/display.tsx"
 import { num } from "../lib/format.ts"
-import { importGraph, isLive } from "../lib/live.ts"
+import { callGraph, importGraph, isLive } from "../lib/live.ts"
 import type { Prefs } from "../lib/prefs.ts"
 import type { Stats } from "../../src/model.ts"
 
@@ -83,6 +83,23 @@ export function Settings({
         <Download />
         git-stats (json)
       </MenuItem>
+      {isLive() && (
+        <MenuItem
+          onClick={async () => {
+            const graph = await callGraph()
+            if (!graph) return
+            const file = named("calls.json")
+            download(file, JSON.stringify(graph, null, 2), "application/json")
+            toast(
+              file,
+              `${num(graph.stats.symbols)} declarations, ${num(graph.stats.edges)} calls between them`,
+            )
+          }}
+        >
+          <Download />
+          download call graph json
+        </MenuItem>
+      )}
       {isLive() && (
         <MenuItem
           onClick={async () => {

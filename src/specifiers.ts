@@ -5,6 +5,31 @@ export interface Specifier {
   text: string // what stood between the quotes
   type: boolean // erased at build time, so a weaker edge
   lazy: boolean // import(), a chunk boundary too
+  /** the names it binds locally, and what each is called where it came from */
+  names: { local: string; name: string }[]
+}
+
+/** `import Thing, { a as b } from "x"` binds Thing and b, which came in as default and a */
+export function bound(clause: string): { local: string; name: string }[] {
+  const out: { local: string; name: string }[] = []
+  const text = clause.replace(/\bfrom\s*$/, "").trim()
+  const listed = text.match(/\{([^}]*)\}/)
+  for (const part of listed?.[1].split(",") ?? []) {
+    const [name, local] = part
+      .trim()
+      .replace(/^type\s+/, "")
+      .split(/\s+as\s+/)
+    if (name) out.push({ local: (local ?? name).trim(), name: name.trim() })
+  }
+  const star = text.match(/\*\s+as\s+([\w$]+)/)
+  if (star) out.push({ local: star[1], name: "*" })
+  const head = text
+    .replace(/\{[^}]*\}/, "")
+    .replace(/\*\s+as\s+[\w$]+/, "")
+    .split(",")[0]
+    .trim()
+  if (/^[A-Za-z_$][\w$]*$/.test(head)) out.push({ local: head, name: "default" })
+  return out
 }
 
 const WORD = /[A-Za-z0-9_$]/
@@ -121,23 +146,23 @@ export function symbols(source: string): Symbols {
 
 // read only what survived the scrub
 const STATIC = new RegExp(
-  `(?:^|[\\s;})])(import|export)\\s+(type\\s+)?(?:[^${MARK}]*?\\bfrom\\s*)?${MARK}(\\d+)${MARK}`,
+  `(?:^|[\\s;})])(import|export)\\s+(type\\s+)?([^${MARK}]*?\\bfrom\\s*)?${MARK}(\\d+)${MARK}`,
   "g",
 )
 const CALLS = new RegExp(`\\b(import|require)\\s*\\(\\s*${MARK}(\\d+)${MARK}`, "g")
 
-/** every module specifier in a file */
-export function specifiers(source: string): Specifier[] {
-  const { code, strings } = scrub(source)
+/** every module specifier in a file, reusing a scrub when the caller already did one */
+export function specifiers(source: string, done?: ReturnType<typeof scrub>): Specifier[] {
+  const { code, strings } = done ?? scrub(source)
   const found: Specifier[] = []
 
   for (const m of code.matchAll(STATIC)) {
-    const text = strings[Number(m[3])]
-    if (text) found.push({ text, type: !!m[2], lazy: false })
+    const text = strings[Number(m[4])]
+    if (text) found.push({ text, type: !!m[2], lazy: false, names: bound(m[3] ?? "") })
   }
   for (const m of code.matchAll(CALLS)) {
     const text = strings[Number(m[2])]
-    if (text) found.push({ text, type: false, lazy: m[1] === "import" })
+    if (text) found.push({ text, type: false, lazy: m[1] === "import", names: [] })
   }
   return found
 }

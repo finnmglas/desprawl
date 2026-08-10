@@ -17,6 +17,8 @@ export interface Module {
   out: Edge[] // resolved inside the repo
   in: string[]
   packages: string[] // by install name
+  /** the specifier each resolved import was written as, so a name can be traced back */
+  imports: Record<string, string>
   /** what it declares, which is a truer size than its line count */
   symbols: Symbols
   lines: number
@@ -207,6 +209,7 @@ export function build(repo: string): Graph {
         out: [],
         in: [],
         packages: [],
+        imports: {},
         symbols: { exports: 0, functions: 0, classes: 0 },
         lines: 0,
       },
@@ -254,6 +257,7 @@ export function build(repo: string): Graph {
         missing.push({ from, specifier: spec.text, reason: target.reason })
         continue
       }
+      modules[from].imports[spec.text] = target.path
       modules[from].out.push({ to: target.path, type: spec.type, lazy: spec.lazy })
       modules[target.path].in.push(from)
     }
