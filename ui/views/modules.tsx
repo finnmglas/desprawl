@@ -6,6 +6,7 @@ import { Back } from "../components/back.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
+import { Circle } from "../components/circle.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { CardHead } from "../components/card-head.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
@@ -39,6 +40,9 @@ const JOINS: Record<string, string> = {
   file: "the file itself",
 }
 const KEEP = ["source only", "all folders"]
+
+// the same dependencies, read as a table or as a ring
+const VIEWS = ["grid", "circle"]
 
 // a wall of anything says less than a count does
 const FEW = 6
@@ -109,6 +113,7 @@ export function Modules({
   const [wide, setWide] = useState(false)
   // the grid draws the same groups, so it follows whatever order the table was put in
   const [sort, setSort] = useState<Sort | null>(null)
+  const [view, setView] = useState(VIEWS[0])
   // one search over the groups, since the table and the grid draw the same ones
   const [find, setFind] = useState("")
 
@@ -166,6 +171,7 @@ export function Modules({
         return sort.asc ? cmp : -cmp
       }
     : undefined
+  const cuts = new Set(loops.flatMap((l) => l.cut.map((c) => `${c.from} ${c.to}`)))
   const folder = (path: string) => !/\.[a-z]+$/.test(path)
   const open = (path: string) => folder(path) && onPath(path.split("/"))
 
@@ -316,21 +322,28 @@ export function Modules({
           hint="Row imports column, sorted by depending count"
           wrap
         >
-          {crowded && (
-            <Button variant="outline" size="sm" className="ml-auto" onClick={() => setWide(!wide)}>
-              {wide ? "hide more" : "show all"}
-            </Button>
-          )}
+          <div className="ml-auto flex items-center gap-1">
+            <Tabs tabs={VIEWS} value={view} onChange={setView} />
+            {crowded && view === VIEWS[0] && (
+              <Button variant="outline" size="sm" onClick={() => setWide(!wide)}>
+                {wide ? "hide more" : "show all"}
+              </Button>
+            )}
+          </div>
         </CardHead>
         <CardContent>
-          <Matrix
-            units={shown}
-            across={units}
-            most={crowded && !wide ? 12 : shown.length}
-            order={order}
-            cuts={new Set(loops.flatMap((l) => l.cut.map((c) => `${c.from} ${c.to}`)))}
-            onPick={open}
-          />
+          {view === VIEWS[0] ? (
+            <Matrix
+              units={shown}
+              across={units}
+              most={crowded && !wide ? 12 : shown.length}
+              order={order}
+              cuts={cuts}
+              onPick={open}
+            />
+          ) : (
+            <Circle units={shown} cuts={cuts} onPick={open} />
+          )}
         </CardContent>
       </Card>
 
