@@ -3,14 +3,19 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Area, Bar, CartesianGrid, ComposedChart, ReferenceArea, XAxis, YAxis } from "recharts"
-import { Button } from "../components/button.tsx"
-import { CopyButton } from "../components/copy-button.tsx"
-import { DownloadButton } from "../components/download-button.tsx"
-import { Card, CardContent } from "../components/card.tsx"
-import { CardHead } from "../components/card-head.tsx"
-import { CURSOR, ChartContainer, ChartTooltip, ChartTooltipContent } from "../components/chart.tsx"
-import { Tabs } from "../components/tabs.tsx"
-import { Working } from "../components/working.tsx"
+import { Button } from "../components/atoms/button.tsx"
+import { CopyButton } from "../components/molecules/copy-button.tsx"
+import { DownloadButton } from "../components/molecules/download-button.tsx"
+import { Card, CardContent } from "../components/atoms/card.tsx"
+import { CardHead } from "../components/molecules/card-head.tsx"
+import {
+  CURSOR,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "../components/atoms/chart.tsx"
+import { Tabs } from "../components/atoms/tabs.tsx"
+import { Working } from "../components/atoms/working.tsx"
 import { delimit, named } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
