@@ -1,5 +1,5 @@
 // owner: finn
-// goal: fold the import graph to units, level them, and name what tangles
+// goal: fold imports to units, level them, name the tangles
 
 import { scc } from "./cycles.ts"
 import type { Graph } from "./graph.ts"
@@ -74,13 +74,13 @@ const TEST =
 const SUPPORT =
   /(^|\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|\.\w+)(\/|$)|\.config\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.(config|setup|rc)\.[cm]?[jt]sx?$/
 
-/** a file sitting loose at the root is configuration, a folder there is the code */
+/** loose at the root is config */
 const LOOSE = /^[^/]+\.[cm]?[jt]sx?$/
 
 export const roleOf = (path: string): Role =>
   TEST.test(path) ? "test" : SUPPORT.test(path) || LOOSE.test(path) ? "support" : "source"
 
-/** the folder a file answers to at this depth, or the file when it sits above it */
+/** the folder a file answers to, or the file itself */
 export const unitOf = (path: string, depth: number): string => {
   const parts = path.split("/")
   return parts.length <= depth ? path : parts.slice(0, depth).join("/")
@@ -98,13 +98,9 @@ interface Branch {
 }
 
 /**
- * A cut through the folder tree, picked rather than declared. A group is a folder,
- * and a file belongs to the deepest chosen folder above it, so the repo is always
- * covered exactly once. Starting from the repo itself it keeps opening the heaviest
- * group by naming the heaviest folder inside it, which is what balances the result.
- *
- * A single file is never a group. A file is a node of the import graph already, and
- * reading every one of them is what the file grain is for.
+ * A cut through the folder tree. A group is a folder, a file belongs to the deepest
+ * chosen folder above it, and the heaviest group keeps opening until it is not.
+ * Never a single file: that is what the file grain is for.
  */
 export function balanced(
   graph: Graph,
@@ -133,8 +129,7 @@ export function balanced(
     at.files.push(module.path)
   }
 
-  // every top folder stands on its own, however small. Sweeping them together mixes
-  // the bottom of the stack with the top and manufactures loops that the code does not have
+  // sweeping top folders together invents loops
   const chosen = new Set<string>(["", ...root.kids.map((kid) => kid.path)])
   /** the deepest chosen folder at or above a branch, which is the group it feeds */
   const owner = (path: string): string => {
@@ -238,7 +233,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     const tally = roles.get(from.path) ?? { source: 0, test: 0, support: 0 }
     tally[roleOf(module.path)]++
     roles.set(from.path, tally)
-    // a remainder group is named for the folder it is the rest of
+    // named for the folder it is the rest of
     const under = from.path.replace(/\/?\*$/, "")
     const rest =
       under && module.path.startsWith(`${under}/`)
@@ -294,7 +289,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   const groups = scc(units.keys(), (path) => Object.keys(seen(path).out))
   const level = new Map<string, number>()
   const tangles: Tangle[] = []
-  // sinks come back first, so every target already has its level
+  // sinks first, so targets already have levels
   for (const group of groups) {
     const inside = new Set(group)
     let deepest = -1
@@ -334,7 +329,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     unit.level = level.get(unit.path) ?? 0
     for (const target of Object.keys(unit.out)) {
       edges++
-      // between groups every edge points down by construction, so only a tangle can climb
+      // only a tangle climbs
       if (unit.tangle >= 0 && seen(target).tangle === unit.tangle) feedback++
     }
   }
@@ -394,7 +389,7 @@ function cut(group: string[], out: (path: string) => string[]): [string, string]
       }
     }
     if (!live.size) break
-    // the one that gives out most and takes back least belongs earliest
+    // gives most, takes least: earliest
     let best = ""
     let score = -Infinity
     for (const u of live) {

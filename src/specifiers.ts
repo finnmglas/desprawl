@@ -33,7 +33,7 @@ export function bound(clause: string): { local: string; name: string }[] {
 }
 
 const WORD = /[A-Za-z0-9_$]/
-const MARK = ""
+export const MARK = ""
 
 /** comments and regex become spaces, strings a marker pointing at their text */
 export function scrub(source: string): { code: string; strings: string[] } {

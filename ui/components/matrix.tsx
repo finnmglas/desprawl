@@ -1,18 +1,11 @@
 // owner: finn
-// goal: every dependency at once, as a grid that a hairball cannot be
+// goal: every dependency at once, as a grid
 
 import { useEffect, useRef, useState } from "react"
 import { Tip } from "./tip.tsx"
+import { PAINT, fit } from "../lib/canvas.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import type { Unit } from "../../src/layers.ts"
-
-// drawn rather than built: a grid of a thousand elements scrolls like tar
-const PAINT = {
-  down: "14, 165, 233", // sky, an import that leans on a lower level
-  loop: "245, 158, 11", // amber, an import inside a loop
-  cut: "239, 68, 68", // red, one the cut list names
-  quiet: "128, 128, 128", // itself, and the lines between levels
-}
 
 const KEY: [string, string, string][] = [
   [
@@ -33,8 +26,7 @@ const KEY: [string, string, string][] = [
   [PAINT.quiet, "Inside", "the group against itself, so the imports that never leave it"],
 ]
 
-// a canvas has a size a browser will refuse, and 2000 rows is past it in every
-// direction. Nothing readable lives up there anyway, so the grid stops before it
+// a browser refuses a bigger canvas, and nothing readable is up there
 const LIMIT = 400
 
 export function Matrix({
@@ -59,14 +51,12 @@ export function Matrix({
   const canvas = useRef<HTMLCanvasElement>(null)
   const [hint, setHint] = useState<{ x: number; y: number; text: string } | null>(null)
 
-  // a link to a group that is not on screen draws nothing, so it earns no row either.
-  // rows and columns are separate sets: narrowing who imports must not hide what they import
+  // separate sets: narrowing rows must not hide columns
   const targets = across ?? units
   const rowSet = new Set(units.map((u) => u.path))
   const colSet = new Set(targets.map((u) => u.path))
   const leaving = (u: Unit) => Object.keys(u.out).filter((p) => colSet.has(p))
   const arriving = (u: Unit) => Object.keys(u.in).filter((p) => rowSet.has(p))
-  // each axis is ranked by what it does on that axis, then put back in reading order
   const busiest = (list: Unit[], by: (u: Unit) => number) =>
     [...list]
       .sort((a, b) => by(b) - by(a))
@@ -104,15 +94,8 @@ export function Matrix({
   useEffect(() => {
     const board = canvas.current
     if (!board) return
-    // two is as sharp as a grid of flat squares can look, and it halves the pixels
-    const scale = Math.min(devicePixelRatio || 1, 2)
-    board.width = cols.length * cell * scale
-    board.height = rows.length * cell * scale
-    board.style.width = `${cols.length * cell}px`
-    board.style.height = `${rows.length * cell}px`
-    const pen = board.getContext("2d")
+    const pen = fit(board, cols.length * cell, rows.length * cell)
     if (!pen) return
-    pen.scale(scale, scale)
 
     rows.forEach((row, y) =>
       cols.forEach((col, x) => {

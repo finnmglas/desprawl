@@ -2,11 +2,11 @@
 // goal: the shape the imports actually make, said in plain words
 
 import { useEffect, useMemo, useState } from "react"
-import { Avatar, profileOf } from "../components/avatar.tsx"
 import { Back } from "../components/back.tsx"
 import { Badge } from "../components/badge.tsx"
 import { Button } from "../components/button.tsx"
 import { Card, CardContent } from "../components/card.tsx"
+import { Face, Hands } from "../components/hands.tsx"
 import { Circle } from "../components/circle.tsx"
 import { CopyButton } from "../components/copy-button.tsx"
 import { CardHead } from "../components/card-head.tsx"
@@ -337,36 +337,9 @@ export function Modules({
                 <Tip
                   className="flex justify-center"
                   side="bottom"
-                  text={
-                    <>
-                      {crew.slice(0, 5).map((one) => (
-                        <span key={one.who.email} className="flex items-center gap-1.5">
-                          <Avatar
-                            name={one.who.name}
-                            email={one.who.email}
-                            found={faces[one.who.email.toLowerCase()]}
-                          />
-                          <span className="flex-1">{one.who.name}</span>
-                          <span className="tabular-nums">{Math.round(one.share * 100)}%</span>
-                        </span>
-                      ))}
-                      {crew.length > 5 && <span className="block">and {crew.length - 5} more</span>}
-                    </>
-                  }
+                  text={<Hands of={crew} faces={faces} />}
                 >
-                  <a
-                    href={profileOf(crew[0].who.email) || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                    className="block w-fit"
-                  >
-                    <Avatar
-                      name={crew[0].who.name}
-                      email={crew[0].who.email}
-                      found={faces[crew[0].who.email.toLowerCase()]}
-                    />
-                  </a>
+                  <Face of={crew} faces={faces} />
                 </Tip>
               )
             },

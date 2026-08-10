@@ -2,9 +2,25 @@
 
 Details on `desprawl` usage.
 
+## Install
+
+Run without installing:
+
+```sh
+npx desprawl
+```
+
+or install once
+
+```sh
+pnpm add -g desprawl
+```
+
+Defaults to UI, CLI available.
+
 ## Showcase
 
-Analyzes only git-tracked files.
+Analyze git-tracked repos (files, history, imports, calls):
 
 - **loc, comment, blank** per language, folder, split by line kind
 - **chars and ~tok**, est 4 characters per token, for ai cost estimation
@@ -67,6 +83,6 @@ The **Modules** view reads the import graph rather than the tree. Files are grou
 
 `desprawl --static` writes one self contained html file with the stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone.
 
-## Read more
+## Continue
 
 [README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md)

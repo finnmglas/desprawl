@@ -1,13 +1,13 @@
 // owner: finn
-// goal: this part is being refreshed, and what you are reading is the old answer
+// goal: this part is refreshing
 
 import { useEffect, useState } from "react"
 import { cn } from "../lib/ui.ts"
 
-// grows and shrinks, so a stalled request looks different from a finished one
+// a stall looks different from a finish
 const STEPS = [1, 2, 3, 2]
 
-/** small on purpose: the data stays where it is, this only says it will change */
+/** the data stays, this says it will change */
 export function Working({ on, className }: { on?: boolean; className?: string }) {
   const [step, setStep] = useState(0)
   useEffect(() => {

@@ -3,16 +3,10 @@
 
 import { useEffect, useRef, useState } from "react"
 import { num, plural, shortPath } from "../lib/format.ts"
+import { PAINT, fit } from "../lib/canvas.ts"
 import type { Unit } from "../../src/layers.ts"
 
 const MOST = 60 // prevent lag
-
-const PAINT = {
-  down: "14, 165, 233",
-  loop: "245, 158, 11",
-  cut: "239, 68, 68",
-  quiet: "128, 128, 128",
-}
 
 export function Circle({
   units,
@@ -51,14 +45,8 @@ export function Circle({
   useEffect(() => {
     const board = canvas.current
     if (!board) return
-    const scale = Math.min(devicePixelRatio || 1, 2)
-    board.width = size * scale
-    board.height = size * scale
-    board.style.width = `${size}px`
-    board.style.height = `${size}px`
-    const pen = board.getContext("2d")
+    const pen = fit(board, size, size)
     if (!pen) return
-    pen.scale(scale, scale)
     pen.clearRect(0, 0, size, size)
     pen.font = "10px ui-sans-serif, system-ui, sans-serif"
 

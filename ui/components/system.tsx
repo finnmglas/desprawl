@@ -1,8 +1,8 @@
 // owner: finn
-// goal: the repo as one picture: what composes, what collects, what it stands on
+// goal: the repo as one picture
 
-import { Avatar, profileOf } from "./avatar.tsx"
 import { Chip } from "./chip.tsx"
+import { Face, Hands } from "./hands.tsx"
 import { Tip } from "./tip.tsx"
 import { num, plural } from "../lib/format.ts"
 import { useDisplay } from "../lib/display.tsx"
@@ -14,7 +14,7 @@ import type { Unit } from "../../src/layers.ts"
 import type { Move } from "../../src/history.ts"
 import type { Contributor, Stack } from "../../src/model.ts"
 
-// on its own each of these names nothing, so it takes the folder above with it
+// takes the folder above, saying nothing alone
 const PLAIN = new Set([
   "lib",
   "libs",
@@ -37,8 +37,7 @@ const PLAIN = new Set([
   "packages",
 ])
 
-// every card the same width, so the count that leaves the fewest holes in the fewest
-// rows wins: six go three and three rather than four and two
+// same width each: six go 3+3, not 4+2
 const columns = (count: number, widest: number): number => {
   let best = 1
   let score = Infinity
@@ -65,21 +64,6 @@ function title(path: string): string {
   const whole = PLAIN.has(own.toLowerCase()) && above ? `${above} ${own}` : own
   const named = whole.charAt(0).toUpperCase() + whole.slice(1)
   return rest ? `${named} modules` : named
-}
-
-/** the face of whoever works there most, linking to them and explaining nothing on its own */
-function Face({ who, faces }: { who: Contributor; faces: Record<string, string> }) {
-  return (
-    <a
-      href={profileOf(who.email) || undefined}
-      target="_blank"
-      rel="noreferrer"
-      onClick={(event) => event.stopPropagation()}
-      className="block"
-    >
-      <Avatar name={who.name} email={who.email} found={faces[who.email.toLowerCase()]} />
-    </a>
-  )
 }
 
 const BANDS = [
@@ -127,10 +111,8 @@ export function System({
   const weigh = (lines: number) =>
     Math.min(100, (curve === "log" ? Math.log1p(lines) / Math.log1p(peak) : lines / peak) * 100)
 
-  // in a window the bar stops saying how big a module is: added grows up from the
-  // middle and removed grows down, both against the biggest either way anywhere here
-  // measured against the drawn modules only: a support folder nobody sees here would
-  // otherwise set the scale and flatten everything that is on screen
+  // added up, removed down, against the biggest either way
+  // drawn modules only, or a hidden folder sets the scale
   const swing = Math.max(
     1,
     ...units.flatMap((unit) => {
@@ -150,7 +132,7 @@ export function System({
 
   const rows = BANDS.map((band) => ({
     ...band,
-    // deepest first inside a band, so the stack still reads downward without saying so
+    // deepest first
     held: units
       .filter((u) => read(u).band === band.key)
       .sort((a, b) => b.level - a.level || b.lines - a.lines),
@@ -161,7 +143,7 @@ export function System({
     from: stack.from[label],
     talks: units.filter((u) => stack.from[label] && u.installs.includes(stack.from[label])),
   }))
-  // where it runs sits on one side, what it calls on the other, and a client is neither
+  // runs on one side, calls on the other
   const hosts = named.filter((s) => isHost(s.label))
   const services = named.filter((s) => !isHost(s.label) && !isClient(s.label))
   const clients = named.filter((s) => isClient(s.label))
@@ -180,7 +162,7 @@ export function System({
               key={one.label}
               className={cn("flex items-center", side === "left" && "flex-row-reverse")}
             >
-              {/* the wire, with its head at the end the traffic arrives at */}
+              {/* head where the traffic arrives */}
               <span className="hidden shrink-0 items-center lg:flex">
                 {(way === "left" || way === "both") && (
                   <span className="border-muted-foreground/70 size-0 border-y-4 border-y-transparent border-r-4 border-l-0" />
@@ -192,7 +174,7 @@ export function System({
                   <span className="border-muted-foreground/70 size-0 border-y-4 border-y-transparent border-l-4 border-r-0" />
                 )}
               </span>
-              {/* the chip carries its own hint, so only the line under it may carry another */}
+              {/* the chip has its own hint */}
               <div className="bg-card flex min-w-0 flex-1 flex-col gap-1 rounded-lg border p-2">
                 <Chip label={one.label} from={one.from} />
                 <Tip
@@ -250,7 +232,7 @@ export function System({
               "flex flex-col gap-2 px-3 py-3",
               i && "border-t",
               i === rows.length - 1 && "rounded-b-[10px]",
-              // the base is drawn as one, because that is what a foundation looks like
+              // the base is the foundation
               row.key === "base" && "bg-muted/30",
               row.key === "middle" && "bg-muted/10",
             )}
@@ -285,22 +267,7 @@ export function System({
                         {shape.label} · {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
                         {plural(unit.packages, "package")}
                         {unit.tangle >= 0 && <> · in a loop</>}
-                        {crew(unit)
-                          .slice(0, 5)
-                          .map((one) => (
-                            <span key={one.who.email} className="mt-1 flex items-center gap-1.5">
-                              <Avatar
-                                name={one.who.name}
-                                email={one.who.email}
-                                found={faces[one.who.email.toLowerCase()]}
-                              />
-                              <span className="flex-1">{one.who.name}</span>
-                              <span className="tabular-nums">{Math.round(one.share * 100)}%</span>
-                            </span>
-                          ))}
-                        {crew(unit).length > 5 && (
-                          <span className="mt-1 block">and {crew(unit).length - 5} more</span>
-                        )}
+                        <Hands of={crew(unit)} faces={faces} />
                       </>
                     }
                   >
@@ -341,7 +308,7 @@ export function System({
                         <span className="min-w-0 flex-1 truncate text-xs font-medium">
                           {title(unit.path)}
                         </span>
-                        {crew(unit)[0] && <Face who={crew(unit)[0].who} faces={faces} />}
+                        <Face of={crew(unit)} faces={faces} />
                       </span>
                       <span className="text-muted-foreground relative truncate font-mono text-[10px]">
                         {unit.path}

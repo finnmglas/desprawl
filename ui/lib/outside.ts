@@ -1,11 +1,9 @@
 // owner: finn
-// goal: telling a system this repo talks to from a library it merely uses to talk
+// goal: a system, or the library that speaks to it
 
 /**
- * A client is code that ships inside the repo and speaks a protocol: axios sends a
- * request, the ai sdk formats one. Whatever answers is the system, and only that
- * belongs outside the wall. Anything not named here is treated as a system, since a
- * detected label usually arrived from an sdk with an account behind it.
+ * A client ships inside the repo and speaks a protocol: axios sends the request, the
+ * thing that answers is the system. Only a system belongs outside the wall.
  */
 const CLIENT = new Set([
   "axios",
@@ -33,7 +31,7 @@ const CLIENT = new Set([
   "Axios Retry",
 ])
 
-/** where it runs, as opposed to what it calls: those belong on opposite sides */
+/** where it runs, as opposed to what it calls */
 const HOST = new Set([
   "Vercel",
   "Netlify",
@@ -57,10 +55,7 @@ const HOST = new Set([
   "Docker",
 ])
 
-/**
- * What a service is for, and which way the traffic runs. Anything not named here is
- * still drawn, it just says less, so the map never invents a purpose it cannot know.
- */
+/** what it is for and which way it runs. Unnamed ones still draw */
 export const MEANS: Record<string, { what: string; way: "out" | "in" | "both" }> = {
   Vercel: { what: "deploys and runs here", way: "out" },
   Netlify: { what: "deploys and runs here", way: "out" },

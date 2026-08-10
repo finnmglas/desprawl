@@ -1,11 +1,11 @@
 // owner: finn
-// goal: which function calls which, resolved through the import graph
+// goal: which function calls which
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { build, type Graph } from "./graph.ts"
 import { packageOf } from "./graph.ts"
-import { scrub, specifiers } from "./specifiers.ts"
+import { MARK, scrub, specifiers } from "./specifiers.ts"
 
 export interface Symbol {
   /** file#name, which is unique because a file cannot declare a name twice */
@@ -47,10 +47,9 @@ export interface Calls {
   }
 }
 
-// a name followed by a bracket, unless something owns it: obj.method() is not method()
-const CALL = /(?<![.\w$])([A-Za-z_$][\w$]*)\s*(?:<[^<>()]*>)?\s*\(/g
-// a react component is called by being written, and that is most calls in a ui repo
-const USED = /<([A-Z][\w$]*)/g
+// onClick={save} calls save. a dot owns the name, a spread does not
+const USED = /(?<![\w$])(?<!(?<!\.)\.)([A-Za-z_$][\w$]*)/g
+const CALLED = /^[^\S\n]*(?:<[^<>()]*>)?[^\S\n]*\(/
 const KEYWORD = new Set([
   "if",
   "async",
@@ -82,7 +81,13 @@ const KEYWORD = new Set([
   "throw",
 ])
 
-// declared by the runtime, so calling one is resolved even though nothing here holds it
+/** what runs on import */
+export const TOP = "(top level)"
+
+// an import, up to the scrub's marker
+const BROUGHT = new RegExp(`(^|[\\s;}])(import|export)\\s+[^${MARK}]*?${MARK}\\d+${MARK}`, "g")
+
+// the runtime holds these
 const GLOBAL = new Set([
   "console",
   "Object",
@@ -153,16 +158,14 @@ const GLOBAL = new Set([
 const DECLARED =
   /(?<![.\w$])(export\s+)?(default\s+)?(async\s+)?(function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g
 const ASSIGNED =
-  /(?<![.\w$])(export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*(async\s+)?(?:function|\([^)]*\)\s*(?::[^=\n]*)?=>|[A-Za-z_$][\w$]*\s*=>)/g
+  /(?<![.\w$])(export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=[^\S\n]*(async[^\S\n]+)?(?:function|\([^)]*\)[^\S\n]*(?::[^=\n]*)?=>|[A-Za-z_$][\w$]*[^\S\n]*=>)/g
 
-// a line that ends on one of these is not finished, it is wrapped
+// wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
 /**
- * How far a declaration reaches. Brackets are counted on the scrubbed code, where
- * strings and templates are already gone, so a brace inside one cannot mislead. The
- * body is the first brace outside the parameter list; an arrow that returns an
- * expression has none, and ends where its statement stops wrapping.
+ * How far a declaration reaches: the first brace outside the parameter list, matched.
+ * An arrow returning an expression has none and ends where its statement stops wrapping.
  */
 function span(code: string, from: number): number {
   let depth = 0
@@ -204,10 +207,10 @@ const lineAt = (starts: number[], index: number): number => {
 
 export function calls(repo: string, graph: Graph = build(repo)): Calls {
   const symbols: Record<string, Symbol> = {}
-  // where each declaration starts and ends, kept so the body is read once, not found twice
   const bodies = new Map<string, [number, number]>()
   const mine = new Map<string, string[]>()
-  // sets while building, since a hub with a thousand callers turns includes() quadratic
+  const tops = new Map<string, string>()
+  // sets: includes() on a hub is quadratic
   const reaches = new Map<string, Set<string>>()
   const reached = new Map<string, Set<string>>()
   const link = (from: string, to: string) => {
@@ -222,7 +225,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     string,
     Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>
   >()
-  // names bound inside a file that are values, not declarations: state setters and the like
+  // values it binds, like state setters
   const locals = new Map<string, Set<string>>()
 
   for (const module of Object.values(graph.modules)) {
@@ -246,7 +249,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     }
     bindings.set(module.path, local)
 
-    // what a destructure binds is a value the file already holds, not a call going out
+    // destructured names are the file's own
     const held = new Set<string>()
     for (const m of code.matchAll(/(?:const|let|var)\s*(?:\[([^\]]*)\]|\{([^}]*)\})\s*=/g))
       for (const part of (m[1] ?? m[2]).split(","))
@@ -290,17 +293,49 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       add(m[2], m.index, !!m[1], /^[A-Z]/.test(m[2]) ? "component" : "function")
   }
 
-  // second pass, since a call can name something declared in a file read later
+  // or every entry point reads as dead
+  for (const [file, code] of sources) {
+    const spans = (mine.get(file) ?? []).map((id) => bodies.get(id)!).sort((a, b) => a[0] - b[0])
+    let outside = ""
+    let at = 0
+    for (const [from, to] of spans) {
+      if (from > at) outside += code.slice(at, from)
+      at = Math.max(at, to)
+    }
+    outside += code.slice(at)
+    // an import names a thing without calling it, so the statements themselves go
+    if (outside.trim()) tops.set(file, outside.replace(BROUGHT, " "))
+  }
+
   for (const [file, code] of sources) {
     const local = bindings.get(file)!
-    for (const id of mine.get(file) ?? []) {
-      const symbol = symbols[id]
-      const [from, to] = bodies.get(id)!
-      const body = code.slice(from, to)
+    const walking = [...(mine.get(file) ?? []), `${file}#${TOP}`]
+    for (const id of walking) {
+      const top = id.endsWith(`#${TOP}`)
+      if (top && !tops.has(file)) continue
+      const symbol =
+        symbols[id] ??
+        (symbols[id] = {
+          id,
+          file,
+          name: TOP,
+          kind: "function",
+          line: 1,
+          lines: 0,
+          exported: false,
+          calls: [],
+          callers: [],
+          packages: [],
+        })
+      const [from, to] = top ? [0, 0] : bodies.get(id)!
+      const body = top ? tops.get(file)! : code.slice(from, to)
+      const takes = new Set((body.match(/\(([^)]*)\)/)?.[1] ?? "").match(/[A-Za-z_$][\w$]*/g) ?? [])
 
       const seen = new Set<string>()
-      for (const m of [...body.matchAll(CALL), ...body.matchAll(USED)]) {
+      for (const m of body.matchAll(USED)) {
         const name = m[1]
+        // coverage counts call shaped mentions only
+        const shaped = CALLED.test(body.slice(m.index + name.length, m.index + name.length + 40))
         if (KEYWORD.has(name) || seen.has(name)) continue
         seen.add(name)
         if (name === symbol.name) continue
@@ -310,13 +345,13 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
           link(symbol.id, here.id)
           continue
         }
-        if (locals.get(file)?.has(name)) continue
+        if (takes.has(name) || locals.get(file)?.has(name)) continue
         if (GLOBAL.has(name)) {
-          builtin++
+          if (shaped) builtin++
           continue
         }
         const came = local.get(name)
-        // a type is not called, it is written down, and the build erases it
+        // written, not called
         if (came?.type) continue
         if (came?.pkg) {
           if (!symbol.packages.includes(came.pkg)) symbol.packages.push(came.pkg)
@@ -324,7 +359,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         }
         if (came?.file) {
           const wanted = came.name === "default" || came.name === "*" ? name : came.name
-          // a file that only passes a name along is a doorway, so keep walking through it
+          // a re-export is a doorway
           let at = came.file
           let called = wanted
           let target = symbols[`${at}#${called}`] ?? symbols[`${at}#${name}`]
@@ -340,7 +375,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
             continue
           }
         }
-        unresolved.push({ from: symbol.id, name })
+        if (shaped) unresolved.push({ from: symbol.id, name })
       }
     }
   }

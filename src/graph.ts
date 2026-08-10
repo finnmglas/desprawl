@@ -278,7 +278,7 @@ export function build(repo: string): Graph {
       return { kind: "missing", reason: "outside the repo" }
 
     const conf = options(root, dirname(importer), configs)
-    // an alias is internal, so a miss is a miss: calling it a package fakes coverage
+    // an alias is internal: calling a miss a package fakes coverage
     let aliased = false
     for (const [pattern, targets] of Object.entries(conf.paths) as [string, string[]][]) {
       const star = pattern.indexOf("*")
@@ -329,7 +329,7 @@ export function build(repo: string): Graph {
     const rel = relative(root, hit)
     if (rel.startsWith("..")) return { kind: "missing", reason: "outside the repo" }
     if (modules[rel]) return { kind: "file", path: rel }
-    // there, just not a module: a stylesheet, or code git never sees
+    // there, not a module: a stylesheet, or code git never sees
     return tracked.has(rel) ? { kind: "asset" } : { kind: "generated" }
   }
 

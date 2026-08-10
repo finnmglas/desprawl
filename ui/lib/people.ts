@@ -1,5 +1,5 @@
 // owner: finn
-// goal: who works where, read off the tree the history already filled in
+// goal: who works where
 
 import type { Contributor, Node } from "../../src/model.ts"
 
@@ -21,7 +21,7 @@ export function worked(tree: Node): Map<string, Record<number, number>> {
   return found
 }
 
-/** who has committed there, most first. A remainder group answers for its folder */
+/** who committed there, most first. A remainder answers for its folder */
 export const hands = (
   at: string,
   where: Map<string, Record<number, number>>,

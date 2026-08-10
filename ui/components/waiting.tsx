@@ -1,10 +1,10 @@
 // owner: finn
-// goal: waiting that shows it is still working, and roughly how long for
+// goal: waiting, visibly
 
 import { useEffect, useState } from "react"
 import { cn } from "../lib/ui.ts"
 
-/** seconds since this mounted, ticking, so a still page is never mistaken for a stuck one */
+/** ticking, so a still page is not read as stuck */
 export function useWaited(): number {
   const [waited, setWaited] = useState(0)
   useEffect(() => {
@@ -22,7 +22,7 @@ export function Waiting({
   className,
 }: {
   what: string
-  /** said once it has taken long enough that someone would wonder */
+  /** said once it takes long enough to wonder */
   slow?: string
   rows?: number
   className?: string
@@ -34,7 +34,6 @@ export function Waiting({
         {what} <span className="tabular-nums">{waited.toFixed(1)}s</span>
         {slow && waited > 8 && <span className="block text-xs">{slow}</span>}
       </p>
-      {/* the shape of what is coming, so the page does not jump when it lands */}
       <div aria-hidden className="flex animate-pulse flex-col gap-2">
         {Array.from({ length: rows }, (_, row) => (
           <div key={row} className="flex gap-2">
