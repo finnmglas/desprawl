@@ -22,6 +22,8 @@ export interface Unit {
   classes: number
   /** installed packages it reaches for, counted once each */
   packages: number
+  /** and which ones, so a service can be traced to the module that talks to it */
+  installs: string[]
   /** units it imports, and how many file imports back each one */
   out: Record<string, number>
   in: Record<string, number>
@@ -215,6 +217,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
           functions: 0,
           classes: 0,
           packages: 0,
+          installs: [],
           out: {},
           in: {},
           types: {},
@@ -270,7 +273,8 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     const listed = entries.get(unit.path)
     unit.spread = listed?.size ?? 0
     unit.folders = listed ? [...listed.values()].filter(Boolean).length : 0
-    unit.packages = reached.get(unit.path)?.size ?? 0
+    unit.installs = [...(reached.get(unit.path) ?? [])]
+    unit.packages = unit.installs.length
     const tally = roles.get(unit.path)
     if (tally)
       unit.role = (Object.keys(tally) as Role[]).reduce((a, b) => (tally[b] > tally[a] ? b : a))

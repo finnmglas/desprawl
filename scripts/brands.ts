@@ -27,6 +27,7 @@ const NAMED: Record<string, string> = {
 /** a glyph is only worth its bytes for a mark that is read at a glance */
 // prettier-ignore
 const GLYPHS = new Set([
+  "Google Cloud", "Crowdin", "Vercel", "Netlify", "Cloudflare", "Railway", "Render", "Fly.io", "Kubernetes", "GitHub Pages", "Resend", "Algolia",
   "TypeScript", "JavaScript", "Python", "Rust", "Go", "Ruby", "PHP", "Swift", "Kotlin", "Java",
   "React", "Next.js", "Vue", "Svelte", "Angular", "Astro", "Node", "Deno", "Bun", "Docker",
   "Tailwind", "shadcn", "Base UI", "Radix", "Vite", "webpack", "ESLint", "Prettier", "Biome",
@@ -46,7 +47,9 @@ function readable(hex: string): string {
 }
 
 const icons = (await (
-  await fetch("https://unpkg.com/simple-icons@latest/data/simple-icons.json", { redirect: "follow" })
+  await fetch("https://unpkg.com/simple-icons@latest/data/simple-icons.json", {
+    redirect: "follow",
+  })
 ).json()) as { title: string; slug: string; hex: string }[]
 
 const bySlug = new Map(icons.map((i) => [i.slug, i]))
@@ -65,7 +68,9 @@ const found: Record<string, [string, string, string]> = {}
 const missing: string[] = []
 
 // every label the ui can show: stack notes, language names, and the named files
-const labels = [...new Set([...Object.keys(NOTES), ...Object.values(LANGS), ...Object.values(NAMES)])]
+const labels = [
+  ...new Set([...Object.keys(NOTES), ...Object.values(LANGS), ...Object.values(NAMES)]),
+]
 
 for (const label of labels) {
   // a hand picked colour wins, or "C#" quietly borrows the mark for C

@@ -10,8 +10,18 @@ import { cn } from "../lib/ui.ts"
 /** the glyph alone, in whatever colour it inherits */
 export function Glyph({ label, className }: { label: string; className?: string }) {
   const { brands } = useDisplay()
-  const path = BRANDS[label]?.[2]
-  if (!path || brands === "off") return null
+  const brand = BRANDS[label]
+  const path = brand?.[2]
+  if (brands === "off" || !brand) return null
+  // some marks are trademarked out of the icon set, and a coloured dot still names it
+  if (!path)
+    return (
+      <span
+        aria-hidden
+        style={{ background: tint(label) }}
+        className={cn("size-2 shrink-0 rounded-full", className)}
+      />
+    )
   return (
     <svg viewBox="0 0 24 24" aria-hidden className={cn("size-3 shrink-0 fill-current", className)}>
       <path d={path} />

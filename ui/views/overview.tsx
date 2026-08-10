@@ -5,6 +5,7 @@ import { useEffect, useState } from "react"
 import { AiCard } from "../components/ai-card.tsx"
 import { Avatar } from "../components/avatar.tsx"
 import { Card, CardContent } from "../components/card.tsx"
+import { CardHead } from "../components/card-head.tsx"
 import { DataTable, type Column } from "../components/data-table.tsx"
 import { Kpi } from "../components/kpi.tsx"
 import { METRICS } from "../lib/columns.ts"
@@ -13,9 +14,12 @@ import { Mark } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/stack-card.tsx"
+import { System } from "../components/system.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
 import { commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
-import { allTime } from "../lib/live.ts"
+import { allTime, importGraph } from "../lib/live.ts"
+import { balanced, fold } from "../../src/layers.ts"
+import type { Graph } from "../../src/graph.ts"
 import type { Timeline } from "../../src/history.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
 
@@ -77,6 +81,11 @@ export function Overview({
   faces: Record<string, string>
 }) {
   const [all, setAll] = useState<Timeline | null>(null)
+  // the picture below needs the imports, which the modules tab would otherwise fetch alone
+  const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
+  useEffect(() => {
+    if (!graph) void importGraph().then(setGraph)
+  }, [])
   // a second pass, so it lands after paint
   useEffect(() => {
     if (stats.truncated) void allTime().then(setAll)
@@ -135,6 +144,25 @@ export function Overview({
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHead
+          title="System"
+          hint="the modules this repo holds, what each depends on, and the services it reaches outside itself"
+        />
+        <CardContent>
+          {graph ? (
+            <System
+              name={stats.repo.split("/").filter(Boolean).pop() ?? "this repo"}
+              units={fold(graph, balanced(graph)).units.filter((u) => u.role === "source")}
+              stack={stats.stack}
+              onPick={() => onTab("Modules")}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">Reading every import in the repo.</p>
+          )}
+        </CardContent>
+      </Card>
 
       <StackCard stack={stats.stack} />
 

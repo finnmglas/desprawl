@@ -147,6 +147,60 @@ export function spreadOf(
   }
 }
 
+/**
+ * What the balance says a group is. A folder that only imports itself is a module
+ * whatever it is called, and one that only imports others is composition. The stars
+ * are the near misses, which is where the work usually is.
+ */
+export function shapeOf(
+  inside: number,
+  out: number,
+): { label: string; band: "entry" | "middle" | "base"; tone: string; why: string } {
+  // nothing imported at all is self contained by definition, not a composition layer
+  if (!inside && !out)
+    return {
+      label: "Module",
+      band: "base",
+      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+      why: "it imports nothing at all, so it stands on its own",
+    }
+  const share = (inside / (inside + out)) * 100
+  if (share >= 100)
+    return {
+      label: "Module",
+      band: "base",
+      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+      why: "every import stays inside it. This can be lifted out of the repo as it stands",
+    }
+  if (share >= 80)
+    return {
+      label: "Module*",
+      band: "base",
+      tone: "border-sky-500/50 text-sky-700 dark:text-sky-300",
+      why: "four imports in five stay inside. A module once the last few are dealt with",
+    }
+  if (share >= 30)
+    return {
+      label: "Sprawl",
+      band: "middle",
+      tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+      why: "half in, half out. It is neither a module nor a composition layer, which is what makes it hard to move or to name",
+    }
+  if (share >= 1)
+    return {
+      label: "Entrypoint*",
+      band: "entry",
+      tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
+      why: "almost everything it imports comes from elsewhere, so it mostly composes other groups",
+    }
+  return {
+    label: "Entrypoint",
+    band: "entry",
+    tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
+    why: "it imports only other groups and nothing of its own. A composition layer, which is what a top of the stack looks like",
+  }
+}
+
 export const TONES: Record<Verdict["tone"], string> = {
   plain: "bg-muted text-muted-foreground",
   fine: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
