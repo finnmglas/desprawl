@@ -9,6 +9,7 @@ import { place } from "../ui/lib/lanes.ts"
 import { effective, shares } from "../ui/lib/scale.ts"
 import { bucket, defaultGrain } from "../ui/lib/format.ts"
 import { expand, rows } from "../ui/lib/series.ts"
+import { shapeOf } from "../ui/lib/verdict.ts"
 import { repo } from "./repo.ts"
 
 const loc = { key: "code", num: true, get: (r: { code: number }) => r.code }
@@ -94,4 +95,29 @@ test("the number ladder shortens without lying about magnitude", () => {
   // prettier-ignore
   const ladder: [number, string][] = [[1, "1"], [999, "999"], [1000, "1.00k"], [1_500_000, "1.50m"], [-2500, "-2.50k"]]
   for (const [n, shown] of ladder) assert.equal(human(n, 3), shown, String(n))
+})
+
+test("a group is placed by which way its edges lean, not by how often one is repeated", () => {
+  const shape = (inside: number, out: number, into: number, reach = 2) =>
+    shapeOf(inside, out, into, reach).label
+  assert.equal(shape(0, 22, 0), "Entrypoint", "nothing imports it")
+  assert.equal(shape(1, 109, 4), "Entrypoint*", "4% arriving")
+  assert.equal(shape(15, 98, 32), "Collection", "25% arriving")
+  assert.equal(shape(32, 30, 25), "Shared*", "45% arriving is neither")
+  assert.equal(shape(13, 12, 120), "Shared", "91% arriving")
+  assert.equal(shape(35, 0, 54), "Module", "every import stays inside")
+
+  // 402 icon files each importing the same one utility is not breadth
+  assert.equal(shape(401, 399, 2, 1), "Module*", "a leaf leaning on one group")
+  assert.equal(
+    shape(401, 399, 2, 6),
+    "Entrypoint*",
+    "the same numbers spread over six groups are not",
+  )
+  assert.equal(
+    shape(1, 9, 0, 1),
+    "Entrypoint",
+    "a route folder keeps nothing inside, so it stays a top",
+  )
+  assert.equal(shape(24, 7, 1963, 1), "Shared", "what everything stands on is never a leaf")
 })

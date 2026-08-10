@@ -4,7 +4,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { build, jsonc, packageOf } from "../src/graph.ts"
-import { specifiers } from "../src/specifiers.ts"
+import { specifiers, symbols } from "../src/specifiers.ts"
 import { repo } from "./repo.ts"
 
 const to = (graph: ReturnType<typeof build>, from: string) =>
@@ -41,6 +41,24 @@ test("every form of import is found, and told apart", () => {
   )
   assert.equal(found.find((s) => s.text === "./b")?.type, true, "type only is marked")
   assert.equal(found.find((s) => s.text === "./e")?.lazy, true, "dynamic is marked")
+})
+
+test("an inline type import is erased too, unless a value comes with it", () => {
+  const found = specifiers(`
+    import { type A } from "./a"
+    import { type B, type C } from "./b"
+    export { type D } from "./d"
+    import { type E, value } from "./e"
+    import Def, { type F } from "./f"
+    import { typeOf } from "./g"
+  `)
+  const type = (text: string) => found.find((s) => s.text === text)?.type
+  assert.equal(type("./a"), true)
+  assert.equal(type("./b"), true)
+  assert.equal(type("./d"), true)
+  assert.equal(type("./e"), false, "a value comes with it, so the module is still loaded")
+  assert.equal(type("./f"), false, "a default comes with it")
+  assert.equal(type("./g"), false, "a name starting with type is not a type import")
 })
 
 test("relative imports resolve through extensions and index files", () => {
@@ -149,4 +167,48 @@ test("a package name is the thing that installs, not the file inside it", () => 
   assert.equal(packageOf("react-dom/client"), "react-dom")
   assert.equal(packageOf("@scope/pkg/deep/path"), "@scope/pkg")
   assert.equal(packageOf("node:fs"), "node:fs")
+})
+
+test("a declaration counts whether it is exported on the spot or at the bottom", () => {
+  assert.equal(symbols("export const A = 1\n").declares, 1)
+  assert.equal(symbols("const A = [1, 2]\nexport { A }\n").declares, 1, "exported at the bottom")
+  assert.equal(
+    symbols('export type { A } from "./a"\n').declares,
+    0,
+    "a type re-export declares nothing",
+  )
+  assert.equal(symbols("export type A = string\n").declares, 1, "a type alias does")
+  assert.equal(
+    symbols("export function f() {\n  const inner = 1\n  return inner\n}\n").declares,
+    1,
+    "what is inside a body is not a declaration of the file",
+  )
+})
+
+test("a door is a file that declares nothing and hands on what it imports", () => {
+  const dir = repo({
+    "star/index.ts": 'export * from "./a"\n',
+    "star/a.ts": "export const a = 1\n",
+    "named/index.ts": 'export { b } from "./b"\nexport type { T } from "./b"\n',
+    "named/b.ts": "export const b = 1\nexport type T = number\n",
+    "listed/index.ts": 'import { c } from "./c"\nimport { d } from "./d"\nexport { c, d }\n',
+    "listed/c.ts": "export const c = 1\n",
+    "listed/d.ts": "export const d = 1\n",
+    "registry/index.ts": 'import { e } from "./e"\nconst ALL = [e]\nexport { ALL }\n',
+    "registry/e.ts": "export const e = 1\n",
+    "entry/main.ts": 'import "./side"\nimport { f } from "./f"\nconsole.log(f)\n',
+    "entry/side.ts": "export const side = 1\n",
+    "entry/f.ts": "export const f = 1\n",
+    "wrapped/index.ts":
+      'import { g } from "./g"\nexport namespace N {\n  export const held = g\n}\n',
+    "wrapped/g.ts": "export const g = 1\n",
+  })
+  const g = build(dir)
+  const door = (path: string) => g.modules[path].barrel
+  assert.equal(door("star/index.ts"), true, "export * forwards")
+  assert.equal(door("named/index.ts"), true, "so does a named re-export")
+  assert.equal(door("listed/index.ts"), true, "and importing then exporting the same names")
+  assert.equal(door("registry/index.ts"), false, "a registry declares the thing it builds")
+  assert.equal(door("entry/main.ts"), false, "an entry imports but hands nothing on")
+  assert.equal(door("star/a.ts"), false, "and a leaf is not a door")
 })

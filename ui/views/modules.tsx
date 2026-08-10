@@ -26,7 +26,7 @@ import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
-import { balanced, fold, type Cut, type Layout, type Unit } from "../../src/layers.ts"
+import { balanced, fold, type Cut, type Layout, type Tangle, type Unit } from "../../src/layers.ts"
 import type { Sort } from "../lib/format.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
@@ -47,6 +47,16 @@ const FEW = 6
 const real = (unit: Unit) => unit.role === "source"
 
 const count = (edges: Record<string, number>) => Object.values(edges).reduce((sum, n) => sum + n, 0)
+
+/** how many groups it leans on, which one dependency imported by every file is not */
+const reach = (unit: Unit) => Object.keys(unit.out).length
+
+/** most of what ties it together goes through a file that only forwards */
+const glued = (loop: Tangle) => {
+  const glue = loop.cut.reduce((sum, edge) => sum + edge.glue, 0)
+  const imports = loop.cut.reduce((sum, edge) => sum + edge.imports, 0)
+  return glue > 0 && glue / Math.max(1, imports) >= 0.5
+}
 
 function Empty({
   stats,
@@ -437,10 +447,10 @@ export function Modules({
                   .map((loop) =>
                     [
                       loop.units.join(" + "),
-                      `${loop.units.length} groups, ${loop.edges} imports, ${loop.runtime ? "loops at runtime" : "only types close it"}`,
+                      `${loop.units.length} groups, ${loop.edges} imports, ${loop.runtime ? (loop.deep ? "loops at runtime, a file cycle spans it" : "loops at this grain only, no file cycle spans it") : "only types close it"}${glued(loop) ? ", held together by barrels" : ""}`,
                       ...loop.cut.map(
                         (edge) =>
-                          `  remove ${edge.from} -> ${edge.to} (${edge.imports} imports${edge.types === edge.imports ? ", type only" : ""}${edge.alone ? ", opens the loop alone" : ""})`,
+                          `  remove ${edge.from} -> ${edge.to} (${edge.imports} imports, ${costOf(edge).label}${edge.alone ? ", opens the loop alone" : ""})`,
                       ),
                     ].join("\n"),
                   )
@@ -472,15 +482,32 @@ export function Modules({
                   <p className="text-muted-foreground text-xs">
                     {plural(loop.units.length, "group")} holding {plural(held, "file")}, tied
                     together by {plural(loop.edges, "import")}.{" "}
-                    {loop.runtime ? (
-                      "There in runtime, decides load order."
-                    ) : (
+                    {!loop.runtime ? (
                       <Tip text="real in source, gone in builds">
                         <span className="underline decoration-dotted">
                           Type import loop, nothing loops at runtime.
                         </span>
                       </Tip>
+                    ) : loop.deep ? (
+                      <Tip text="checked at file grain: a single file cycle already spans these folders, so no amount of regrouping removes it">
+                        <span className="underline decoration-dotted">
+                          There in runtime, decides load order.
+                        </span>
+                      </Tip>
+                    ) : (
+                      <Tip text="checked at file grain: no file cycle spans these folders, so the loop is where the files sit, not how they run">
+                        <span className="underline decoration-dotted">
+                          Only a loop at this grain, no file cycle spans it.
+                        </span>
+                      </Tip>
                     )}{" "}
+                    {glued(loop) ? (
+                      <Tip text="these imports go through a file that only forwards, so naming the file that declares it is the whole fix">
+                        <span className="underline decoration-dotted">
+                          Held together by barrels.
+                        </span>
+                      </Tip>
+                    ) : null}{" "}
                     Removing {plural(loop.cut.length, "import")} of them fixes it, see below..
                   </p>
                 </div>
@@ -508,6 +535,26 @@ export function Modules({
 
 type Removal = Cut & { loop: number }
 
+/** what removing it would actually take */
+const costOf = (edge: Cut): { label: string; why: string; work: boolean } =>
+  edge.types === edge.imports
+    ? {
+        label: "type move",
+        why: "typescript erases these, so moving the type is usually the whole fix",
+        work: false,
+      }
+    : edge.types + edge.glue === edge.imports
+      ? {
+          label: "name the file",
+          why: "every one of these goes through a file that only forwards, so importing what declares it removes the edge without moving any code",
+          work: false,
+        }
+      : {
+          label: "manual",
+          why: "this one is there when the code runs, so removing it is a real change",
+          work: true,
+        }
+
 const CUTS: Column<Removal>[] = [
   { key: "from", label: "Remove in", get: (edge) => edge.from },
   { key: "to", label: "import of", get: (edge) => edge.to },
@@ -521,21 +568,19 @@ const CUTS: Column<Removal>[] = [
   {
     key: "kind",
     label: "Costs",
-    get: (edge) => (edge.types === edge.imports ? "type move" : "manual"),
-    cell: (edge) =>
-      edge.types === edge.imports ? (
-        <Tip text="typescript erases these, so moving the type is usually the whole fix">
-          <span className="text-muted-foreground">type move</span>
-        </Tip>
-      ) : (
-        <Tip text="this one is there when the code runs, so removing it is a real change">
-          <span className="flex items-center gap-1">
-            <Refresh className="size-3" />
-            manual
+    get: (edge) => costOf(edge).label,
+    cell: (edge) => {
+      const cost = costOf(edge)
+      return (
+        <Tip text={cost.why}>
+          <span className={cn("flex items-center gap-1", !cost.work && "text-muted-foreground")}>
+            {cost.work && <Refresh className="size-3" />}
+            {cost.label}
           </span>
         </Tip>
-      ),
-    hint: "an import carrying only types is erased by the build, so it is the cheap kind to move",
+      )
+    },
+    hint: "a type import is erased by the build and a barrel import only needs a different path, so both are cheaper than a refactor",
   },
   {
     key: "alone",
@@ -642,9 +687,9 @@ const COLUMNS: Column<Unit>[] = [
   {
     key: "shape",
     label: "Classification",
-    get: (u) => shapeOf(u.internal, count(u.out)).label,
+    get: (u) => shapeOf(u.internal, count(u.out), count(u.in), reach(u)).label,
     cell: (u) => {
-      const shape = shapeOf(u.internal, count(u.out))
+      const shape = shapeOf(u.internal, count(u.out), count(u.in), reach(u))
       return (
         <Tip text={shape.why}>
           <Badge variant="outline" className={shape.tone}>
@@ -653,7 +698,7 @@ const COLUMNS: Column<Unit>[] = [
         </Tip>
       )
     },
-    hint: "what the balance makes it, read off the share of imports that stay inside. A star is the near miss",
+    hint: "read off Inside, Leaves and Arrives together: what it keeps, what it needs, and who needs it. A star is the near miss",
   },
   {
     key: "exports",
@@ -690,6 +735,21 @@ const COLUMNS: Column<Unit>[] = [
     num: true,
     get: (u) => count(u.in),
     hint: "imports coming from other groups, so the cost of changing it",
+  },
+  {
+    key: "barrels",
+    label: "Doors",
+    num: true,
+    get: (u) => u.barrels,
+    cell: (u) =>
+      u.barrels ? (
+        <Tip text="a file that declares nothing and only hands on what it imports. Everything reaching this group through one goes in as a single import, which flatters its cohesion and hides who depends on it">
+          <span className="underline decoration-dotted">{num(u.barrels)}</span>
+        </Tip>
+      ) : (
+        <span className="text-muted-foreground">0</span>
+      ),
+    hint: "barrel files: they forward other files rather than declare anything, so imports pile through them",
   },
   {
     key: "packages",

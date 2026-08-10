@@ -10,6 +10,8 @@ export interface Edge {
   to: string
   type: boolean
   lazy: boolean
+  /** a re-export, so the importer is only passing it on */
+  via: boolean
 }
 
 export interface Module {
@@ -22,6 +24,8 @@ export interface Module {
   /** what it declares */
   symbols: Symbols
   lines: number
+  /** forwards everything and declares nothing, so importing through it is a choice */
+  barrel: boolean
 }
 
 export interface Missing {
@@ -210,8 +214,9 @@ export function build(repo: string): Graph {
         in: [],
         packages: [],
         imports: {},
-        symbols: { exports: 0, functions: 0, classes: 0 },
+        symbols: { exports: 0, declares: 0, functions: 0, classes: 0 },
         lines: 0,
+        barrel: false,
       },
     ]),
   )
@@ -258,9 +263,15 @@ export function build(repo: string): Graph {
         continue
       }
       modules[from].imports[spec.text] = target.path
-      modules[from].out.push({ to: target.path, type: spec.type, lazy: spec.lazy })
+      modules[from].out.push({ to: target.path, type: spec.type, lazy: spec.lazy, via: spec.via })
       modules[target.path].in.push(from)
     }
+    // declares nothing and hands something on: `export * from`, or imports re-exported by name
+    const own = modules[from]
+    own.barrel =
+      own.out.length > 0 &&
+      !own.symbols.declares &&
+      (own.symbols.exports > 0 || own.out.some((edge) => edge.via))
   }
 
   function locate(

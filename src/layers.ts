@@ -20,6 +20,8 @@ export interface Unit {
   exports: number
   functions: number
   classes: number
+  /** files that declare nothing and only hand on what they import */
+  barrels: number
   /** packages it reaches for */
   packages: number
   /** and which, to trace a service to its module */
@@ -29,6 +31,8 @@ export interface Unit {
   in: Record<string, number>
   /** of those, the type only ones */
   types: Record<string, number>
+  /** of the runtime ones, those landing on a barrel and not the file that declares it */
+  glue: Record<string, number>
   /** never leaves it: cohesion */
   internal: number
   /** how deep its dependencies go */
@@ -45,6 +49,8 @@ export interface Cut {
   imports: number
   /** of those, the cheap kind to move */
   types: number
+  /** of those, the ones cured by naming the file instead of the barrel */
+  glue: number
   /** breaks the loop alone */
   alone: boolean
 }
@@ -54,6 +60,8 @@ export interface Tangle {
   edges: number
   /** still a loop without the types */
   runtime: boolean
+  /** a file cycle spans these folders too, so it is load order and not just placement */
+  deep: boolean
   /** one set that opens the loop, not proven minimal */
   cut: Cut[]
 }
@@ -207,11 +215,13 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
           exports: 0,
           functions: 0,
           classes: 0,
+          barrels: 0,
           packages: 0,
           installs: [],
           out: {},
           in: {},
           types: {},
+          glue: {},
           internal: 0,
           level: 0,
           instability: 0,
@@ -244,6 +254,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     from.exports += module.symbols.exports
     from.functions += module.symbols.functions
     from.classes += module.symbols.classes
+    if (module.barrel) from.barrels++
     const packages = reached.get(from.path) ?? new Set()
     for (const name of module.packages) packages.add(name)
     reached.set(from.path, packages)
@@ -255,6 +266,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
       }
       from.out[to] = (from.out[to] ?? 0) + 1
       if (edge.type) from.types[to] = (from.types[to] ?? 0) + 1
+      if (!edge.type && graph.modules[edge.to]?.barrel) from.glue[to] = (from.glue[to] ?? 0) + 1
       const target = seen(to)
       target.in[from.path] = (target.in[from.path] ?? 0) + 1
     }
@@ -282,6 +294,16 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   for (const group of scc(units.keys(), runs))
     for (const path of group) still.set(path, group.length)
 
+  // the folders a single file cycle already spans: folding cannot have invented those
+  const across: Set<string>[] = []
+  for (const group of scc(Object.keys(graph.modules), (path) =>
+    graph.modules[path].out.filter((e) => !e.type && graph.modules[e.to]).map((e) => e.to),
+  )) {
+    if (group.length < 2) continue
+    const spans = new Set(group.map(keyOf))
+    if (spans.size > 1) across.push(spans)
+  }
+
   const groups = scc(units.keys(), (path) => Object.keys(seen(path).out))
   const level = new Map<string, number>()
   const tangles: Tangle[] = []
@@ -306,16 +328,22 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
       edges,
       // some part of it survives without the types, so it is a real load order loop
       runtime: group.some((member) => (still.get(member) ?? 1) > 1),
+      deep: across.some((spans) => [...spans].filter((u) => inside.has(u)).length > 1),
       cut: cut(group, (p) => Object.keys(seen(p).out))
         .map(([from, to]) => ({
           from,
           to,
           imports: seen(from).out[to],
           types: seen(from).types[to] ?? 0,
+          glue: seen(from).glue[to] ?? 0,
           alone: opens(group, (p) => Object.keys(seen(p).out), [from, to]),
         }))
-        // the cheap ones first: a type import is a move, a runtime one is a refactor
-        .sort((a, b) => b.types / b.imports - a.types / a.imports || a.imports - b.imports),
+        // the cheap ones first: a type or a barrel is a move, anything else is a refactor
+        .sort(
+          (a, b) =>
+            (b.types + b.glue) / b.imports - (a.types + a.glue) / a.imports ||
+            a.imports - b.imports,
+        ),
     })
   }
 

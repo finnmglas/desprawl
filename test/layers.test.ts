@@ -192,3 +192,44 @@ test("the heaviest folder is the one that gets opened", () => {
   assert.ok(groups.has("app/heavy"), "the weight decides, not the name")
   assert.ok(!groups.has("app"), "and its parent is no longer a group of its own")
 })
+
+test("a folder loop no file cycle spans is placement, not load order", () => {
+  // four files, no path back to any of them: only the folding closes the loop
+  const g = build(
+    repo({
+      "x/a.ts": 'import "../y/b"\n',
+      "y/b.ts": "export const b = 1\n",
+      "y/c.ts": 'import "../x/d"\n',
+      "x/d.ts": "export const d = 1\n",
+    }),
+  )
+  const loop = fold(g, 1).tangles[0]
+  assert.equal(loop.units.join(), "x,y", "the folders do close a loop")
+  assert.equal(loop.runtime, true, "and no type import is erasing it")
+  assert.equal(loop.deep, false, "but nothing at file grain agrees")
+})
+
+test("a real file cycle is called out as one whatever grain it is folded at", () => {
+  const g = build(
+    repo({
+      "x/a.ts": 'import "../y/b"\nexport const a = 1\n',
+      "y/b.ts": 'import "../x/a"\nexport const b = 1\n',
+    }),
+  )
+  assert.equal(fold(g, 1).tangles[0].deep, true)
+})
+
+test("an import through a barrel costs a path, not a refactor", () => {
+  const g = build(
+    repo({
+      "x/a.ts": 'import "../y"\nexport const a = 1\n',
+      "y/index.ts": 'export { b } from "./b"\n',
+      "y/b.ts": 'import "../x/a"\nexport const b = 1\n',
+    }),
+  )
+  assert.equal(g.modules["y/index.ts"].barrel, true, "it forwards and declares nothing")
+  assert.equal(g.modules["y/b.ts"].barrel, false, "this one declares its own")
+  const loop = fold(g, 1).tangles[0]
+  const edge = loop.cut.find((c) => c.from === "x" && c.to === "y")!
+  assert.equal(edge.glue, 1, "the import lands on the barrel, so naming the file removes it")
+})

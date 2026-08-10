@@ -143,53 +143,89 @@ export function spreadOf(
   }
 }
 
-/** only imports itself: a module. Only imports others: composition. A star is the near miss */
+/** only imports itself: a module. Otherwise placed by which way its edges lean, entry to foundation */
 export function shapeOf(
   inside: number,
   out: number,
+  /** imports arriving from other groups, without which a leaf reads as an entry point */
+  into = 0,
+  /** how many groups it leans on, since one dependency repeated is not breadth */
+  reach = 2,
 ): { label: string; band: "entry" | "middle" | "base"; tone: string; why: string } {
-  // nothing imported at all is self contained by definition, not a composition layer
+  const MODULE = "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
+  const NEAR = "border-sky-500/50 text-sky-700 dark:text-sky-300"
+  const ENTRY = "border-violet-500/50 text-violet-700 dark:text-violet-300"
+  const MIDDLE = "border-amber-500/60 text-amber-700 dark:text-amber-300"
   if (!inside && !out)
     return {
       label: "Module",
       band: "base",
-      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
-      why: "it imports nothing at all, so it stands on its own",
+      tone: MODULE,
+      why: into
+        ? "it imports nothing at all and the rest imports it, so it stands on its own"
+        : "it imports nothing and nothing imports it, so it stands apart from the repo",
     }
-  const share = (inside / (inside + out)) * 100
-  if (share >= 100)
+  const kept = (inside / (inside + out)) * 100
+
+  if (kept >= 100)
     return {
       label: "Module",
       band: "base",
-      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
-      why: "every import stays inside it. This can be lifted out of the repo as it stands",
+      tone: MODULE,
+      why: "every import stays inside it, so it can be lifted out as it stands",
     }
-  if (share >= 80)
+  if (kept >= 80)
     return {
       label: "Module*",
       band: "base",
-      tone: "border-sky-500/50 text-sky-700 dark:text-sky-300",
+      tone: NEAR,
       why: "four imports in five stay inside. A module once the last few are dealt with",
     }
-  if (share >= 30)
+
+  // everything left is placed by which way it leans, so nothing turns on one import
+  const arriving = into + out ? (into / (into + out)) * 100 : 0
+  if (arriving >= 55)
     return {
-      label: "Collection",
-      band: "middle",
-      tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
-      why: "half in, half out. It is neither a module nor a composition layer, which is what makes it hard to move or to name",
+      label: "Shared",
+      band: "base",
+      tone: MODULE,
+      why: `${Math.round(arriving)}% of its edges arrive, so it is what the rest stands on`,
     }
-  if (share >= 1)
+  // half of it is its own and it leans on one group: a leaf hanging off the tree, and
+  // nothing importing it means unused, never a top of the stack
+  if (kept >= 50 && reach <= 1)
+    return {
+      label: "Module*",
+      band: "base",
+      tone: NEAR,
+      why: `half its imports stay inside and it leans on ${reach ? "one other group" : "nothing"}, so it is a leaf. Almost nothing here uses it`,
+    }
+  if (arriving <= 0)
+    return {
+      label: "Entrypoint",
+      band: "entry",
+      tone: ENTRY,
+      why: "nothing here imports it, and it imports the rest. A top of the stack",
+    }
+  if (arriving < 10)
     return {
       label: "Entrypoint*",
       band: "entry",
-      tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
-      why: "almost everything it imports comes from elsewhere, so it mostly composes other groups",
+      tone: ENTRY,
+      why: `${Math.round(arriving)}% of its edges arrive, the rest leave, so it mostly composes`,
+    }
+  if (arriving < 45)
+    return {
+      label: "Collection",
+      band: "middle",
+      tone: MIDDLE,
+      why: `${Math.round(arriving)}% of its edges arrive, so it leans on more than leans on it. Hard to move or to name`,
     }
   return {
-    label: "Entrypoint",
-    band: "entry",
-    tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
-    why: "it imports only other groups and nothing of its own. A composition layer, which is what a top of the stack looks like",
+    label: "Shared*",
+    band: "middle",
+    tone: NEAR,
+    why: `${Math.round(arriving)}% of its edges arrive, which is even. Nearly a foundation, and it would take little to make it one`,
   }
 }
 

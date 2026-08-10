@@ -70,7 +70,7 @@ const BANDS = [
   {
     key: "entry",
     label: "Entrypoints",
-    hint: "imports mostly from elsewhere, so it wires the rest together",
+    hint: "almost nothing imports it, and it imports the rest, so it wires things together",
   },
   {
     key: "middle",
@@ -79,8 +79,8 @@ const BANDS = [
   },
   {
     key: "base",
-    label: "Stands on its own (Module)",
-    hint: "its imports stay inside it, so it could be lifted out as it is",
+    label: "What the rest stands on",
+    hint: "more imports arrive than leave, so the rest is built on top of it",
   },
 ] as const
 
@@ -120,11 +120,9 @@ export function System({
       return one ? [one.up, one.down] : []
     }),
   )
+  const edges = (side: Record<string, number>) => Object.values(side).reduce((sum, n) => sum + n, 0)
   const read = (unit: Unit) =>
-    shapeOf(
-      unit.internal,
-      Object.values(unit.out).reduce((sum, n) => sum + n, 0),
-    )
+    shapeOf(unit.internal, edges(unit.out), edges(unit.in), Object.keys(unit.out).length)
 
   // in a window, whoever did the moving then, rather than whoever owns it overall
   const crew = (unit: Unit) =>

@@ -5,6 +5,7 @@ export interface Specifier {
   text: string // what stood between the quotes
   type: boolean // erased at build time, so a weaker edge
   lazy: boolean // import(), a chunk boundary too
+  via: boolean // `export ... from`, so this file forwards rather than uses
   /** the names it binds locally, and what each is called where it came from */
   names: { local: string; name: string }[]
 }
@@ -30,6 +31,16 @@ export function bound(clause: string): { local: string; name: string }[] {
     .trim()
   if (/^[A-Za-z_$][\w$]*$/.test(head)) out.push({ local: head, name: "default" })
   return out
+}
+
+/** `import { type A, type B }` is erased just as `import type { A, B }` is */
+export function erased(clause: string): boolean {
+  const listed = clause
+    .replace(/\bfrom\s*$/, "")
+    .trim()
+    .match(/^\{([^}]*)\}$/)
+  const parts = listed?.[1].split(",").filter((part) => part.trim()) ?? []
+  return parts.length > 0 && parts.every((part) => /^\s*type\s/.test(part))
 }
 
 const WORD = /[A-Za-z0-9_$]/
@@ -114,6 +125,8 @@ export function scrub(source: string): { code: string; strings: string[] } {
 export interface Symbols {
   /** what a file hands out, so its api surface rather than its size */
   exports: number
+  /** what it declares itself, exported here or not, so 0 means it only forwards */
+  declares: number
   /** top level, not the callbacks inside */
   functions: number
   classes: number
@@ -122,6 +135,10 @@ export interface Symbols {
 const NAMED = /export\s*\{([^}]*)\}/g
 const DECLARED =
   /(^|[\s;}])export\s+(default\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum|abstract)\b/g
+// its own, whether it exports it here or at the bottom. `type {` is a re-export, not a
+// declaration, and a body holding one is indented, so only the first column counts
+const OWN =
+  /^(export\s+)?(default\s+)?(async\s+)?(function|class|const|let|var|interface|enum|abstract|declare|namespace|type(?!\s*\{))\b/gm
 const FUNCTIONS = /(^|[\s;}])(async\s+)?function\b/g
 // a const bound to an arrow in the first column: a declaration
 const ARROWS =
@@ -139,6 +156,7 @@ export function symbols(source: string): Symbols {
   )
   return {
     exports: listed + count(code, DECLARED),
+    declares: count(code, OWN),
     functions: count(code, FUNCTIONS) + count(code, ARROWS),
     classes: count(code, CLASSES),
   }
@@ -158,11 +176,19 @@ export function specifiers(source: string, done?: ReturnType<typeof scrub>): Spe
 
   for (const m of code.matchAll(STATIC)) {
     const text = strings[Number(m[4])]
-    if (text) found.push({ text, type: !!m[2], lazy: false, names: bound(m[3] ?? "") })
+    const clause = m[3] ?? ""
+    if (text)
+      found.push({
+        text,
+        type: !!m[2] || erased(clause),
+        lazy: false,
+        via: m[1] === "export",
+        names: bound(clause),
+      })
   }
   for (const m of code.matchAll(CALLS)) {
     const text = strings[Number(m[2])]
-    if (text) found.push({ text, type: false, lazy: m[1] === "import", names: [] })
+    if (text) found.push({ text, type: false, lazy: m[1] === "import", via: false, names: [] })
   }
   return found
 }
