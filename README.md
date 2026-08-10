@@ -1,10 +1,10 @@
-> ✨ HUMAN GENERATED DOCS
+![desprawl - unfuck your TypeScript project, by scoping and delivering cleanup work](ui/brand/readme-banner.svg)
 
-# desprawl
+# <img src="ui/brand/favicon.svg" alt="" height="32"> desprawl
 
 [![GitHub package.json version](https://img.shields.io/github/package-json/v/finnmglas/desprawl?style=for-the-badge&color=%23ffc46a)](https://github.com/finnmglas/desprawl/releases) [![NPM Downloads](https://img.shields.io/npm/d18m/desprawl?style=for-the-badge&color=%23ffc46a)](https://www.npmjs.com/package/desprawl) [![GitHub contributors](https://img.shields.io/github/contributors/finnmglas/desprawl?style=for-the-badge&color=%23ffc46a)](https://github.com/finnmglas/desprawl)
 
-Unfuck typescript projects by scoping and delivering cleanup work.
+Scope and deliver cleanup.
 
 ## Quickstart
 
