@@ -2,12 +2,13 @@
 
 # desprawl
 
+[![GitHub package.json version](https://img.shields.io/github/package-json/v/finnmglas/desprawl?style=for-the-badge&color=%23ffc46a)](https://github.com/finnmglas/desprawl/releases) [![NPM Downloads](https://img.shields.io/npm/d18m/desprawl?style=for-the-badge&color=%23ffc46a)](https://www.npmjs.com/package/desprawl) [![GitHub contributors](https://img.shields.io/github/contributors/finnmglas/desprawl?style=for-the-badge&color=%23ffc46a)](https://github.com/finnmglas/desprawl)
+
 Unfuck your typescript projects by scoping and delivering cleanup work.
 
-This is truely free software: **no tracking, no costs, no ads, truely yours**!\
-Save it, ⭐ it & unfuck projects.
-
-\- Cheers, Julia & Finn
+> _This is truely free software: **no tracking, no costs, no ads, truely yours**!\
+> Save it, ⭐ it & unfuck projects._
+> _\- Cheers, Julia & Finn_
 
 ## Quickstart
 
