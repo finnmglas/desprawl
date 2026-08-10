@@ -16,6 +16,14 @@ or install once
 pnpm add -g desprawl
 ```
 
+and unfuck projects
+
+```sh
+desprawl               # view your repo
+desprawl <local path>  # view repo at path
+desprawl <git url>     # view remote repo (auto-clones)
+```
+
 Defaults to UI, CLI available.
 
 ## Showcase
@@ -78,6 +86,11 @@ Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owne
 Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.
 
 `desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone - or served as a website.
+
+## Related
+
+- Uses: [npm-packaging](https://www.npmjs.com/), [pnpm-cli](https://pnpm.io/), [ts](https://www.typescriptlang.org/), [git](https://git-scm.com/), [claude](https://claude.ai/new)
+- Influence: code viz [graphify](https://github.com/Graphify-Labs/graphify), [GitNexus](https://github.com/abhigyanpatwari/GitNexus), [codegraph](https://github.com/colbymchenry/codegraph), archi viz [S202](https://github.com/Weigend/S202), [c4 model](https://c4model.info/#what-is-the-c4-model)
 
 ## Continue
 
