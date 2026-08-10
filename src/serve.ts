@@ -17,7 +17,7 @@ import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
 import { explain } from "./needs.ts"
-import { shell } from "./view.ts"
+import { page as onePage, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
@@ -103,6 +103,12 @@ export function serve(
         return ""
       }
     })()
+
+  // stopping on purpose deserves the same sentence as stopping because a tab went
+  process.once("SIGINT", () => {
+    console.log("\n\nStopped by you, so desprawl is no longer serving that repo.\n")
+    process.exit(0)
+  })
 
   return new Promise((resolve, reject) => {
     const server = createServer((req, res) => {
@@ -235,6 +241,13 @@ export function serve(
           imports ||= build(repo)
           called ||= calls(repo, imports)
           return json(called)
+        }
+
+        // the whole thing as one file, using whatever this run has already built
+        if (url.pathname === "/api/static") {
+          imports ||= build(repo)
+          const made = onePage(load(false), { graph: imports, called, viewer: html })
+          return send(200, made.html, "text/html")
         }
 
         // dates and authors only, so the chart spans everything

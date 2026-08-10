@@ -17,7 +17,7 @@ import {
   type Scale,
 } from "../lib/display.tsx"
 import { num } from "../lib/format.ts"
-import { callGraph, importGraph, isLive } from "../lib/live.ts"
+import { callGraph, importGraph, isLive, staticPage } from "../lib/live.ts"
 import type { Prefs } from "../lib/prefs.ts"
 import type { Stats } from "../../src/model.ts"
 
@@ -83,7 +83,21 @@ export function Settings({
         <Download />
         git-stats (json)
       </MenuItem>
-      {isLive() && (
+      {(isLive() || window.__DESPRAWL_GRAPH__) && (
+        <MenuItem
+          onClick={async () => {
+            const graph = await importGraph()
+            if (!graph) return
+            const file = named("imports.json")
+            download(file, JSON.stringify(graph, null, 2), "application/json")
+            toast(file, `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`)
+          }}
+        >
+          <Download />
+          import-graph (json)
+        </MenuItem>
+      )}
+      {(isLive() || window.__DESPRAWL_CALLS__) && (
         <MenuItem
           onClick={async () => {
             const graph = await callGraph()
@@ -103,15 +117,15 @@ export function Settings({
       {isLive() && (
         <MenuItem
           onClick={async () => {
-            const graph = await importGraph()
-            if (!graph) return
-            const file = named("imports.json")
-            download(file, JSON.stringify(graph, null, 2), "application/json")
-            toast(file, `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`)
+            const made = await staticPage()
+            if (!made) return
+            const file = named("desprawl.html")
+            download(file, made, "text/html")
+            toast(file, "The whole report in one file, with both graphs inside it")
           }}
         >
           <Download />
-          import-graph (json)
+          full static desprawl (html)
         </MenuItem>
       )}
       <div className="bg-border my-1 h-px" />

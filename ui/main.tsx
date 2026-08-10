@@ -24,6 +24,7 @@ import { useView } from "./lib/hash.ts"
 import { attach, isLive, onBusy, token } from "./lib/live.ts"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
+import type { Calls as Called } from "../src/calls.ts"
 import type { Graph as Imports } from "../src/graph.ts"
 import type { Stats } from "../src/model.ts"
 
@@ -31,8 +32,9 @@ import type { Stats } from "../src/model.ts"
 declare global {
   interface Window {
     __DESPRAWL__?: Stats
-    /** a static export carries the graph too, since there is no server to ask */
+    /** a static export carries both graphs too, since there is no server to ask */
     __DESPRAWL_GRAPH__?: Imports
+    __DESPRAWL_CALLS__?: Called
   }
 }
 

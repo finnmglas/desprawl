@@ -68,11 +68,31 @@ export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
 
 export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/api/timeline", null)
 
-/** built on the first ask, held by the server after */
-export const importGraph = (): Promise<Graph | null> => ask<Graph | null>("/api/graph", null)
+/** built on the first ask and held by the server, or carried by a static page already */
+export const importGraph = (): Promise<Graph | null> =>
+  window.__DESPRAWL_GRAPH__
+    ? Promise.resolve(window.__DESPRAWL_GRAPH__)
+    : ask<Graph | null>("/api/graph", null)
 
 /** every declaration and what calls it, which takes longer again than the imports */
-export const callGraph = (): Promise<Calls | null> => ask<Calls | null>("/api/calls", null)
+export const callGraph = (): Promise<Calls | null> =>
+  window.__DESPRAWL_CALLS__
+    ? Promise.resolve(window.__DESPRAWL_CALLS__)
+    : ask<Calls | null>("/api/calls", null)
+
+/** the whole thing as one file, built by the server that is already holding the pieces */
+export async function staticPage(): Promise<string | null> {
+  const t = token()
+  if (!t) return null
+  try {
+    const res = await fetch(`/api/static?t=${t}`)
+    if (res.ok) return await res.text()
+  } catch {
+    /* the toast below says it did not arrive */
+  }
+  toast("Could not build the file", "the server did not answer", "error")
+  return null
+}
 
 export interface Sample {
   date: string

@@ -48,6 +48,8 @@ export function AiCard({ ai }: { ai: Ai }) {
         )}
       </CardHead>
 
+      {/* nothing to list still needs a floor, or the card ends on its header */}
+      {rows.length === 0 && <div className="pb-4" />}
       {rows.length > 0 && (
         <CardContent className="flex flex-wrap gap-x-10 gap-y-3 pt-1">
           {rows.map(([label, items]) => (
