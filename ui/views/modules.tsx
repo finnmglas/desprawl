@@ -21,7 +21,7 @@ import { Tip } from "../components/tip.tsx"
 import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
-import { layeringOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
+import { layeringOf, shapeOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import { balanced, fold, type Cut, type Layout, type Unit } from "../../src/layers.ts"
 import type { Sort } from "../lib/format.ts"
@@ -173,7 +173,12 @@ export function Modules({
     : undefined
   const cuts = new Set(loops.flatMap((l) => l.cut.map((c) => `${c.from} ${c.to}`)))
   const folder = (path: string) => !/\.[a-z]+$/.test(path)
-  const open = (path: string) => folder(path) && onPath(path.split("/"))
+  // a remainder group is named for its folder with a star on the end, and the star
+  // is not a directory anyone can open
+  const open = (path: string) => {
+    const at = path.replace(/\/?\*$/, "")
+    if (folder(at)) onPath(at ? at.split("/") : [])
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -540,52 +545,6 @@ const CUTS: Column<Removal>[] = [
   { key: "loop", label: "Loop", num: true, flat: true, get: (edge) => edge.loop },
 ]
 
-/**
- * What the balance says a group is. A folder that only imports itself is a module
- * whatever it is called, and one that only imports others is composition. The stars
- * are the near misses, which is where the work usually is.
- */
-const SHAPES: { label: string; from: number; tone: string; why: string }[] = [
-  {
-    label: "Module",
-    from: 100,
-    tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
-    why: "every import stays inside it. This can be lifted out of the repo as it stands",
-  },
-  {
-    label: "Module*",
-    from: 80,
-    tone: "border-sky-500/50 text-sky-700 dark:text-sky-300",
-    why: "four imports in five stay inside. A module once the last few are dealt with",
-  },
-  {
-    label: "Sprawl",
-    from: 30,
-    tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
-    why: "half in, half out. It is neither a module nor a composition layer, which is what makes it hard to move or to name",
-  },
-  {
-    label: "Entrypoint*",
-    from: 1,
-    tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
-    why: "almost everything it imports comes from elsewhere, so it mostly composes other groups",
-  },
-  {
-    label: "Entrypoint",
-    from: 0,
-    tone: "border-violet-500/50 text-violet-700 dark:text-violet-300",
-    why: "it imports only other groups and nothing of its own. A composition layer, which is what a top of the stack looks like",
-  },
-]
-
-const shapeOf = (unit: Unit) => {
-  const out = count(unit.out)
-  // nothing imported at all is self contained by definition, not a composition layer
-  if (!unit.internal && !out) return SHAPES[0]
-  const inside = (unit.internal / (unit.internal + out)) * 100
-  return SHAPES.find((shape) => inside >= shape.from) ?? SHAPES[SHAPES.length - 1]
-}
-
 /** the split every group is really judged on: what it keeps in against what it reaches out for */
 const Balance = ({ unit }: { unit: Unit }) => {
   const out = count(unit.out)
@@ -673,9 +632,9 @@ const COLUMNS: Column<Unit>[] = [
   {
     key: "shape",
     label: "Reads as",
-    get: (u) => shapeOf(u).label,
+    get: (u) => shapeOf(u.internal, count(u.out)).label,
     cell: (u) => {
-      const shape = shapeOf(u)
+      const shape = shapeOf(u.internal, count(u.out))
       return (
         <Tip text={shape.why}>
           <Badge variant="outline" className={shape.tone}>

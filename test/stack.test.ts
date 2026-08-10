@@ -173,3 +173,50 @@ test("using a cloud's services is not the same as deploying there", () => {
   const s = stack(repo({ "package.json": '{"dependencies":{"@google-cloud/storage":"7.0.0"}}' }))
   assert.deepEqual(s.hosts, [], "a storage client says nothing about the host")
 })
+
+test("an ignored link folder is boilerplate, not a deployment", () => {
+  // create-next-app writes this into every repo it makes, deployed there or not
+  const dir = repo({
+    "package.json": '{"name":"app","dependencies":{"next":"15.0.0"}}',
+    ".gitignore": "node_modules\n\n# vercel\n.vercel\n",
+    "app/page.tsx": "export default function Page() {\n  return null\n}\n",
+  })
+  assert.deepEqual(stack(dir).hosts, [], "a template line proves nothing about where this runs")
+})
+
+test("a package that only runs on one platform names that platform", () => {
+  const dir = repo({
+    "package.json": '{"name":"app","dependencies":{"@vercel/analytics":"1.0.0"}}',
+    "src/main.ts": "export const main = 1\n",
+  })
+  const found = stack(dir)
+  assert.deepEqual(found.hosts, ["Vercel"])
+  assert.equal(found.from["Vercel"], "@vercel/analytics", "and the claim can be followed")
+})
+
+test("a file whose name half the world uses has to say what it is", () => {
+  const vague = repo({
+    "package.json": '{"name":"app"}',
+    // a kubernetes manifest, not app engine, and a docs template, not SAM
+    "deploy/app.yaml": "apiVersion: apps/v1\nkind: Deployment\n",
+    "docs/template.yaml": "title: a page\nbody: text\n",
+    "src/main.ts": "export const main = 1\n",
+  })
+  assert.deepEqual(stack(vague).hosts, [], "a name alone is not a deployment")
+
+  const named = repo({
+    "package.json": '{"name":"app"}',
+    "app.yaml": "runtime: nodejs20\nenv: standard\n",
+    "src/main.ts": "export const main = 1\n",
+  })
+  assert.deepEqual(stack(named).hosts, ["Google Cloud"], "a runtime makes it app engine")
+})
+
+test("serverless names its own cloud rather than assuming one", () => {
+  const dir = repo({
+    "package.json": '{"name":"app"}',
+    "serverless.yml": "service: thing\nprovider:\n  name: google\n  runtime: nodejs20\n",
+    "src/main.ts": "export const main = 1\n",
+  })
+  assert.deepEqual(stack(dir).hosts, ["Google Cloud"], "the framework runs on more than aws")
+})

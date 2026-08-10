@@ -198,15 +198,13 @@ const HOSTED: [RegExp, string][] = [
   [/^(.*\/)?fly\.toml$/, "Fly.io"],
   [/^(.*\/)?railway\.(json|toml)$/, "Railway"],
   [/^(.*\/)?render\.ya?ml$/, "Render"],
-  [/^(.*\/)?app\.ya?ml$/, "Google Cloud"],
   [/^(.*\/)?Procfile$/, "Heroku"],
   [/^(.*\/)?heroku\.ya?ml$/, "Heroku"],
   [/^(.*\/)?firebase\.json$/, "Firebase"],
   [/^(.*\/)?amplify\.ya?ml$/, "AWS"],
-  [/^(.*\/)?(template|samconfig)\.(ya?ml|toml)$/, "AWS"],
+  [/^(.*\/)?samconfig\.toml$/, "AWS"],
   [/^(.*\/)?cdk\.json$/, "AWS"],
   [/^(.*\/)?sst\.config\.[cm]?ts$/, "AWS"],
-  [/^(.*\/)?serverless\.ya?ml$/, "AWS"],
   [/^(.*\/)?\.platform\.app\.ya?ml$/, "Platform.sh"],
   [/^(.*\/)?captain-definition$/, "CapRover"],
   [/^\.do\/(app|deploy)\.ya?ml$/, "DigitalOcean"],
@@ -218,6 +216,20 @@ const HOSTED: [RegExp, string][] = [
   [/^\.ebextensions\//, "AWS"],
   [/^(.*\/)?staticwebapp\.config\.json$/, "Azure"],
   [/^(.*\/)?skaffold\.ya?ml$/, "Kubernetes"],
+]
+
+/**
+ * A file whose name half the world uses. app.yaml is app engine only when it names a
+ * runtime, template.yaml is SAM only when it says so, and serverless.yml can target
+ * any cloud. Each has to say what it is before it counts as anything.
+ */
+// prettier-ignore
+const AMBIGUOUS: [RegExp, RegExp, string][] = [
+  [/^(.*\/)?app\.ya?ml$/, /^\s*runtime:\s*\S/m, "Google Cloud"],
+  [/^(.*\/)?template\.ya?ml$/, /AWSTemplateFormatVersion|Transform:\s*(-\s*)?AWS::Serverless/, "AWS"],
+  [/^(.*\/)?serverless\.ya?ml$/, /name:\s*aws\b/, "AWS"],
+  [/^(.*\/)?serverless\.ya?ml$/, /name:\s*google\b/, "Google Cloud"],
+  [/^(.*\/)?serverless\.ya?ml$/, /name:\s*azure\b/, "Azure"],
 ]
 
 /** what a terraform provider, a workflow step or a registry says about the target */
@@ -240,6 +252,21 @@ const DEPLOYS: [RegExp, string][] = [
   [/firebase-tools|FirebaseExtended\/action-hosting-deploy|\bfirebase\s+deploy/, "Firebase"],
   [/\bkubectl\s+apply|azure\/k8s-deploy|helm\s+upgrade/, "Kubernetes"],
 ]
+
+/**
+ * A package that only works on one platform, which is the same as saying it runs there.
+ * An ignored link folder is not evidence, whatever it looks like: `create-next-app`
+ * writes `.vercel` into every repo it makes, deployed there or not.
+ */
+// prettier-ignore
+const PLATFORM: Table = {
+  "@vercel/analytics": "Vercel", "@vercel/speed-insights": "Vercel", "@vercel/blob": "Vercel",
+  "@vercel/kv": "Vercel", "@vercel/postgres": "Vercel", "@vercel/edge-config": "Vercel",
+  "@vercel/og": "Vercel", "@vercel/functions": "Vercel", "@netlify/blobs": "Netlify",
+  "@netlify/edge-functions": "Netlify", "@cloudflare/next-on-pages": "Cloudflare",
+  "@cloudflare/workers-types": "Cloudflare", "@opennextjs/cloudflare": "Cloudflare",
+  "@aws-sdk/client-lambda": "AWS", "@azure/static-web-apps-cli": "Azure",
+}
 
 /** a package whose whole job is putting this repo somewhere */
 // prettier-ignore
@@ -473,6 +500,8 @@ function markers(repo: string, paths: string[]) {
       if (match.test(path)) add((found[where] ??= []), path.split("/").pop() ?? path)
     }
     for (const [match, host] of HOSTED) if (match.test(path)) add(hosts, host)
+    for (const [named, says, host] of AMBIGUOUS)
+      if (named.test(path) && says.test(read(repo, path))) add(hosts, host)
 
     // a workflow, a terraform file or a compose file can name the target too
     if (
@@ -630,6 +659,11 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       pinning[pin(String(range))]++
       if (name === "typescript") add(typescript, String(range))
       add(hosts, label(SHIPS, name))
+      const platform = label(PLATFORM, name)
+      if (platform) {
+        add(hosts, platform)
+        from[platform] ??= name
+      }
       for (const [bucket, table] of TABLES) {
         const found = label(table, name)
         if (!found) continue
