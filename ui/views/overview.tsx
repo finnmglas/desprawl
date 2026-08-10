@@ -14,6 +14,7 @@ import { Mark } from "../components/mark.tsx"
 import { Onward } from "../components/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/stack-card.tsx"
+import { Waiting } from "../components/waiting.tsx"
 import { System } from "../components/system.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
 import { commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
@@ -170,7 +171,10 @@ export function Overview({
               onPick={() => onTab("Modules")}
             />
           ) : (
-            <p className="text-muted-foreground text-sm">Reading every import in the repo.</p>
+            <Waiting
+              what="Reading every import in the repo,"
+              slow="A large repo takes a few seconds. The answer is held after that."
+            />
           )}
           <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
         </CardContent>

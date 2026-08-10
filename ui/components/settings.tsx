@@ -97,7 +97,7 @@ export function Settings({
           }}
         >
           <Download />
-          download call graph json
+          call-graph (json)
         </MenuItem>
       )}
       {isLive() && (

@@ -19,6 +19,7 @@ import { Matrix } from "../components/matrix.tsx"
 import { Onward } from "../components/onward.tsx"
 import { Tabs } from "../components/tabs.tsx"
 import { Tip } from "../components/tip.tsx"
+import { Waiting } from "../components/waiting.tsx"
 import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
@@ -139,10 +140,19 @@ export function Modules({
 
   if (!graph)
     return (
-      <Empty stats={stats} onTab={onTab}>
-        Reading every import in the repo. A large one takes a few seconds, and the answer is held
-        after that.
-      </Empty>
+      <div className="flex flex-col gap-4">
+        <Back onTab={onTab} />
+        <Card>
+          <CardContent className="p-4">
+            <Waiting
+              what="Reading every import in the repo,"
+              slow="A large repo takes a few seconds. The answer is held after that."
+              rows={4}
+            />
+          </CardContent>
+        </Card>
+        <Onward stats={stats} current="Modules" onTab={onTab} />
+      </div>
     )
 
   if (!layout || !units.length)

@@ -7,6 +7,7 @@ import { Blocks, Clock, FolderMark } from "./components/icons.tsx"
 import { Settings } from "./components/settings.tsx"
 import { RemoteLink } from "./components/remote-link.tsx"
 import { ThemeToggle } from "./components/theme-toggle.tsx"
+import { Waiting } from "./components/waiting.tsx"
 import { Tabs } from "./components/tabs.tsx"
 import { Toaster, toast } from "./components/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
@@ -43,7 +44,19 @@ const MARKS: Record<string, React.ReactNode> = {
   History: <Clock />,
 }
 
-function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
+function App({
+  stats,
+  prefs,
+  change,
+  themed,
+  reload,
+}: {
+  stats: Stats
+  prefs: Prefs
+  change: (next: Partial<Prefs>) => void
+  themed: ReturnType<typeof useTheme>
+  reload?: () => void
+}) {
   // view state lives in the url, so back works and a link carries the place
   const [{ tab, path, lang, from, to }, go] = useView({
     tab: TABS[0],
@@ -52,26 +65,9 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     from: "",
     to: "",
   })
-  const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
   const { scale, curve, brands } = prefs
-  // one writer for every setting
-  const change = (next: Partial<Prefs>) => {
-    const merged = { ...prefs, ...next }
-    setPrefs(merged)
-    savePrefs(merged)
-    if (next.region) setLocale(next.region)
-  }
-
-  // disk wins, it outlives the port
-  useEffect(() => {
-    void pullPrefs().then((saved) => {
-      if (!saved) return
-      setPrefs(saved)
-      setLocale(saved.region)
-    })
-  }, [])
   setSimple(scale === "simple") // before the tree below renders
 
   useEffect(() => {
@@ -87,9 +83,6 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
     describes(stats.repo)
     document.title = `${name} · desprawl`
   }, [stats.repo])
-
-  const themed = useTheme(prefs.theme, (theme) => change({ theme }))
-  useThemeHotkey(themed)
 
   const explore = (picked: string) => {
     go({ lang: picked, path: [], tab: "Files" })
@@ -201,8 +194,27 @@ function App({ stats, reload }: { stats: Stats; reload?: () => void }) {
 function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")
-  const [waited, setWaited] = useState(0)
   const live = isLive()
+
+  // settings live here, not in App: a repo that takes a minute to read should not
+  // spend that minute in the wrong theme
+  const [prefs, setPrefs] = useState<Prefs>(readPrefs)
+  const change = (next: Partial<Prefs>) => {
+    const merged = { ...prefs, ...next }
+    setPrefs(merged)
+    savePrefs(merged)
+    if (next.region) setLocale(next.region)
+  }
+  // disk wins, it outlives the port
+  useEffect(() => {
+    void pullPrefs().then((saved) => {
+      if (!saved) return
+      setPrefs(saved)
+      setLocale(saved.region)
+    })
+  }, [])
+  const themed = useTheme(prefs.theme, (theme) => change({ theme }))
+  useThemeHotkey(themed)
 
   const load = () => {
     setError("")
@@ -224,27 +236,33 @@ function Root() {
     if (live) load()
   }, [])
 
-  // large repo passes
-  useEffect(() => {
-    if (stats || error) return
-    const tick = setInterval(() => setWaited((s) => s + 1), 1000)
-    return () => clearInterval(tick)
-  }, [stats, error])
-
   if (error) return <p className="text-destructive p-6 text-sm">Could not load stats: {error}</p>
   if (!stats) {
+    if (!live)
+      return (
+        <p className="text-muted-foreground p-6 text-sm">
+          No stats inlined. Run `desprawl view` or `desprawl serve`.
+        </p>
+      )
     return (
-      <p className="text-muted-foreground p-6 text-sm">
-        {live
-          ? `Analysing, ${waited}s so far. Every tracked file is read once, then the history` +
-            (waited > 20 ? ". A repo this size takes a few minutes the first time" : "…")
-          : "No stats inlined. Run `desprawl view` or `desprawl serve`."}
-      </p>
+      <div className="mx-auto max-w-3xl p-6">
+        <Waiting
+          what="Analysing, every tracked file read once and then the history,"
+          slow="A repo this size takes a few minutes the first time."
+          rows={5}
+        />
+      </div>
     )
   }
   return (
     <>
-      <App stats={stats} reload={live ? load : undefined} />
+      <App
+        stats={stats}
+        prefs={prefs}
+        change={change}
+        themed={themed}
+        reload={live ? load : undefined}
+      />
       <Toaster />
     </>
   )
