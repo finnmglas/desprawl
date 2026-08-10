@@ -11,10 +11,13 @@ const MOST = 60 // prevent lag
 export function Circle({
   units,
   cuts,
+  rings,
   onPick,
 }: {
   units: Unit[]
   cuts?: Set<string>
+  /** pairs a real file ring runs through, drawn heavier than a merely untidy one */
+  rings?: Set<string>
   onPick?: (path: string) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -59,13 +62,15 @@ export function Circle({
         const j = place.get(to)
         if (j === undefined || j === i) continue
         const target = shown[j]
+        const ring = rings?.has(`${from.path} ${to}`)
         const cut = cuts?.has(`${from.path} ${to}`)
-        const colour = cut ? PAINT.cut : target.level >= from.level ? PAINT.loop : PAINT.down
+        const colour =
+          ring || cut ? PAINT.cut : target.level >= from.level ? PAINT.loop : PAINT.down
         const quiet = near >= 0 && near !== i && near !== j
         const a = spot(i)
         const b = spot(j)
-        pen.strokeStyle = `rgba(${colour}, ${quiet ? 0.05 : 0.2 + 0.6 * (weight / peak)})`
-        pen.lineWidth = quiet ? 1 : 1 + 2 * (weight / peak)
+        pen.strokeStyle = `rgba(${colour}, ${quiet ? 0.05 : ring ? 0.95 : 0.2 + 0.6 * (weight / peak)})`
+        pen.lineWidth = quiet ? 1 : (ring ? 2 : 1) + 2 * (weight / peak)
         pen.beginPath()
         pen.moveTo(a.x, a.y)
         // bent toward the middle, so the ring stays open and the ends stay readable
@@ -93,7 +98,7 @@ export function Circle({
       pen.fillText(shortPath(unit.path.split("/").slice(-2).join("/"), 22), 0, 0)
       pen.restore()
     })
-  }, [units, cuts, near])
+  }, [units, cuts, rings, near])
 
   const found = near >= 0 ? shown[near] : null
   return (

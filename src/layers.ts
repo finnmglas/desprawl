@@ -70,6 +70,8 @@ export interface Layout {
   units: Unit[]
   levels: number
   tangles: Tangle[]
+  /** files that really import each other in a ring, which no grouping invents or hides */
+  cycles: string[][]
   /** and the ones levelling cannot explain */
   edges: number
   feedback: number
@@ -294,15 +296,19 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   for (const group of scc(units.keys(), runs))
     for (const path of group) still.set(path, group.length)
 
-  // the folders a single file cycle already spans: folding cannot have invented those
+  // the ground truth every grouping is a lossy view of: contracting a graph both hides
+  // cycles inside a group and invents ones between groups, so the file rings are kept
+  const cycles: string[][] = []
   const across: Set<string>[] = []
   for (const group of scc(Object.keys(graph.modules), (path) =>
     graph.modules[path].out.filter((e) => !e.type && graph.modules[e.to]).map((e) => e.to),
   )) {
     if (group.length < 2) continue
+    cycles.push([...group].sort())
     const spans = new Set(group.map(keyOf))
     if (spans.size > 1) across.push(spans)
   }
+  cycles.sort((a, b) => b.length - a.length)
 
   const groups = scc(units.keys(), (path) => Object.keys(seen(path).out))
   const level = new Map<string, number>()
@@ -362,6 +368,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     units: [...units.values()].sort((a, b) => b.level - a.level || a.path.localeCompare(b.path)),
     levels: Math.max(0, ...level.values()) + 1,
     tangles: tangles.sort((a, b) => b.units.length - a.units.length),
+    cycles,
     edges,
     feedback,
     depth,

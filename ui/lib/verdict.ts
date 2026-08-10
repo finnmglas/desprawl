@@ -71,13 +71,13 @@ export const contextOf = (tokens: number): Verdict => ({
   why: "roughly how many model contexts the whole repo would fill, at four characters a token",
 })
 
-/** a folder that imports its own importer cannot be moved */
-export const tanglesOf = (n: number, units: number): Verdict =>
+/** a file that imports its own importer cannot be moved, tested or read apart */
+export const tanglesOf = (n: number, files: number): Verdict =>
   n === 0
     ? {
         label: "acyclic",
         tone: "fine",
-        why: "no unit here imports one that imports it back, so the levels below are the real order",
+        why: "no file here imports one that imports it back, so the levels below are the real order",
       }
     : {
         label: band(n, [
@@ -86,7 +86,7 @@ export const tanglesOf = (n: number, units: number): Verdict =>
           [Infinity, "knotted"],
         ]),
         tone: "watch",
-        why: `${n} groups of units import each other in a loop, out of ${units}. Neither side can move, be tested or be understood without the other`,
+        why: `${n} rings of files import each other, out of ${files}. Counted on the files themselves, so no grouping invented them`,
       }
 
 /** steps from the entry points to the leaves */

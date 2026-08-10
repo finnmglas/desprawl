@@ -26,7 +26,15 @@ import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
-import { balanced, fold, type Cut, type Layout, type Tangle, type Unit } from "../../src/layers.ts"
+import {
+  balanced,
+  fold,
+  unitOf,
+  type Cut,
+  type Layout,
+  type Tangle,
+  type Unit,
+} from "../../src/layers.ts"
 import type { Sort } from "../lib/format.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
@@ -50,6 +58,16 @@ const count = (edges: Record<string, number>) => Object.values(edges).reduce((su
 
 /** how many groups it leans on, which one dependency imported by every file is not */
 const reach = (unit: Unit) => Object.keys(unit.out).length
+
+/** the deepest folder holding every file of a ring, which is where the fix lives */
+const shared = (paths: string[]): string => {
+  const parts = paths[0].split("/").slice(0, -1)
+  for (const path of paths) {
+    const other = path.split("/").slice(0, -1)
+    while (parts.length && parts.some((part, i) => other[i] !== part)) parts.pop()
+  }
+  return parts.join("/") || "the repo root"
+}
 
 /** most of what ties it together goes through a file that only forwards */
 const glued = (loop: Tangle) => {
@@ -131,9 +149,14 @@ export function Modules({
   }, [])
 
   const at = group || AUTO
-  const layout: Layout | null = useMemo(
-    () => (graph ? fold(graph, at === AUTO ? balanced(graph) : DEPTH[at]) : null),
+  // kept, not just passed on: it is the only way back from a file to the group holding it
+  const split = useMemo(
+    () => (graph ? (at === AUTO ? balanced(graph) : DEPTH[at]) : null),
     [graph, at],
+  )
+  const layout: Layout | null = useMemo(
+    () => (graph && split !== null ? fold(graph, split) : null),
+    [graph, split],
   )
   const units = useMemo(
     () => (layout ? layout.units.filter((u) => keep === KEEP[1] || real(u)) : []),
@@ -166,6 +189,21 @@ export function Modules({
     0,
   )
   const loops = layout.tangles.filter((t) => t.units.some((path) => kept.has(path)))
+  // the file rings, which no grouping can invent or hide, unlike the tangles above them
+  const cycles = layout.cycles
+  const groupOf = (path: string) =>
+    typeof split === "number" ? unitOf(path, split) : (split?.[path] ?? "")
+  // the group pairs a real ring runs through: those edges are not a matter of tidiness
+  const rings = new Set<string>()
+  for (const ring of cycles) {
+    const held = new Set(ring)
+    for (const file of ring)
+      for (const edge of graph.modules[file].out) {
+        if (edge.type || !held.has(edge.to)) continue
+        // same group on both ends lands on the diagonal, where it is the only way to see it
+        rings.add(`${groupOf(file)} ${groupOf(edge.to)}`)
+      }
+  }
   const levels = Math.max(...units.map((u) => u.level)) + 1
   const files = units.reduce((sum, u) => sum + u.files, 0)
   const dropped = layout.units.length - units.length
@@ -285,17 +323,17 @@ export function Modules({
           verdict={layeringOf(levels, units.length)}
         />
         <Kpi
-          label="Loops"
-          value={num(loops.length)}
+          label="Cycles"
+          value={num(cycles.length)}
           sub={
-            loops.length
+            cycles.length
               ? `${plural(
-                  loops.reduce((sum, loop) => sum + loop.edges, 0),
-                  "import",
+                  cycles.reduce((sum, ring) => sum + ring.length, 0),
+                  "file",
                 )} caught in them`
-              : "no bi-directional dependency"
+              : "no file imports one that imports it back"
           }
-          verdict={tanglesOf(loops.length, units.length)}
+          verdict={tanglesOf(cycles.length, graph.stats.files)}
         />
         <Kpi
           label="Module links"
@@ -362,6 +400,7 @@ export function Modules({
         <CardContent>
           {view === VIEWS[0] ? (
             <Matrix
+              rings={rings}
               units={shown}
               across={units}
               most={crowded && !wide ? 12 : shown.length}
@@ -370,7 +409,7 @@ export function Modules({
               onPick={open}
             />
           ) : (
-            <Circle units={shown} cuts={cuts} onPick={open} />
+            <Circle units={shown} cuts={cuts} rings={rings} onPick={open} />
           )}
         </CardContent>
       </Card>
@@ -433,11 +472,26 @@ export function Modules({
         </CardContent>
       </Card>
 
+      {cycles.length > 0 && (
+        <DataTable
+          title="Cycles"
+          hint="files that import each other in a ring, read off the files themselves"
+          rows={cycles.map((ring) => ({
+            ring,
+            where: shared(ring),
+            spans: new Set(ring.map(groupOf)).size,
+          }))}
+          id={(row) => row.ring[0]}
+          columns={RINGS}
+          fold={8}
+        />
+      )}
+
       {loops.length > 0 && (
         <Card>
           <CardHead
-            title="Internal dependency loops"
-            hint="groups bi-directional importing (bad, blocks abstraction and isolation)"
+            title="Folders that import each other"
+            hint={`at the ${at} grain: real coupling, but only the ones marked below are cycles in the code`}
           >
             <CopyButton
               className="ml-auto"
@@ -532,6 +586,57 @@ export function Modules({
     </div>
   )
 }
+
+interface Ring {
+  ring: string[]
+  where: string
+  /** groups it crosses at this grain: one means the grouping hides it entirely */
+  spans: number
+}
+
+const RINGS: Column<Ring>[] = [
+  {
+    key: "where",
+    label: "Inside",
+    get: (row) => row.where,
+    cell: (row) => <Tip text={row.where}>{shortPath(row.where)}</Tip>,
+    hint: "the deepest folder holding every file of the ring, so the whole fix is in there",
+  },
+  { key: "files", label: "Files", num: true, get: (row) => row.ring.length },
+  {
+    key: "spans",
+    label: "Groups",
+    num: true,
+    flat: true,
+    get: (row) => row.spans,
+    cell: (row) =>
+      row.spans > 1 ? (
+        <Tip text="the grouping above splits this ring, so it shows there as a loop between folders too">
+          <span className="underline decoration-dotted">{row.spans}</span>
+        </Tip>
+      ) : (
+        <Tip text="every file of it sits in one group, so the grouping above cannot show it at all">
+          <span className="text-muted-foreground underline decoration-dotted">1</span>
+        </Tip>
+      ),
+    hint: "how many groups at this grain it crosses. One means only this table can see it",
+  },
+  {
+    key: "members",
+    label: "Ring",
+    get: (row) => row.ring.join(" -> "),
+    cell: (row) => (
+      <span className="text-muted-foreground font-mono text-xs">
+        {row.ring
+          .slice(0, 3)
+          .map((path) => path.split("/").pop())
+          .join(" \u2194 ")}
+        {row.ring.length > 3 && ` and ${row.ring.length - 3} more`}
+      </span>
+    ),
+    hint: "the files caught in it, by name",
+  },
+]
 
 type Removal = Cut & { loop: number }
 
