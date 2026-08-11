@@ -60,7 +60,16 @@ export function page(
   return { html, skipped: heavy && !said ? graph.stats.files : 0 }
 }
 
-export function view(stats: Stats): string {
+/**
+ * A published page hands every commit email over as one scrapeable blob. Blanking them
+ * takes the faces with it: an avatar and a profile link are both derived from the address.
+ */
+export const anonymous = (stats: Stats): Stats => ({
+  ...stats,
+  contributors: stats.contributors.map((one) => ({ ...one, email: "" })),
+})
+
+export function view(stats: Stats, into?: string): string {
   const { html, skipped } = page(stats)
   if (skipped)
     console.log(
@@ -71,8 +80,9 @@ export function view(stats: Stats): string {
   const now = new Date()
   const pad = (n: number) => String(n).padStart(2, "0")
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`
-  const out = join(tmpdir(), `${stamp}-${name}-${stats.head}.html`)
+  // a caller with somewhere to put it says so, rather than reading the path off stdout
+  const out = into ?? join(tmpdir(), `${stamp}-${name}-${stats.head}.html`)
   writeFileSync(out, html)
-  open(out)
+  if (!into) open(out)
   return out
 }

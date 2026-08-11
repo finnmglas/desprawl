@@ -44,7 +44,7 @@ const LANGS: Column<Node>[] = [
 ]
 
 // prettier-ignore
-const people = (commits: number, moved: number, faces: Record<string, string>): Column<Contributor>[] => [
+const people = (commits: number, moved: number, faces: Record<string, string>, anon: boolean): Column<Contributor>[] => [
   {
     key: "name", label: "Name", get: (p) => p.name,
     cell: (p) => (
@@ -54,7 +54,7 @@ const people = (commits: number, moved: number, faces: Record<string, string>): 
       </span>
     ),
   },
-  { key: "email", label: "Email", get: (p) => p.email },
+  ...(anon ? [] : [{ key: "email", label: "Email", get: (p: Contributor) => p.email }]),
   { key: "commits", label: "com", num: true, get: (p) => p.commits, cell: (p) => num(p.commits) },
   { key: "pct", label: "pct", num: true, get: (p) => p.commits / (commits || 1), cell: (p) => pct(p.commits, commits) },
   {
@@ -153,6 +153,8 @@ export function Overview({
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1
   const name = stats.repo.split("/").filter(Boolean).pop() ?? "Repo"
+  // an export can be published with the addresses stripped, and then the column says nothing
+  const anon = stats.contributors.every((one) => !one.email)
   const wall_ = useRef<HTMLDivElement>(null)
   const count = (edges: Record<string, number>) =>
     Object.values(edges).reduce((sum, n) => sum + n, 0)
@@ -297,16 +299,19 @@ export function Overview({
         hint={
           did
             ? `${plural(did.length, "person")} committed between ${range?.[0]} and ${range?.[1]}`
-            : `${stats.contributors.length} identities by email`
+            : anon
+              ? `${stats.contributors.length} people, addresses left out`
+              : `${stats.contributors.length} identities by email`
         }
         file={did ? "contributors-in-range" : "contributors"}
         columns={people(
           did ? did.reduce((sum, one) => sum + one.commits, 0) : stats.commits,
           did ? did.reduce((sum, one) => sum + one.insertions + one.deletions, 0) : moved,
           faces,
+          anon,
         )}
         rows={did ?? stats.contributors}
-        id={(p) => p.email}
+        id={(p) => p.email || p.name}
         fold={8}
       />
 

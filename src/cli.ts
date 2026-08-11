@@ -10,7 +10,7 @@ import { blank, git, merge } from "./model.ts"
 import { explain, needs } from "./needs.ts"
 import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
-import { open, view } from "./view.ts"
+import { anonymous, open, view } from "./view.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
@@ -31,6 +31,8 @@ const { values, positionals } = (() => {
         commits: { type: "string" },
         raw: { type: "boolean", default: false },
         static: { type: "boolean", default: false },
+        anon: { type: "boolean", default: false },
+        out: { type: "string" },
         keep: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
@@ -43,7 +45,7 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    "desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
   )
   process.exit(0)
 }
@@ -191,7 +193,7 @@ try {
     console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
   } else {
     const stats = analyze(target, cap)
-    if (viewing) console.log(view(stats))
+    if (viewing) console.log(view(values.anon ? anonymous(stats) : stats, values.out))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }
 } catch (err) {
