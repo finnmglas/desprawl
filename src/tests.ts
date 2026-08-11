@@ -1,0 +1,190 @@
+// owner: finn
+// goal: what tests exist and what they cover, without running anything
+
+import { execFile } from "node:child_process"
+import { existsSync, mkdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
+import { jsonc } from "./graph.ts"
+import { git } from "./model.ts"
+import { roleOf } from "./layers.ts"
+import { scrub } from "./specifiers.ts"
+
+export interface Suite {
+  /** the script a reader would run, and what it is called in the manifest */
+  script: string
+  command: string
+  /** counted by scanning, since running them is the expensive thing */
+  files: number
+  cases: number
+  runners: string[]
+  /** the script that writes a report, or the command that would, per runner */
+  measure: string
+  measured: string
+  /** read off a report already on disk, empty when nothing has been written */
+  coverage: { lines: number; statements: number; branches: number; functions: number } | null
+  covered: string
+  ran: Run | null
+}
+
+export interface Run {
+  ok: boolean
+  code: number
+  seconds: number
+  output: string
+}
+
+// what each runner is asked to write a report with, when the repo has no script for it
+const MEASURE: Record<string, string> = {
+  vitest: "npx vitest run --coverage --coverage.reporter=lcov",
+  jest: "npx jest --coverage --coverageReporters=lcov",
+  "node:test":
+    "node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
+  mocha: "npx c8 --reporter=lcov npm test",
+  ava: "npx c8 --reporter=lcov npm test",
+}
+
+// what declares a test, whichever runner is underneath
+const CASE = /(^|[\s;{}])(test|it)(\.\w+)?\s*\(/g
+const RUNNERS: [string, RegExp][] = [
+  ["vitest", /^vitest$/],
+  ["jest", /^jest$/],
+  ["node:test", /^node:test$/],
+  ["playwright", /^@playwright\/test$/],
+  ["cypress", /^cypress$/],
+  ["mocha", /^mocha$/],
+  ["ava", /^ava$/],
+  ["bun:test", /^bun:test$/],
+]
+
+const read = (path: string): Record<string, any> | null => {
+  try {
+    return jsonc(readFileSync(path, "utf8")) as Record<string, any>
+  } catch {
+    return null
+  }
+}
+
+/** a report someone already produced: istanbul writes both of these, and lcov is universal */
+function coverage(root: string): { made: Suite["coverage"]; from: string } {
+  const summary = read(join(root, "coverage", "coverage-summary.json"))
+  if (summary?.total)
+    return {
+      made: {
+        lines: summary.total.lines?.pct ?? 0,
+        statements: summary.total.statements?.pct ?? 0,
+        branches: summary.total.branches?.pct ?? 0,
+        functions: summary.total.functions?.pct ?? 0,
+      },
+      from: "coverage/coverage-summary.json",
+    }
+
+  const lcov = join(root, "coverage", "lcov.info")
+  if (existsSync(lcov)) {
+    const text = readFileSync(lcov, "utf8")
+    const add = (key: string) =>
+      [...text.matchAll(new RegExp(`^${key}:(\\d+)$`, "gm"))].reduce((sum, m) => sum + +m[1], 0)
+    const pct = (hit: number, found: number) => (found ? Math.round((hit / found) * 1000) / 10 : 0)
+    return {
+      made: {
+        lines: pct(add("LH"), add("LF")),
+        statements: pct(add("LH"), add("LF")),
+        branches: pct(add("BRH"), add("BRF")),
+        functions: pct(add("FNH"), add("FNF")),
+      },
+      from: "coverage/lcov.info",
+    }
+  }
+  return { made: null, from: "" }
+}
+
+/** what a repo would run, what it holds, and any coverage already lying about */
+export function tests(repo: string): Suite {
+  const root = git(repo, "rev-parse", "--show-toplevel").trim()
+  const manifest = read(join(root, "package.json"))
+  const scripts = (manifest?.scripts ?? {}) as Record<string, string>
+  const script = ["test", "test:unit", "tests", "spec"].find((one) => scripts[one]) ?? ""
+
+  const deps = Object.keys({ ...manifest?.dependencies, ...manifest?.devDependencies })
+  const runners = RUNNERS.filter(
+    ([name, match]) =>
+      deps.some((one) => match.test(one)) ||
+      (name === "node:test" && /node --test|node:test/.test(script ? scripts[script] : "")),
+  ).map(([name]) => name)
+
+  let files = 0
+  let cases = 0
+  for (const path of git(root, "ls-files", "-z")
+    .split("\0")
+    .filter((one) => one && roleOf(one) === "test" && /\.[cm]?[jt]sx?$/.test(one))) {
+    files++
+    try {
+      cases += (scrub(readFileSync(join(root, path), "utf8")).code.match(CASE) ?? []).length
+    } catch {
+      // unreadable is still a test file, it just contributes no cases
+    }
+  }
+
+  // a repo that already writes a report says how, and otherwise the runner decides
+  const measure =
+    Object.keys(scripts).find(
+      (one) =>
+        /cov/i.test(one) ||
+        /--coverage|\bc8\b|\bnyc\b|experimental-test-coverage/.test(scripts[one]),
+    ) ?? ""
+  const made_ = MEASURE[runners[0] ?? ""] ?? ""
+  const measured = measure
+    ? scripts[measure]
+    : made_ && runners[0] === "node:test" && script
+      ? // the glob belongs to this repo's own test script, so it is taken from there
+        `${made_} ${scripts[script].replace(/^node --test\s*/, "")}`
+      : made_
+
+  const { made, from } = coverage(root)
+  return {
+    script,
+    command: script ? scripts[script] : "",
+    measure,
+    measured,
+    files,
+    cases,
+    runners,
+    coverage: made,
+    covered: from,
+    ran: null,
+  }
+}
+
+const LIMIT = 10 * 60_000
+
+/**
+ * Only when a reader asks: a suite is the one thing here that can take minutes. A script
+ * is run by name through the manager, a synthesised coverage command through a shell,
+ * and that command is only ever one this file wrote.
+ */
+export function run(repo: string, script: string, command = ""): Promise<Run> {
+  const root = git(repo, "rev-parse", "--show-toplevel").trim()
+  const manager = existsSync(join(root, "pnpm-lock.yaml"))
+    ? "pnpm"
+    : existsSync(join(root, "yarn.lock"))
+      ? "yarn"
+      : "npm"
+  if (command) mkdirSync(join(root, "coverage"), { recursive: true })
+  const started = Date.now()
+  return new Promise((resolve) => {
+    execFile(
+      command ? "/bin/sh" : manager,
+      command ? ["-c", command] : manager === "npm" ? ["run", script] : [script],
+      { cwd: root, timeout: LIMIT, maxBuffer: 1 << 26 },
+      (err, stdout, stderr) => {
+        const output = `${stdout}${stderr}`.trim()
+        resolve({
+          ok: !err,
+          code: (err as { code?: number } | null)?.code ?? 0,
+          seconds: Math.round((Date.now() - started) / 100) / 10,
+          // the end is where a runner puts its totals, and the head is where it puts noise
+          output: output.length > 8000 ? `…\n${output.slice(-8000)}` : output,
+        })
+      },
+    )
+  })
+}

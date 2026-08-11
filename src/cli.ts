@@ -6,6 +6,7 @@ import { existsSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { deps } from "./deps.ts"
+import { tests } from "./tests.ts"
 import { human, nest, pct, tokens } from "./human.ts"
 import { blank, git, merge } from "./model.ts"
 import { explain, needs } from "./needs.ts"
@@ -195,7 +196,9 @@ try {
   } else {
     const stats = analyze(target, cap)
     // licences come off disk, advisories off the network, and a saved page keeps both
-    const held = viewing ? { deps: await deps(target).catch(() => null) } : undefined
+    const held = viewing
+      ? { deps: await deps(target).catch(() => null), suite: tests(target) }
+      : undefined
     if (viewing) console.log(view(values.anon ? anonymous(stats) : stats, values.out, held))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }

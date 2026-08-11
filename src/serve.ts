@@ -12,6 +12,8 @@ import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
+import { run as runTests, tests } from "./tests.ts"
+import type { Suite } from "./tests.ts"
 import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
 import { bytesAt, count, detail, moved, page, timeline } from "./history.ts"
@@ -85,6 +87,7 @@ export function serve(
   let imports: Graph | null = null
   let called: Calls | null = null
   let known: Deps | null = null
+  let suite: Suite | null = null
 
   const load = (fresh: boolean): Stats => {
     const head = git(repo, "rev-parse", "--short", "HEAD").trim()
@@ -272,6 +275,29 @@ export function serve(
           return
         }
 
+        if (url.pathname === "/api/tests") return json((suite ||= tests(repo)))
+
+        // the one thing here that can take minutes, so it happens only when asked
+        if (url.pathname === "/api/tests/run") {
+          const script = url.searchParams.get("script") ?? ""
+          if (!/^[\w:-]+$/.test(script)) return send(400, "bad script", "text/plain")
+          // never a command from the url: only the one this repo's own detection wrote
+          const measuring = url.searchParams.has("coverage")
+          const found = (suite ||= tests(repo))
+          runTests(
+            repo,
+            measuring && found.measure ? found.measure : script,
+            measuring && !found.measure ? found.measured : "",
+          ).then(
+            (ran) => {
+              suite = { ...(suite ||= tests(repo)), ...tests(repo), ran }
+              json(suite)
+            },
+            (err: Error) => json({ error: err.message }, 500),
+          )
+          return
+        }
+
         // read once a page asks, since it reaches the network
         if (url.pathname === "/api/deps") {
           ;(known ? Promise.resolve(known) : deps(repo).then((d) => (known = d))).then(
@@ -283,7 +309,13 @@ export function serve(
 
         if (url.pathname === "/api/static") {
           imports ||= build(repo)
-          const made = onePage(load(false), { graph: imports, called, deps: known, viewer: html })
+          const made = onePage(load(false), {
+            graph: imports,
+            called,
+            deps: known,
+            suite: (suite ||= tests(repo)),
+            viewer: html,
+          })
           return send(200, made.html, "text/html")
         }
 

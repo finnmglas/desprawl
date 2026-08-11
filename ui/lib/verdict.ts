@@ -295,3 +295,31 @@ export const familyOf = (license: string): "permissive" | "weak" | "strong" | "u
   if (parts.some((p) => STRONG.test(p))) return "strong"
   return "unknown"
 }
+
+/** how covered is covered enough, in the bands every team argues about anyway */
+export const coverageOf = (pct: number): Verdict =>
+  pct >= 80
+    ? { label: "well covered", tone: "fine", why: `${pct}% of lines run under the suite` }
+    : pct >= 50
+      ? {
+          label: "partly covered",
+          tone: "plain",
+          why: `${pct}% of lines run, half the file tree is dark`,
+        }
+      : {
+          label: "thin",
+          tone: "watch",
+          why: `${pct}% of lines run, so most of it is never exercised`,
+        }
+
+/** a suite is green or it is not, and the count of what it holds says how much that means */
+export const suiteOf = (ran: { ok: boolean } | null, cases: number): Verdict =>
+  !ran
+    ? {
+        label: "not run",
+        tone: "plain",
+        why: `${cases} cases found by reading, none run from here`,
+      }
+    : ran.ok
+      ? { label: "green", tone: "fine", why: `every one of the ${cases} cases passed` }
+      : { label: "red", tone: "watch", why: "the suite exited with a failure" }

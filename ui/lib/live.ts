@@ -4,6 +4,7 @@
 import { toast } from "./toast.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
+import type { Suite } from "../../src/tests.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -145,3 +146,16 @@ export const dependencies = (): Promise<Deps | null> =>
   window.__DESPRAWL_DEPS__
     ? Promise.resolve(window.__DESPRAWL_DEPS__)
     : ask<Deps | null>("/api/deps", null)
+
+/** what the repo would run, counted rather than run */
+export const testSuite = (): Promise<Suite | null> =>
+  window.__DESPRAWL_TESTS__
+    ? Promise.resolve(window.__DESPRAWL_TESTS__)
+    : ask<Suite | null>("/api/tests", null)
+
+/** and actually running it, which only a served run can do */
+export const runTests = (script: string, coverage = false): Promise<Suite | null> =>
+  ask<Suite | null>(
+    `/api/tests/run?script=${encodeURIComponent(script)}${coverage ? "&coverage=1" : ""}`,
+    null,
+  )
