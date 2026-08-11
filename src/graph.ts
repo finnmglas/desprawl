@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
 import { git } from "./model.ts"
-import { specifiers, symbols, type Symbols } from "./specifiers.ts"
+import { scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
 
 export interface Edge {
   to: string
@@ -71,7 +71,9 @@ const RUNTIME = /parcelRequire|webpackJsonp|__webpack_require__|System\.register
 function bundled(file: string): boolean {
   try {
     const head = readFileSync(file, "utf8").slice(0, 4096)
-    if (RUNTIME.test(head)) return true
+    // scrubbed first: a tool that names these markers holds them in a regex or a string,
+    // and this file is one. Unscrubbed, it read itself as a bundle and vanished
+    if (RUNTIME.test(scrub(head).code)) return true
     const lines = head.split("\n")
     return lines.length > 1 && head.length / lines.length > 300
   } catch {

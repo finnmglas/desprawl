@@ -212,3 +212,17 @@ test("a door is a file that declares nothing and hands on what it imports", () =
   assert.equal(door("entry/main.ts"), false, "an entry imports but hands nothing on")
   assert.equal(door("star/a.ts"), false, "and a leaf is not a door")
 })
+
+test("a file that names bundler markers is not a bundle, it is a tool", () => {
+  const dir = repo({
+    // the same markers this repo's own detector holds, in a regex and in a string
+    "detect.ts":
+      'const RUNTIME = /webpackJsonp|__webpack_require__/\nconst note = "parcelRequire"\nimport "./real"\nexport const detect = RUNTIME.test(note)\n',
+    "real.ts": "export const real = 1\n",
+    "bundle.js": "webpackJsonp([0],[function(e,t,n){}]);\n",
+  })
+  const g = build(dir)
+  assert.ok(g.modules["detect.ts"], "a file that only mentions them is still source")
+  assert.deepEqual(to(g, "detect.ts"), ["real.ts"], "and its imports are still read")
+  assert.equal(g.modules["bundle.js"], undefined, "while one that runs them is not a module")
+})
