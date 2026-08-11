@@ -1,6 +1,6 @@
 <!-- # desprawl -->
 
-![desprawl - unfuck your TypeScript project, by scoping and delivering cleanup work](ui/brand/readme-banner.svg)\
+[![desprawl - unfuck your TypeScript project, by scoping and delivering cleanup work](ui/brand/readme-banner.svg)](https://finnmglas.github.io/desprawl/)\
 Scope and deliver cleanup work.
 
 ```sh
