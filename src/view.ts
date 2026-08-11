@@ -7,6 +7,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
+import type { Deps } from "./deps.ts"
 import { build } from "./graph.ts"
 import type { Graph } from "./graph.ts"
 import type { Stats } from "./model.ts"
@@ -40,7 +41,7 @@ const HEAD = "<head>"
 /** the page and everything it would ask a server for, reusing what a caller holds */
 export function page(
   stats: Stats,
-  held?: { graph?: Graph; called?: Calls | null; viewer?: string },
+  held?: { graph?: Graph; called?: Calls | null; deps?: Deps | null; viewer?: string },
 ): { html: string; skipped: number } {
   // < escaped so a path holding </script> cannot close the tag
   const inline = (data: unknown) => JSON.stringify(data).replaceAll("<", "\\u003c")
@@ -50,7 +51,8 @@ export function page(
 
   const data =
     `<script>window.__DESPRAWL__=${inline(stats)};window.__DESPRAWL_GRAPH__=${inline(graph)}` +
-    `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}</script>`
+    `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}` +
+    `${held?.deps ? `;window.__DESPRAWL_DEPS__=${inline(held.deps)}` : ""}</script>`
   const shell_ = held?.viewer ?? shell()
   const at = shell_.indexOf(HEAD)
   if (at === -1) throw new Error("no <head> in the built page, run: pnpm build")
@@ -69,8 +71,8 @@ export const anonymous = (stats: Stats): Stats => ({
   contributors: stats.contributors.map((one) => ({ ...one, email: "" })),
 })
 
-export function view(stats: Stats, into?: string): string {
-  const { html, skipped } = page(stats)
+export function view(stats: Stats, into?: string, held?: { deps?: Deps | null }): string {
+  const { html, skipped } = page(stats, held)
   if (skipped)
     console.log(
       `\nToo many files (${skipped}) to read every call for a single page, so the call graph was left out.\n`,

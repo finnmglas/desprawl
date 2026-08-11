@@ -20,10 +20,25 @@ import { System, wall } from "../components/molecules/system.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
-import { commentsOf, contextOf, historyOf, shapeOf, sizeOf } from "../lib/verdict.ts"
+import {
+  commentsOf,
+  contextOf,
+  historyOf,
+  familyOf,
+  shapeOf,
+  sizeOf,
+  worst,
+  RANK,
+} from "../lib/verdict.ts"
 import { allTime, importGraph, isLive, movedIn } from "../lib/live.ts"
 import { worked } from "../lib/people.ts"
+import { dependencies } from "../lib/live.ts"
+import { cn } from "../lib/ui.ts"
+import { Badge } from "../components/atoms/badge.tsx"
+import { Tabs } from "../components/atoms/tabs.tsx"
+import { Tip } from "../components/atoms/tip.tsx"
 import { balanced, fold } from "../../src/layers.ts"
+import type { Dep, Deps } from "../../src/deps.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Move, Timeline } from "../../src/history.ts"
 import type { Contributor, Node, Stats } from "../../src/model.ts"
@@ -44,9 +59,206 @@ const LANGS: Column<Node>[] = [
 ]
 
 // prettier-ignore
-const people = (commits: number, moved: number, faces: Record<string, string>, anon: boolean): Column<Contributor>[] => [
+/** the pinned row at the bottom, which answers for the list rather than for a package */
+type Row = Dep & { every?: Dep[] }
+
+// what this repo asked for, against everything that arrived with it
+const SCOPE = ["named here", "whole tree"]
+
+/** two years without a release: not dead, but worth knowing before leaning on it */
+const quiet = (released: string) => !!released && Date.now() - Date.parse(released) > 730 * 864e5
+
+const FAMILY: Record<string, string> = {
+  permissive: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+  weak: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+  strong: "border-red-500/60 text-red-700 dark:text-red-300",
+  unknown: "text-muted-foreground",
+}
+
+const DEPS: Column<Row>[] = [
   {
-    key: "name", label: "Name", get: (p) => p.name,
+    key: "name",
+    label: "Package",
+    get: (one) => one.name,
+    cell: (one) =>
+      one.every ? (
+        <span className="font-medium">{plural(one.every.length, "package")}</span>
+      ) : (
+        <a
+          href={`https://www.npmjs.com/package/${one.name}`}
+          target="_blank"
+          rel="noreferrer"
+          title={`${one.name} on npm`}
+          className="hover:text-foreground underline decoration-dotted"
+        >
+          {one.name}
+        </a>
+      ),
+  },
+  {
+    key: "version",
+    label: "Version",
+    get: (one) => one.version || one.range,
+    cell: (one) => (
+      <Tip
+        text={
+          one.version
+            ? `${one.range} in the manifest, ${one.version} on disk`
+            : "not installed here, so the range is all there is"
+        }
+      >
+        <span className="font-mono text-xs">{one.version || one.range}</span>
+      </Tip>
+    ),
+    hint: "what is installed, falling back to what the manifest asks for",
+  },
+  {
+    key: "license",
+    label: "Licence",
+    get: (one) => one.license || "unknown",
+    cell: (one) => {
+      if (!one.every)
+        return one.license ? (
+          <Badge variant="outline" className={FAMILY[familyOf(one.license)]}>
+            {one.license}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground">unknown</span>
+        )
+      // what the whole list asks of the code around it, counted rather than judged
+      const by = new Map<string, number>()
+      for (const dep of one.every)
+        by.set(familyOf(dep.license), (by.get(familyOf(dep.license)) ?? 0) + 1)
+      const named = new Map<string, number>()
+      for (const dep of one.every)
+        named.set(dep.license || "unknown", (named.get(dep.license || "unknown") ?? 0) + 1)
+      return (
+        <Tip
+          text={[...named]
+            .sort((a, b) => b[1] - a[1])
+            .map(([name, n]) => `${name}: ${n}`)
+            .join(" · ")}
+        >
+          <span className="flex flex-wrap gap-1">
+            {(["permissive", "weak", "strong", "unknown"] as const)
+              .filter((kind) => by.get(kind))
+              .map((kind) => (
+                <Badge key={kind} variant="outline" className={FAMILY[kind]}>
+                  {by.get(kind)} {kind}
+                </Badge>
+              ))}
+          </span>
+        </Tip>
+      )
+    },
+    hint: "read from the installed package, never guessed. Permissive asks for attribution, weak copyleft asks for changes to the package itself back, strong copyleft asks about the code around it",
+  },
+  {
+    key: "released",
+    label: "Last release",
+    num: true,
+    flat: true,
+    get: (one) => one.released,
+    cell: (one) => {
+      if (one.every)
+        return (
+          <span className="text-muted-foreground">
+            {one.every.filter((d) => quiet(d.released)).length} over 2 years
+          </span>
+        )
+      if (!one.released)
+        return (
+          <Tip text="asked for the packages this repo names, not for everything they pull in">
+            <span className="text-muted-foreground">—</span>
+          </Tip>
+        )
+      return (
+        <Tip text={`npm last published anything for it on ${one.released.slice(0, 10)}`}>
+          <span className={quiet(one.released) ? "text-amber-600 dark:text-amber-400" : ""}>
+            {day(one.released)}
+          </span>
+        </Tip>
+      )
+    },
+    hint: "when npm last saw any release, asked for the packages this repo names. Quiet for over two years is worth a look, not a verdict",
+  },
+  {
+    key: "kind",
+    label: "Asked for",
+    get: (one) => (one.direct ? (one.dev ? "direct dev" : "direct") : "pulled in"),
+    cell: (one) =>
+      one.every ? (
+        <span className="text-muted-foreground">
+          {one.every.filter((d) => d.direct).length} named
+        </span>
+      ) : one.direct ? (
+        <Tip text={one.dev ? "a dev dependency, so it never ships" : "named in package.json"}>
+          <Badge variant="outline">{one.dev ? "direct dev" : "direct"}</Badge>
+        </Tip>
+      ) : (
+        <Tip text="nothing here asked for it, something it depends on did">
+          <span className="text-muted-foreground">pulled in</span>
+        </Tip>
+      ),
+    hint: "whether this repo names it. Dev or runtime is only known for the ones it does, since a pulled in package is whatever pulled it",
+  },
+  {
+    key: "advisories",
+    label: "Advisories",
+    num: true,
+    flat: true,
+    good: true,
+    get: (one) => one.advisories.length,
+    cell: (one) =>
+      one.every ? (
+        <span className={one.every.some((d) => d.advisories.length) ? "" : "text-muted-foreground"}>
+          {one.every.reduce((n, d) => n + d.advisories.length, 0)} on{" "}
+          {one.every.filter((d) => d.advisories.length).length}
+        </span>
+      ) : one.advisories.length ? (
+        <Tip
+          text={
+            <>
+              {one.advisories.slice(0, 4).map((a) => (
+                <span key={a.id} className="block">
+                  {a.id}: {a.summary}
+                </span>
+              ))}
+              {one.advisories.length > 4 && <>and {one.advisories.length - 4} more</>}
+            </>
+          }
+        >
+          <a
+            href={one.advisories[0].url}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(
+              "underline decoration-dotted",
+              worst(one.advisories) === "CRITICAL" || worst(one.advisories) === "HIGH"
+                ? "text-red-600 dark:text-red-400"
+                : "text-amber-600 dark:text-amber-400",
+            )}
+          >
+            {one.advisories.length} {worst(one.advisories).toLowerCase()}
+          </a>
+        </Tip>
+      ) : (
+        <span className="text-muted-foreground">none</span>
+      ),
+    hint: "open advisories for this exact version, from osv.dev, worst first",
+  },
+]
+
+const people = (
+  commits: number,
+  moved: number,
+  faces: Record<string, string>,
+  anon: boolean,
+): Column<Contributor>[] => [
+  {
+    key: "name",
+    label: "Name",
+    get: (p) => p.name,
     cell: (p) => (
       <span className="flex min-w-0 items-center gap-2">
         <Avatar name={p.name} email={p.email} found={faces[p.email.toLowerCase()]} />
@@ -56,19 +268,51 @@ const people = (commits: number, moved: number, faces: Record<string, string>, a
   },
   ...(anon ? [] : [{ key: "email", label: "Email", get: (p: Contributor) => p.email }]),
   { key: "commits", label: "com", num: true, get: (p) => p.commits, cell: (p) => num(p.commits) },
-  { key: "pct", label: "pct", num: true, get: (p) => p.commits / (commits || 1), cell: (p) => pct(p.commits, commits) },
   {
-    key: "added", label: "added", num: true, get: (p) => p.insertions,
+    key: "pct",
+    label: "pct",
+    num: true,
+    get: (p) => p.commits / (commits || 1),
+    cell: (p) => pct(p.commits, commits),
+  },
+  {
+    key: "added",
+    label: "added",
+    num: true,
+    get: (p) => p.insertions,
     cell: (p) => <Moved n={p.insertions} kind="ins" />,
   },
   {
-    key: "removed", label: "removed", num: true, get: (p) => p.deletions,
+    key: "removed",
+    label: "removed",
+    num: true,
+    get: (p) => p.deletions,
     cell: (p) => <Moved n={p.deletions} kind="del" />,
   },
-  { key: "churn", label: "churn", num: true, get: (p) => p.insertions + p.deletions, cell: (p) => pct(p.insertions + p.deletions, moved) },
+  {
+    key: "churn",
+    label: "churn",
+    num: true,
+    get: (p) => p.insertions + p.deletions,
+    cell: (p) => pct(p.insertions + p.deletions, moved),
+  },
   { key: "files", label: "files", num: true, get: (p) => p.files, cell: (p) => num(p.files) },
-  { key: "first", label: "first", num: true, get: (p) => p.first, cell: (p) => day(p.first), flat: true },
-  { key: "last", label: "last", num: true, get: (p) => p.last, cell: (p) => day(p.last), flat: true },
+  {
+    key: "first",
+    label: "first",
+    num: true,
+    get: (p) => p.first,
+    cell: (p) => day(p.first),
+    flat: true,
+  },
+  {
+    key: "last",
+    label: "last",
+    num: true,
+    get: (p) => p.last,
+    cell: (p) => day(p.last),
+    flat: true,
+  },
 ]
 
 export function Overview({
@@ -156,6 +400,11 @@ export function Overview({
   // an export can be published with the addresses stripped, and then the column says nothing
   const anon = stats.contributors.every((one) => !one.email)
   const wall_ = useRef<HTMLDivElement>(null)
+  const [kit, setKit] = useState<Deps | null>(null)
+  const [scope, setScope] = useState(SCOPE[0])
+  useEffect(() => {
+    void dependencies().then(setKit)
+  }, [])
   const count = (edges: Record<string, number>) =>
     Object.values(edges).reduce((sum, n) => sum + n, 0)
 
@@ -316,6 +565,36 @@ export function Overview({
       />
 
       <AiCard ai={stats.stack.ai} />
+
+      {kit && kit.list.length > 0 && (
+        <DataTable
+          title="External dependencies"
+          hint={
+            kit.offline
+              ? "licences read off node_modules. The advisory check could not reach osv.dev"
+              : `${plural(kit.list.length, "package")}, licences off disk and advisories from osv.dev on ${day(kit.checked)}`
+          }
+          // worst first: a table of 185 packages is read for the handful that are filed against
+          rows={[...(scope === SCOPE[0] ? kit.list.filter((one) => one.direct) : kit.list)].sort(
+            (a, b) =>
+              b.advisories.length - a.advisories.length ||
+              RANK.indexOf(worst(a.advisories)) - RANK.indexOf(worst(b.advisories)) ||
+              a.name.localeCompare(b.name),
+          )}
+          // 134 packages here are installed at two versions, and a repeated key stops react
+          // reordering the rows at all, so a click on a header looked like it did nothing
+          id={(one) => `${one.name}@${one.version}`}
+          columns={DEPS}
+          total={{
+            ...kit.list[0],
+            name: "",
+            every: scope === SCOPE[0] ? kit.list.filter((one) => one.direct) : kit.list,
+          }}
+          fold={8}
+        >
+          <Tabs className="ml-auto" tabs={SCOPE} value={scope} onChange={setScope} />
+        </DataTable>
+      )}
 
       <Onward stats={stats} current="Overview" onTab={onTab} />
     </div>

@@ -20,6 +20,8 @@ export interface Column<T> {
   hint?: string
   /** keep it left, even when the values are numbers the table would right align */
   left?: boolean
+  /** a column where all zeros is the good answer, so it is never flagged as unread */
+  good?: boolean
 }
 
 /** a row's own lines, the denominator when reading shares within a row */

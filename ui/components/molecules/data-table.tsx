@@ -81,7 +81,9 @@ export function DataTable<T>({
     () =>
       new Set(
         columns
-          .filter((col) => col.num && rows.some((row) => typeof col.get(row) === "number"))
+          .filter(
+            (col) => col.num && !col.good && rows.some((row) => typeof col.get(row) === "number"),
+          )
           .map((col) => col.key),
       ),
     [columns, rows],

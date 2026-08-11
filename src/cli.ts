@@ -5,6 +5,7 @@
 import { existsSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
+import { deps } from "./deps.ts"
 import { human, nest, pct, tokens } from "./human.ts"
 import { blank, git, merge } from "./model.ts"
 import { explain, needs } from "./needs.ts"
@@ -193,7 +194,9 @@ try {
     console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
   } else {
     const stats = analyze(target, cap)
-    if (viewing) console.log(view(values.anon ? anonymous(stats) : stats, values.out))
+    // licences come off disk, advisories off the network, and a saved page keeps both
+    const held = viewing ? { deps: await deps(target).catch(() => null) } : undefined
+    if (viewing) console.log(view(values.anon ? anonymous(stats) : stats, values.out, held))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }
 } catch (err) {

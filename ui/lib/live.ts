@@ -3,6 +3,7 @@
 
 import { toast } from "./toast.ts"
 import type { Calls } from "../../src/calls.ts"
+import type { Deps } from "../../src/deps.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -138,3 +139,9 @@ export async function printed(): Promise<Blob | null> {
   }
   return null
 }
+
+/** licences off disk and advisories from osv, carried by a saved page or asked for once */
+export const dependencies = (): Promise<Deps | null> =>
+  window.__DESPRAWL_DEPS__
+    ? Promise.resolve(window.__DESPRAWL_DEPS__)
+    : ask<Deps | null>("/api/deps", null)

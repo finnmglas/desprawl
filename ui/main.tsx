@@ -30,6 +30,7 @@ import { CopyButton } from "./components/molecules/copy-button.tsx"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Calls as Called } from "../src/calls.ts"
+import type { Deps as Depended } from "../src/deps.ts"
 import type { Graph as Imports } from "../src/graph.ts"
 import type { Stats } from "../src/model.ts"
 
@@ -40,6 +41,7 @@ declare global {
     /** a static export carries both graphs too, since there is no server to ask */
     __DESPRAWL_GRAPH__?: Imports
     __DESPRAWL_CALLS__?: Called
+    __DESPRAWL_DEPS__?: Depended
   }
 }
 

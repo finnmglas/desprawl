@@ -272,3 +272,26 @@ export const TONES: Record<Verdict["tone"], string> = {
   fine: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
   watch: "bg-amber-500/20 text-amber-700 dark:text-amber-300",
 }
+
+export const RANK = ["CRITICAL", "HIGH", "MODERATE", "LOW"]
+
+/** the worst one filed against a package, since a list of five is read by its top entry */
+export const worst = (found: { severity: string }[]): string =>
+  RANK.find((one) => found.some((a) => a.severity === one)) ?? (found.length ? "UNKNOWN" : "")
+
+// the families every licence list sorts into, by what they ask of the code around them
+const PERMISSIVE = /^(MIT|ISC|0BSD|BSD-|Apache-2|Unlicense|CC0|WTFPL|OFL|Zlib|Python-2|BlueOak)/i
+const WEAK = /^(LGPL|MPL|EPL|CDDL|CeCILL-C|Artistic)/i
+const STRONG = /^(GPL|AGPL|SSPL|OSL|EUPL|CC-BY-NC|Elastic|BUSL)/i
+
+/** what a licence asks of the code that uses it, which is a fact rather than a verdict */
+export const familyOf = (license: string): "permissive" | "weak" | "strong" | "unknown" => {
+  const one = license.trim()
+  if (!one) return "unknown"
+  // "MIT OR Apache-2.0" is satisfied by either, so the gentler side is the one that counts
+  const parts = one.split(/\s+OR\s+/i).map((p) => p.replace(/[()]/g, "").trim())
+  if (parts.some((p) => PERMISSIVE.test(p))) return "permissive"
+  if (parts.some((p) => WEAK.test(p))) return "weak"
+  if (parts.some((p) => STRONG.test(p))) return "strong"
+  return "unknown"
+}

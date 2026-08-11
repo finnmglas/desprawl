@@ -11,6 +11,8 @@ import { analyze } from "./analyze.ts"
 import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
+import { deps } from "./deps.ts"
+import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
 import { bytesAt, count, detail, moved, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
@@ -82,6 +84,7 @@ export function serve(
   let sizes: { date: string; bytes: number }[] | null = null
   let imports: Graph | null = null
   let called: Calls | null = null
+  let known: Deps | null = null
 
   const load = (fresh: boolean): Stats => {
     const head = git(repo, "rev-parse", "--short", "HEAD").trim()
@@ -269,9 +272,18 @@ export function serve(
           return
         }
 
+        // read once a page asks, since it reaches the network
+        if (url.pathname === "/api/deps") {
+          ;(known ? Promise.resolve(known) : deps(repo).then((d) => (known = d))).then(
+            (d) => json(d),
+            (err: Error) => json({ error: err.message }, 500),
+          )
+          return
+        }
+
         if (url.pathname === "/api/static") {
           imports ||= build(repo)
-          const made = onePage(load(false), { graph: imports, called, viewer: html })
+          const made = onePage(load(false), { graph: imports, called, deps: known, viewer: html })
           return send(200, made.html, "text/html")
         }
 

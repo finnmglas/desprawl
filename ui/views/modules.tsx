@@ -1003,6 +1003,7 @@ const COLUMNS: Column<Unit>[] = [
     key: "barrels",
     label: "Doors",
     num: true,
+    good: true,
     get: (u) => u.barrels,
     cell: (u) =>
       u.barrels ? (
