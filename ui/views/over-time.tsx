@@ -24,7 +24,7 @@ import {
   ChartTooltipContent,
 } from "../components/atoms/chart.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Working } from "../components/atoms/working.tsx"
+import { Working, useSlow } from "../components/atoms/working.tsx"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, defaultGrain, endsAt, num, stamp, startsAt } from "../lib/format.ts"
@@ -55,6 +55,7 @@ export function OverTime({
   const [grained, setGrained] = useState(false)
   const [sizes, setSizes] = useState<Sample[]>([])
   const [sizing, setSizing] = useState(false)
+  const slow = useSlow(sizing)
   // how a repo grew, and who was there while it did
   const [picked, setPicked] = useState<string[]>(["changes", "lines", "devs"])
   const series = expand(picked)
@@ -151,7 +152,7 @@ export function OverTime({
       ? "reading every commit date, so the chart can span the whole history…"
       : zoom
         ? `zoomed to ${shown[0]?.day} - ${shown.at(-1)?.day}, ${num(shown.length)} of ${num(days.length)} buckets. Double click to reset`
-        : sizing
+        : slow
           ? "measuring the size at points across history…"
           : all && mixed
             ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`

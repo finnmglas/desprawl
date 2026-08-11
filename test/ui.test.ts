@@ -140,6 +140,7 @@ test("a route parameter is named for what it is a detail of", () => {
   assert.equal(nameOf("src/pages/[owner]/*"), "Owner [detail]")
   assert.equal(nameOf("modname/[slug]"), "Modname [detail]", "a slug names only its parent")
   assert.equal(nameOf("blog/[...rest]"), "Blog [detail]", "and so does a catch all")
+  assert.equal(nameOf("convex/lib/[slug]"), "Convex [detail]", "and not a folder saying nothing")
 })
 
 test("a folder named after a uuid is left as written, and sorts last", () => {
@@ -159,6 +160,50 @@ test("two groups called the same thing both take their parent", () => {
   assert.equal(named.get("ui/components/data"), "Components data")
   assert.equal(named.get("ui/lib/data"), "Library data")
   assert.equal(named.get("ui/views"), "Views", "what does not clash stays short")
+})
+
+test("a group is named after the folder that tells it apart, not the one above it", () => {
+  const named = namesOf([
+    { path: "apps/admin/src/modules/*", folders: 4 },
+    { path: "apps/customer/src/modules/*", folders: 7 },
+  ])
+  assert.equal(named.get("apps/admin/src/modules/*"), "Admin [modules]")
+  assert.equal(named.get("apps/customer/src/modules/*"), "Customer [modules]", "not both source")
+  assert.equal(
+    nameOf("packages/lib/src/*", 2),
+    "Library source [modules]",
+    "nothing above says more",
+  )
+  assert.equal(nameOf("src/submodules/*", 3), "Submodules [modules]", "only the whole word repeats")
+})
+
+test("a clash climbs a folder at a time, and says the path when climbing runs out", () => {
+  const still = namesOf([
+    { path: "apps/admin/src/modules/*", folders: 4 },
+    { path: "apps/admin/lib/modules/*", folders: 4 },
+  ])
+  assert.equal(
+    still.get("apps/admin/src/modules/*"),
+    "Source [modules]",
+    "one borrow was not enough",
+  )
+  assert.equal(still.get("apps/admin/lib/modules/*"), "Library [modules]")
+
+  // climbing onto a name someone else already had has to set that one climbing too
+  const onto = namesOf([
+    { path: "src/modules/*", folders: 2 },
+    { path: "apps/admin/src/modules/*", folders: 2 },
+    { path: "apps/admin/lib/modules/*", folders: 2 },
+  ])
+  assert.equal(new Set(onto.values()).size, 3, "one round settled a clash by making another")
+
+  // `_lib` and `lib` are read the same however far it climbs
+  const same = namesOf([
+    { path: "convex/_lib", folders: 0 },
+    { path: "convex/lib", folders: 0 },
+  ])
+  assert.equal(same.get("convex/_lib"), "convex/_lib", "two rows reading alike is the bug")
+  assert.equal(same.get("convex/lib"), "convex/lib")
 })
 
 test("a label decided on a handful of imports says so, an exact one does not", () => {

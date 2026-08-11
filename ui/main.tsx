@@ -8,6 +8,7 @@ import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
 import { ThemeToggle } from "./components/molecules/theme-toggle.tsx"
 import { Waiting } from "./components/atoms/waiting.tsx"
+import { useSlow } from "./components/atoms/working.tsx"
 import { Tabs } from "./components/atoms/tabs.tsx"
 import { Toaster, toast } from "./components/atoms/toast.tsx"
 import { Explorer } from "./views/explorer.tsx"
@@ -79,6 +80,7 @@ function App({
   })
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
+  const slow = useSlow(busy > 0)
 
   // every tab at once while a file is being made
   const [printing, setPrinting] = useState(paperOnly)
@@ -271,7 +273,7 @@ function App({
                   · partial clone, no line counts
                 </span>
               )}
-              {busy > 0 && <span className="text-foreground"> · working…</span>}
+              {slow && <span className="text-foreground"> · working…</span>}
             </p>
           </div>
           <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">

@@ -7,15 +7,31 @@ import { cn } from "../../lib/ui.ts"
 // a stall looks different from a finish
 const STEPS = [1, 2, 3, 2]
 
+// long enough that a request nobody waited for never says anything
+const PATIENCE = 800
+
+/** true once the wait is worth a word, so a blink neither flashes nor reflows the line */
+export function useSlow(on?: boolean): boolean {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => {
+    setSlow(false)
+    if (!on) return
+    const wait = setTimeout(() => setSlow(true), PATIENCE)
+    return () => clearTimeout(wait)
+  }, [on])
+  return slow
+}
+
 /** the data stays, this says it will change */
 export function Working({ on, className }: { on?: boolean; className?: string }) {
+  const slow = useSlow(on)
   const [step, setStep] = useState(0)
   useEffect(() => {
-    if (!on) return
+    if (!slow) return
     const tick = setInterval(() => setStep((was) => (was + 1) % STEPS.length), 260)
     return () => clearInterval(tick)
-  }, [on])
-  if (!on) return null
+  }, [slow])
+  if (!slow) return null
   return (
     <span
       role="status"

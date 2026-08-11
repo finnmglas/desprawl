@@ -104,13 +104,19 @@ const VARIES = /^\[.+\]$/
  * What a group would be called out loud. A remainder says whether opening it shows
  * folders or files, a route parameter is named for what it is a detail of, and an id
  * is left exactly as written since only its characters tell two of them apart.
+ * `deep` is how many folders a clash has had to climb, and every step adds one.
  */
-export function nameOf(path: string, folders = 0, deep = false): string {
+export function nameOf(path: string, folders = 0, deep = 0): string {
   if (path === LOOSE_FILES) return "Repo root [files]"
   const parts = path.split("/")
   const rest = parts.at(-1) === LOOSE_FILES
   const own = parts.at(rest ? -2 : -1) ?? path
-  const above = parts.at(rest ? -3 : -2) ?? ""
+  const above = parts
+    .slice(0, rest ? -2 : -1)
+    .map(said)
+    .filter(Boolean)
+  // `apps/admin/src/modules` is admin's, not another src's, so a borrow skips what says nothing
+  const speaks = above.filter((w) => !PLAIN.has(w.toLowerCase()))
 
   if (isId(own)) return own
 
@@ -120,29 +126,42 @@ export function nameOf(path: string, folders = 0, deep = false): string {
       .replace(/\s*id$/i, "")
       .trim()
     const every = /^\[+\.{3}/.test(own)
-    const named = every || !inner || ANY.has(inner.toLowerCase()) ? said(above) : inner
+    const holds = speaks.at(-1) ?? above.at(-1) ?? ""
+    const named = every || !inner || ANY.has(inner.toLowerCase()) ? holds : inner
     return `${cased(named) || "One"} [detail]`
   }
 
   const word = said(own)
-  const borrows = above && (deep || PLAIN.has(word.toLowerCase()))
-  return (
-    cased(borrows ? `${said(above)} ${word}` : word) +
-    (rest ? (folders ? " [modules]" : " [files]") : "")
-  )
+  const plain = PLAIN.has(word.toLowerCase())
+  const borrowed = deep
+    ? above.slice(-deep)
+    : plain
+      ? [speaks.at(-1) ?? above.at(-1)].filter(Boolean)
+      : []
+  const name = cased([...borrowed, word].join(" "))
+  if (!rest) return name
+  // the tag already says modules, so `Admin modules [modules]` says it twice
+  const tag = folders ? "modules" : "files"
+  const words = name.split(" ")
+  const short = words.at(-1)?.toLowerCase() === tag ? words.slice(0, -1).join(" ") : name
+  return `${short || name} [${tag}]`
 }
 
 /** two groups called the same thing is worse than one long name, so only a clash grows */
 export function namesOf(units: { path: string; folders: number }[]): Map<string, string> {
+  const folders = new Map(units.map((u) => [u.path, u.folders]))
   const names = new Map(units.map((u) => [u.path, nameOf(u.path, u.folders)]))
-  const taken = new Map<string, string[]>()
-  for (const [path, name] of names) taken.set(name, [...(taken.get(name) ?? []), path])
-  for (const paths of taken.values()) {
-    if (paths.length < 2) continue
-    for (const path of paths) {
-      const unit = units.find((u) => u.path === path)!
-      names.set(path, nameOf(path, unit.folders, true))
-    }
+  // one folder per round, until the last one that could tell them apart has been said
+  for (let deep = 1; ; deep++) {
+    const taken = new Map<string, string[]>()
+    for (const [path, name] of names) taken.set(name, [...(taken.get(name) ?? []), path])
+    const clashing = [...taken.values()].filter((paths) => paths.length > 1).flat()
+    if (!clashing.length) break
+    // `a-b` and `a_b` are read the same however far it climbs, so the path becomes the name
+    const spent = deep > 8
+    for (const path of clashing)
+      names.set(path, spent ? path : nameOf(path, folders.get(path), deep))
+    if (spent) break
   }
   return names
 }
