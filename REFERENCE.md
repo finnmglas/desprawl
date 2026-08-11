@@ -35,6 +35,10 @@ Analyze git-tracked repos (files, history, imports, calls):
 - **contributors** listed traceably (also ai)
 - **stack** from manifests and marker files, frameworks etc
 - **imports** are graphed, mapped and structured into groups logically to show module structure
+- **cycles** read off the files themselves (so nothing invented or lost)
+- **dependencies** licence of every installed package + version advisories
+- **tests** counted read-only, run from interface w/ coverage
+- **actions** git and scripts a repo declares, servers controllable from panel
 
 ```
 /home/you/desprawl  @3982e3d
@@ -56,7 +60,7 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 ## CLI reference
 
 ```sh
-desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
+desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
 |                          |                                      |
@@ -75,6 +79,8 @@ desprawl [cli|view] [path|url] [--static] [--keep] [--depth N] [--top N] [--comm
 | `--commits N` | commits read from the log, default 10,000               |
 | `--digits N`  | digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
 | `--static`    | write standalone file rather than server                |
+| `--anon`      | leave every commit address out, and avatars with them   |
+| `--out FILE`  | write the file there, rather than a temporary name      |
 | `--keep`      | keep server after the tab closes                        |
 | `--raw`       | exact numbers instead of scaled ones                    |
 | `--json`      | machine readable, numbers exact                         |
@@ -86,6 +92,10 @@ Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owne
 Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.
 
 `desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone - or served as a website.
+
+A saved file carries both graphs, the dependency table and what the test suite holds, and says plainly what it cannot do: it never runs a suite, never reaches a registry, and its numbers are as old as the file.
+
+Every panel saves as CSV, TSV, JSON, TOML, Markdown or Excel, every drawing as PNG, JPEG, WebP or SVG, and the whole report as a PDF printed by your own browser, so the text in it stays text.
 
 ## Related
 
