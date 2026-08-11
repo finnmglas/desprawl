@@ -13,6 +13,7 @@ import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
 import { run as runTests, tests } from "./tests.ts"
+import { act, actions, alive, begin, stop as stopAction } from "./actions.ts"
 import type { Suite } from "./tests.ts"
 import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
@@ -276,6 +277,30 @@ export function serve(
         }
 
         if (url.pathname === "/api/tests") return json((suite ||= tests(repo)))
+
+        if (url.pathname === "/api/actions") return json(actions(repo))
+
+        // a server is started and left up, and asked about or stopped from the same panel
+        if (url.pathname === "/api/actions/start") {
+          try {
+            return json(begin(repo, url.searchParams.get("id") ?? ""))
+          } catch (err) {
+            return json({ error: (err as Error).message }, 400)
+          }
+        }
+        if (url.pathname === "/api/actions/stop") {
+          return json({ stopped: stopAction(url.searchParams.get("id") ?? "") })
+        }
+        if (url.pathname === "/api/actions/alive") return json(alive())
+
+        // by id: the command itself is never taken from the url
+        if (url.pathname === "/api/actions/run") {
+          act(repo, url.searchParams.get("id") ?? "").then(
+            (ran) => json(ran),
+            (err: Error) => json({ error: err.message }, 400),
+          )
+          return
+        }
 
         // the one thing here that can take minutes, so it happens only when asked
         if (url.pathname === "/api/tests/run") {

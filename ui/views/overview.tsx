@@ -14,6 +14,7 @@ import { Mark } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/molecules/stack-card.tsx"
+import { Doing } from "../components/molecules/doing.tsx"
 import { Working } from "../components/atoms/working.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { System, wall } from "../components/molecules/system.tsx"
@@ -561,6 +562,9 @@ export function Overview({
           <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
         </CardContent>
       </Card>
+
+      {/* after what the repo is, before what happened to it */}
+      <Doing />
 
       <OverTime
         stats={stats}

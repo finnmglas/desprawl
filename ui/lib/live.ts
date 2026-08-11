@@ -4,7 +4,8 @@
 import { toast } from "./toast.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
-import type { Suite } from "../../src/tests.ts"
+import type { Run, Suite } from "../../src/tests.ts"
+import type { Action, Alive } from "../../src/actions.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -159,3 +160,18 @@ export const runTests = (script: string, coverage = false): Promise<Suite | null
     `/api/tests/run?script=${encodeURIComponent(script)}${coverage ? "&coverage=1" : ""}`,
     null,
   )
+
+/** what this repo can be told to do, and doing it, both served only */
+export const repoActions = (): Promise<Action[]> => ask<Action[]>("/api/actions", [])
+
+export const runAction = (id: string): Promise<Run | null> =>
+  ask<Run | null>(`/api/actions/run?id=${encodeURIComponent(id)}`, null)
+
+/** the ones that never end: started, watched and interrupted from the same panel */
+export const startAction = (id: string): Promise<Alive | null> =>
+  ask<Alive | null>(`/api/actions/start?id=${encodeURIComponent(id)}`, null)
+
+export const stopAction = (id: string): Promise<{ stopped: boolean }> =>
+  ask(`/api/actions/stop?id=${encodeURIComponent(id)}`, { stopped: false })
+
+export const aliveActions = (): Promise<Alive[]> => ask<Alive[]>("/api/actions/alive", [])
