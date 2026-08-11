@@ -26,6 +26,7 @@ import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
 import { attach, isLive, onBusy, token } from "./lib/live.ts"
+import { CopyButton } from "./components/molecules/copy-button.tsx"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
 import type { Calls as Called } from "../src/calls.ts"
@@ -187,6 +188,34 @@ function App({
   return (
     <DisplayProvider value={{ scale, curve, brands }}>
       <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
+        {/* a saved file is read by someone who did not run it, so it says what it is */}
+        {!isLive() && (
+          <div
+            data-print="hide"
+            className="bg-card flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-4"
+          >
+            <p className="min-w-0 flex-1 text-sm">
+              <span className="font-medium">
+                {name === "desprawl"
+                  ? "A static demo of desprawl on its own source."
+                  : `A static desprawl report for ${name}.`}
+              </span>{" "}
+              <span className="text-muted-foreground">Run it on your own project:</span>
+            </p>
+            {/* the command and the button stay one row, whatever the text above them does */}
+            <div className="flex shrink-0 items-center gap-2">
+              <code className="bg-muted flex-1 rounded-md px-3 py-1.5 font-mono text-sm select-all">
+                npx desprawl
+              </code>
+              <CopyButton
+                text={() => "npx desprawl"}
+                message="Copied npx desprawl"
+                note="Run it in any git repo"
+              />
+            </div>
+          </div>
+        )}
+
         <header className="flex flex-wrap items-center justify-between gap-3">
           {/* min-w-0 lets a long path truncate */}
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">

@@ -11,7 +11,8 @@ export interface Prefs {
   curve: Curve
   region: Choice
   brands: Brands
-  /** whether the metadata under the architecture card stays open */
+  /** whether the metadata under the architecture card stays open. Open by default: it is
+   * the answer to what is this repo, and folding it hides that behind a click */
   metadata: boolean
 }
 
@@ -21,7 +22,7 @@ export const FALLBACK: Prefs = {
   curve: "linear",
   region: "auto",
   brands: "flashy",
-  metadata: false,
+  metadata: true,
 }
 
 const KEY = "desprawl-prefs"
