@@ -90,6 +90,8 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 
 Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses, or uses the copy it already has.
 
+Graph view draws it. Every file is a dot inside the module holding it, and a module sits on the level its imports put it on, so nothing drifts across the picture with the force. Switch the grain to modules, or down to declarations, where a file becomes a box of its own. Imports and calls are separate edges on separate bows, either can be turned off, and a pair carrying both shows both.
+
 Execution view analyzes the call graph rather than the import graph. Reach is followed from what actually runs: every file's top level, and every export unless you switch that off. What nothing arrives at is named, with the lines deleting it would take out.
 
 Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.

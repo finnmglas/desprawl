@@ -48,6 +48,9 @@ export interface Calls {
   }
 }
 
+// a name opening an object entry, which is a field and not a reach for anything. A ternary
+// keeps its colon company, so the `?` is what tells the two apart
+const KEY = /[{,;]\s*[A-Za-z_$][\w$]*\s*:\s*$/
 // onClick={save} calls save. a dot owns the name, a spread does not
 const USED = /(?<![\w$])(?<!(?<!\.)\.)([A-Za-z_$][\w$]*)/g
 const CALLED = /^[^\S\n]*(?:<[^<>()]*>)?[^\S\n]*\(/
@@ -160,12 +163,25 @@ const GLOBAL = new Set([
   "decodeURIComponent",
   "btoa",
   "atob",
+  "scrollTo",
+  "scrollBy",
+  "Path2D",
+  "XMLSerializer",
+  "DOMParser",
+  "ResizeObserver",
+  "IntersectionObserver",
+  "MutationObserver",
+  "performance",
+  "crypto",
+  "history",
+  "location",
+  "Image",
 ])
 
 const DECLARED =
   /(?<![.\w$])(export\s+)?(default\s+)?(async\s+)?(function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g
 const ASSIGNED =
-  /(?<![.\w$])(export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=[^\S\n]*(async[^\S\n]+)?(?:function|\([^)]*\)[^\S\n]*(?::[^=\n]*)?=>|[A-Za-z_$][\w$]*[^\S\n]*=>)/g
+  /(?<![.\w$])(export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=[^\S\n]*(async[^\S\n]+)?(?:function|(?:<[^<>=]*>[^\S\n]*)?\((?:[^()]|\([^()]*\))*\)[^\S\n]*(?::[^=\n]*)?=>|[A-Za-z_$][\w$]*[^\S\n]*=>)/g
 
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
@@ -334,23 +350,32 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         })
       const [from, to] = top ? [0, 0] : bodies.get(id)!
       const body = top ? tops.get(file)! : code.slice(from, to)
-      const takes = new Set((body.match(/\(([^)]*)\)/)?.[1] ?? "").match(/[A-Za-z_$][\w$]*/g) ?? [])
+      // names it is handed, with the defaults stripped off: `isEqual = defaultIsEqual` names
+      // isEqual and reaches for defaultIsEqual, and only the first of those is a parameter
+      const takes = new Set(
+        (body.match(/\(([^)]*)\)/)?.[1] ?? "").replace(/=[^,]*/g, "").match(/[A-Za-z_$][\w$]*/g) ??
+          [],
+      )
 
       const seen = new Set<string>()
       for (const m of body.matchAll(USED)) {
         const name = m[1]
         // coverage counts call shaped mentions only
         const shaped = CALLED.test(body.slice(m.index + name.length, m.index + name.length + 40))
+        if (KEY.test(body.slice(Math.max(0, m.index - 24), m.index + name.length + 2))) continue
         if (KEYWORD.has(name) || seen.has(name)) continue
         seen.add(name)
         if (name === symbol.name) continue
 
+        // a parameter shadows a file level name, but a file's top level has no parameters:
+        // reading the first brackets there picks up jsx and buries whatever it names
+        if (!top && takes.has(name)) continue
         const here = symbols[`${file}#${name}`]
         if (here) {
           link(symbol.id, here.id)
           continue
         }
-        if (takes.has(name) || locals.get(file)?.has(name)) continue
+        if (locals.get(file)?.has(name)) continue
         if (GLOBAL.has(name)) {
           if (shaped) builtin++
           continue

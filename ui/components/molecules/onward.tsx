@@ -42,6 +42,11 @@ export function Onward({
       title: "Read the history",
       desc: `${num(stats.log.length)} commits as a branch graph, sized by the lines each moved`,
     },
+    {
+      to: "Graph",
+      title: "Look at the whole thing",
+      desc: "every file a dot inside the module holding it, with imports one way and calls the other",
+    },
   ].filter((link) => link.to !== current)
 
   return (

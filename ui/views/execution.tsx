@@ -88,6 +88,17 @@ export function Execution({
   const declaredLines = declared.reduce((sum, s) => sum + s.lines, 0)
   const busiest = [...declared].sort((a, b) => b.callers.length - a.callers.length)[0]
 
+  const lost = [
+    ...calls.unresolved
+      .reduce((held, one) => {
+        const found = held.get(one.name) ?? { name: one.name, sites: 0, from: [] as string[] }
+        found.sites++
+        if (found.from.length < 4) found.from.push(one.from)
+        return held.set(one.name, found)
+      }, new Map<string, { name: string; sites: number; from: string[] }>())
+      .values(),
+  ].sort((a, b) => b.sites - a.sites)
+
   const hunted = find.trim().toLowerCase()
   const shown = declared.filter(
     (s) =>
@@ -286,6 +297,18 @@ export function Execution({
         />
       )}
 
+      {lost.length > 0 && (
+        <DataTable
+          title="Calls we could not place"
+          hint="a name used like a call that resolves to nothing here: a prop from an enclosing component, a global we do not know, or prose that reads like code"
+          rows={lost}
+          id={(row) => row.name}
+          columns={LOST}
+          fold={8}
+          file="unresolved"
+        />
+      )}
+
       {repeated.length > 0 && (
         <DataTable
           title="Names declared in more than one file"
@@ -469,6 +492,34 @@ const DEAD: Column<Symbol>[] = [
     num: true,
     flat: true,
     get: (s) => s.line,
+  },
+]
+
+const LOST: Column<{ name: string; sites: number; from: string[] }>[] = [
+  {
+    key: "name",
+    label: "Name",
+    get: (row) => row.name,
+    cell: (row) => <span className="font-mono text-xs">{row.name}</span>,
+  },
+  {
+    key: "sites",
+    label: "Sites",
+    num: true,
+    get: (row) => row.sites,
+    hint: "how many places use that name like a call",
+  },
+  {
+    key: "from",
+    label: "Used in",
+    get: (row) => row.from.join(", "),
+    cell: (row) => (
+      <Tip className="max-w-96 min-w-0" text={row.from.join("\n")}>
+        <span className="text-muted-foreground block truncate font-mono text-xs">
+          {row.from.map((one) => one.split("/").pop()).join(", ")}
+        </span>
+      </Tip>
+    ),
   },
 ]
 
