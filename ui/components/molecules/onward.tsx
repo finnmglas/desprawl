@@ -28,6 +28,11 @@ export function Onward({
       desc: "which folders depend on which, the levels they stack into, and the loops that stop any of them being moved",
     },
     {
+      to: "Execution",
+      title: "Follow the calls",
+      desc: "which declarations everything leans on, which ones nothing reaches at all, and the names written twice",
+    },
+    {
       to: "Files",
       title: "Walk the tree",
       desc: `${num(stats.files)} files in ${plural(folders, "top level folder")}, with the language split per folder and churn beside it`,

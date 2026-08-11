@@ -36,6 +36,7 @@ Analyze git-tracked repos (files, history, imports, calls):
 - **stack** from manifests and marker files, frameworks etc
 - **imports** are graphed, mapped and structured into groups logically to show module structure
 - **cycles** read off the files themselves (so nothing invented or lost)
+- **calls** followed from what runs, naming hotspots, unreachable code, recursion and repeated names
 - **dependencies** licence of every installed package + version advisories
 - **tests** counted read-only, run from interface w/ coverage
 - **actions** git and scripts a repo declares, servers controllable from panel
@@ -88,6 +89,8 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 
 Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses, or uses the copy it already has.
+
+Execution view analyzes the call graph rather than the import graph. Reach is followed from what actually runs: every file's top level, and every export unless you switch that off. What nothing arrives at is named, with the lines deleting it would take out.
 
 Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.
 

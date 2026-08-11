@@ -37,6 +37,7 @@ export const FolderMark = () => (
   <Line d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
 )
 export const Clock = () => <Line circle d="M12 7v5l3 2" />
+export const Run = () => <Line d="M5 4h4l6 8-6 8H5l6-8-6-8ZM15 4h4" />
 
 // the theme switch
 export const Sun = () => (

@@ -312,6 +312,22 @@ export const coverageOf = (pct: number): Verdict =>
           why: `${pct}% of lines run, so most of it is never exercised`,
         }
 
+/** unreachable code is read, moved and merged like the rest of it, so its share is the cost */
+export const deadOf = (lines: number, whole: number): Verdict =>
+  !lines
+    ? { label: "none", tone: "fine", why: "every declaration is reached by something that runs" }
+    : lines / Math.max(1, whole) < 0.05
+      ? {
+          label: "a corner",
+          tone: "plain",
+          why: `${((lines / whole) * 100).toFixed(1)}% of declared lines, small enough to be leftovers`,
+        }
+      : {
+          label: "a share",
+          tone: "watch",
+          why: `${((lines / whole) * 100).toFixed(1)}% of declared lines nothing arrives at, which is read and maintained anyway`,
+        }
+
 /** a suite is green or it is not, and the count of what it holds says how much that means */
 export const suiteOf = (ran: { ok: boolean } | null, cases: number): Verdict =>
   !ran

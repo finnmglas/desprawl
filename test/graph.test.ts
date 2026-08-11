@@ -4,8 +4,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { build, jsonc, packageOf } from "../src/graph.ts"
-import { specifiers, symbols } from "../src/specifiers.ts"
+import { scrub, specifiers, symbols } from "../src/specifiers.ts"
 import { repo } from "./repo.ts"
+
+const count = (text: string, pattern: RegExp) => (text.match(pattern) ?? []).length
 
 const to = (graph: ReturnType<typeof build>, from: string) =>
   graph.modules[from].out.map((e) => e.to).sort()
@@ -22,6 +24,25 @@ test("a comment, a string or a regex cannot invent an import", () => {
     found.map((s) => s.text),
     ["./real.ts"],
   )
+})
+
+test("a scrub hands back the lines it was given, so a line number still means one", () => {
+  // `</p>` opened a regex that ran to the end of the line and took the newline with it,
+  // which moved every declaration below it and let one body swallow the next
+  const source = [
+    "function Panel() {",
+    "  return (",
+    "    <p className={cn('a')}>",
+    "      Nothing here is a regex, and it isn't a string either",
+    "    </p>",
+    "  )",
+    "}",
+    "function Below() { return 1 }",
+  ].join("\n")
+  const { code } = scrub(source)
+  assert.equal(code.split("\n").length, 8, "every line survives")
+  assert.equal(count(code, /\{/g), count(code, /\}/g), "and every brace closes")
+  assert.match(code.split("\n")[7], /function Below/, "so the last line is still the last line")
 })
 
 test("every form of import is found, and told apart", () => {

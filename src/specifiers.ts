@@ -45,6 +45,7 @@ export function erased(clause: string): boolean {
 
 const WORD = /[A-Za-z0-9_$]/
 export const MARK = ""
+const MARKED = new RegExp(`${MARK}(\\d+)${MARK}`, "g")
 
 /** comments and regex become spaces, strings a marker pointing at their text */
 export function scrub(source: string): { code: string; strings: string[] } {
@@ -57,7 +58,8 @@ export function scrub(source: string): { code: string; strings: string[] } {
     for (let back = code.length - 1; back >= 0; back--) {
       const ch = code[back]
       if (/\s/.test(ch)) continue
-      return WORD.test(ch) || ch === ")" || ch === "]"
+      // `</div>` closes a tag and `{on} />` ends one, and tsx is full of both
+      return WORD.test(ch) || ch === ")" || ch === "]" || ch === "<" || ch === "}"
     }
     return false
   }
@@ -79,7 +81,8 @@ export function scrub(source: string): { code: string; strings: string[] } {
         at += source[at] === "\\" ? 2 : 1
       strings.push(source.slice(i + 1, at))
       code += `${MARK}${strings.length - 1}${MARK}`
-      i = at + 1
+      // an apostrophe in jsx text opens a string that never closes, and its line has to survive that
+      i = source[at] === "\n" ? at : at + 1
     } else if (ch === "`") {
       // an expression inside a template can hold an import
       let at = i + 1
@@ -100,8 +103,15 @@ export function scrub(source: string): { code: string; strings: string[] } {
       }
       const inner = scrub(flat)
       strings.push("")
-      code += `${MARK}${strings.length - 1}${MARK}`
+      const marker = `${MARK}${strings.length - 1}${MARK}`
+      // its own strings land further along, so the numbers pointing at them move with them
+      const base = strings.length
       strings.push(...inner.strings)
+      const held = inner.code
+        .replace(MARKED, (_, n) => `${MARK}${Number(n) + base}${MARK}`)
+        .replace(/\n/g, " ")
+      // `${install(tool)}` calls install, and the lines it spans stay behind it
+      code += `${marker}${held}${"\n".repeat(count(source.slice(i, at), /\n/g))}`
       i = at + 1
     } else if (ch === "/" && !divides()) {
       let at = i + 1
@@ -113,7 +123,8 @@ export function scrub(source: string): { code: string; strings: string[] } {
         at++
       }
       code += " "
-      i = at + 1
+      // a regex ends with its line, and eating that newline moves every line below it
+      i = source[at] === "\n" ? at : at + 1
     } else {
       code += ch
       i++

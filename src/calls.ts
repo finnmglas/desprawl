@@ -12,7 +12,8 @@ export interface Symbol {
   id: string
   file: string
   name: string
-  kind: "function" | "class" | "component"
+  /** module is the file's own top level, which declares nothing and runs on import */
+  kind: "function" | "class" | "component" | "module"
   line: number
   /** lines its body spans */
   lines: number
@@ -79,13 +80,19 @@ const KEYWORD = new Set([
   "try",
   "finally",
   "throw",
+  "extends",
+  "implements",
 ])
 
 /** what runs on import */
 export const TOP = "(top level)"
 
-// an import, up to the scrub's marker
-const BROUGHT = new RegExp(`(^|[\\s;}])(import|export)\\s+[^${MARK}]*?${MARK}\\d+${MARK}`, "g")
+// an import, up to the scrub's marker. It has to want a `from` the way a specifier does,
+// or `export default plugins([one()])` reads as one and the calls in it go with it
+const BROUGHT = new RegExp(
+  `(^|[\\s;})])(import|export)\\s+(type\\s+)?([^${MARK}]*?\\bfrom\\s*)?${MARK}\\d+${MARK}`,
+  "g",
+)
 
 // the runtime holds these
 const GLOBAL = new Set([
@@ -261,7 +268,8 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
 
     const add = (name: string, at: number, exported: boolean, kind: Symbol["kind"]) => {
       const id = `${module.path}#${name}`
-      if (symbols[id]) return
+      // `= class extends Base {` declares no name, and extends is not one
+      if (symbols[id] || KEYWORD.has(name)) return
       const end = span(code, at)
       bodies.set(id, [at, end])
       ;(mine.get(module.path) ?? mine.set(module.path, []).get(module.path)!).push(id)
@@ -316,7 +324,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
           id,
           file,
           name: TOP,
-          kind: "function",
+          kind: "module",
           line: 1,
           lines: 0,
           exported: false,
