@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Blocks, Clock, FolderMark } from "./components/atoms/icons.tsx"
+import { Blocks, Clock, FolderMark, NpmMark } from "./components/atoms/icons.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
 import { ThemeToggle } from "./components/molecules/theme-toggle.tsx"
@@ -230,6 +230,18 @@ function App({
               {stats.remotes.map((remote) => (
                 <RemoteLink key={remote.url} remote={remote} />
               ))}
+              {/* a manifest that is not private is one npm would take, so its page exists */}
+              {stats.stack.name && !stats.stack.private && (
+                <a
+                  href={`https://www.npmjs.com/package/${stats.stack.name}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={`${stats.stack.name} on npm, read off package.json rather than the registry`}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <NpmMark className="size-5" />
+                </a>
+              )}
             </div>
             <button
               onClick={async () =>

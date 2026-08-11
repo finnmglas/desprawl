@@ -104,6 +104,11 @@ const HOSTS: Record<string, string> = {
   git: "M12 2 2 12l10 10 10-10L12 2Zm0 4 6 6-6 6-6-6 6-6Z",
 }
 
+// the npm wordmark box, since a package page is where a reader goes next
+export const NpmMark = ({ className }: { className?: string }) => (
+  <Solid className={className} d="M2 7v10h6v-8h3v8h3V9h3v8h3V7H2Z" />
+)
+
 export const HostMark = ({ host, className }: { host: string; className?: string }) => (
   <Solid className={className} d={HOSTS[host] ?? HOSTS.git} />
 )
