@@ -1,7 +1,7 @@
 // owner: finn
 // goal: show data
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AiCard } from "../components/molecules/ai-card.tsx"
 import { Avatar } from "../components/atoms/avatar.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
@@ -16,9 +16,11 @@ import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/molecules/stack-card.tsx"
 import { Working } from "../components/atoms/working.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
-import { System } from "../components/molecules/system.tsx"
+import { System, wall } from "../components/molecules/system.tsx"
+import { Save } from "../components/molecules/save.tsx"
+import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { day, num, pct, plural, tokens } from "../lib/format.ts"
-import { commentsOf, contextOf, historyOf, sizeOf } from "../lib/verdict.ts"
+import { commentsOf, contextOf, historyOf, shapeOf, sizeOf } from "../lib/verdict.ts"
 import { allTime, importGraph, isLive, movedIn } from "../lib/live.ts"
 import { worked } from "../lib/people.ts"
 import { balanced, fold } from "../../src/layers.ts"
@@ -150,6 +152,10 @@ export function Overview({
   const source = stats.code + stats.comment
   const moved = stats.contributors.reduce((a, c) => a + c.insertions + c.deletions, 0)
   const span = Math.round((Date.parse(stats.last) - Date.parse(stats.first)) / 86_400_000) + 1
+  const name = stats.repo.split("/").filter(Boolean).pop() ?? "Repo"
+  const wall_ = useRef<HTMLDivElement>(null)
+  const count = (edges: Record<string, number>) =>
+    Object.values(edges).reduce((sum, n) => sum + n, 0)
 
   return (
     <div className="flex flex-col gap-4">
@@ -209,22 +215,53 @@ export function Overview({
             </span>
           }
           hint="modules and services, generated from repo"
-        />
-        <CardContent>
-          {graph ? (
-            <System
-              name={stats.repo.split("/").filter(Boolean).pop() ?? "Repo"}
-              moved={range && isLive() ? changed : undefined}
-              people={stats.contributors}
-              worked={where}
-              faces={faces}
-              units={units}
-              stack={stats.stack}
-              onPick={() => onTab("Modules")}
-            />
-          ) : (
-            <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
+          wrap
+        >
+          {graph && units.length > 0 && (
+            <div className="ml-auto flex items-center gap-1">
+              <CopyButton
+                label="Copy the architecture, as text"
+                text={() => wall(name, units, stats.stack)}
+                message={`Copied ${plural(units.length, "group")}`}
+                note="Every band, its groups and what they talk to"
+              />
+              <Save
+                name="architecture"
+                picture={() => wall_.current}
+                rows={() => [
+                  ["group", "name", "level", "files", "lines", "classification", "packages"],
+                  ...units.map((u) => [
+                    u.path,
+                    u.path,
+                    u.level,
+                    u.files,
+                    u.lines,
+                    shapeOf(u.internal, count(u.out), count(u.in), Object.keys(u.out).length).label,
+                    u.packages,
+                  ]),
+                ]}
+                note={`${plural(units.length, "group")}, as`}
+              />
+            </div>
           )}
+        </CardHead>
+        <CardContent>
+          <div ref={wall_}>
+            {graph ? (
+              <System
+                name={name}
+                moved={range && isLive() ? changed : undefined}
+                people={stats.contributors}
+                worked={where}
+                faces={faces}
+                units={units}
+                stack={stats.stack}
+                onPick={() => onTab("Modules")}
+              />
+            ) : (
+              <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
+            )}
+          </div>
           {range && !isLive() && (
             <p className="text-muted-foreground mt-3 text-xs">Needs live npx desprawl server.</p>
           )}

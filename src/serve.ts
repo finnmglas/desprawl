@@ -17,6 +17,7 @@ import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
 import { explain } from "./needs.ts"
+import { browser, print } from "./print.ts"
 import { page as onePage, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
@@ -184,6 +185,8 @@ export function serve(
         }
       }
       try {
+        if (url.pathname === "/api/can-print") return json({ can: !!browser() })
+
         if (url.pathname === "/api/stats") {
           const stats = load(url.searchParams.has("fresh"))
           return json({ ...stats, tree: prune(stats.tree) })
@@ -249,6 +252,23 @@ export function serve(
         }
 
         // the whole thing as one file, using whatever this run has already built
+        // printed by a real browser, so the text stays text
+        if (url.pathname === "/api/pdf") {
+          const port = (server.address() as { port: number }).port
+          const theme = url.searchParams.get("theme") === "dark" ? "dark" : "light"
+          print(`http://${HOST}:${port}/?t=${token}&paper=1&theme=${theme}`).then(
+            (made) => {
+              res.writeHead(200, {
+                "content-type": "application/pdf",
+                "cache-control": "no-store",
+              })
+              res.end(made)
+            },
+            (err: Error) => json({ error: err.message }, 500),
+          )
+          return
+        }
+
         if (url.pathname === "/api/static") {
           imports ||= build(repo)
           const made = onePage(load(false), { graph: imports, called, viewer: html })

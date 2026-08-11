@@ -53,9 +53,14 @@ async function ask<T>(path: string, fallback: T): Promise<T> {
 export function attach(): void {
   // a static file has no server to tell, and must never try to reach one
   if (!isLive()) return
+  // a headless printer waits on a stream that never ends, and is not a tab worth keeping
+  if (printing()) return
   // the browser drops this the moment the tab goes, and reopens it after a sleep
   new EventSource(`/api/session?t=${token()}`)
 }
+
+/** opened to be printed, not read */
+export const printing = (): boolean => new URLSearchParams(location.search).has("paper")
 
 export const filesIn = (path: string): Promise<Node[]> =>
   ask(`/api/files?path=${encodeURIComponent(path)}`, [])
@@ -107,3 +112,29 @@ export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
 
 export const trueCount = (): Promise<number> =>
   ask<{ commits: number }>("/api/count", { commits: 0 }).then((r) => r.commits)
+
+/** a browser on that machine can write one */
+export async function canPrint(): Promise<boolean> {
+  const t = token()
+  if (!t) return false
+  try {
+    const res = await fetch(`/api/can-print?t=${t}`)
+    return res.ok && ((await res.json()) as { can: boolean }).can
+  } catch {
+    return false
+  }
+}
+
+/** the whole report, printed rather than painted */
+export async function printed(): Promise<Blob | null> {
+  const t = token()
+  if (!t) return null
+  try {
+    const theme = document.documentElement.classList.contains("dark") ? "dark" : "light"
+    const res = await fetch(`/api/pdf?t=${t}&theme=${theme}`)
+    if (res.ok) return await res.blob()
+  } catch {
+    /* the caller falls back to a picture */
+  }
+  return null
+}

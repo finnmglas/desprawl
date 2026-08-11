@@ -12,10 +12,13 @@ export function Circle({
   units,
   cuts,
   rings,
+  label,
   onPick,
 }: {
   units: Unit[]
   cuts?: Set<string>
+  /** what to call a group, when the grouping derives a name for it */
+  label?: (path: string) => string
   /** pairs a real file ring runs through, drawn heavier than a merely untidy one */
   rings?: Set<string>
   onPick?: (path: string) => void
@@ -95,10 +98,14 @@ export function Circle({
       pen.textAlign = right ? "left" : "right"
       pen.textBaseline = "middle"
       pen.fillStyle = lit ? "rgba(128,128,128,1)" : "rgba(128,128,128,0.75)"
-      pen.fillText(shortPath(unit.path.split("/").slice(-2).join("/"), 22), 0, 0)
+      pen.fillText(
+        label?.(unit.path) ?? shortPath(unit.path.split("/").slice(-2).join("/"), 22),
+        0,
+        0,
+      )
       pen.restore()
     })
-  }, [units, cuts, rings, near])
+  }, [units, cuts, rings, label, near])
 
   const found = near >= 0 ? shown[near] : null
   return (

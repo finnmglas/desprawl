@@ -1,15 +1,15 @@
 // owner: finn
 // goal: one column spec drives render, sort and export
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "../atoms/card.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
-import { DownloadButton } from "./download-button.tsx"
+import { Save } from "./save.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "../atoms/table.tsx"
 import { Tip } from "../atoms/tip.tsx"
 import { type Column } from "../../lib/columns.ts"
-import { delimit, named } from "../../lib/export.ts"
+import { delimit } from "../../lib/export.ts"
 import { HINTS } from "../../lib/hints.ts"
 import { backdrop, cycle, pct } from "../../lib/format.ts"
 import { effective, shares } from "../../lib/scale.ts"
@@ -57,6 +57,7 @@ export function DataTable<T>({
   onSort,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
+  const sheet = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -140,96 +141,100 @@ export function DataTable<T>({
             message={`Copied ${sorted.length} rows`}
             note="Paste straight into a sheet"
           />
-          <DownloadButton
-            name={named(`${slug}.csv`)}
-            text={() => delimit(matrix(), ",")}
-            note={`${sorted.length} rows`}
+          <Save
+            name={slug}
+            rows={matrix}
+            picture={() => sheet.current}
+            note={`${sorted.length} rows, as`}
           />
         </div>
       </CardHead>
       <CardContent className="p-0 pt-2">
-        <Table>
-          <THead>
-            <TR>
-              {columns.map((col) => (
-                <TH
-                  key={col.key}
-                  num={col.num && !col.left}
-                  onClick={() => {
-                    const next = cycle(sort, col.key)
-                    setSort(next)
-                    onSort?.(next)
-                  }}
-                  className="hover:text-foreground cursor-pointer select-none"
-                >
-                  <Tip text={col.hint ?? HINTS[col.label]} side="bottom">
-                    <span>
-                      {col.label}
-                      {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}
-                    </span>
-                  </Tip>
-                  {/* a column of nothing but zeros is usually a number that could not be
-                      read, not a column of real zeros, and either way it says nothing */}
-                  {counted.has(col.key) && sums[col.key] === 0 && (
-                    <Tip
-                      text="every row reads 0 here, so either there is nothing to count or the number could not be read at all"
-                      side="bottom"
-                    >
-                      <span className="ml-1 cursor-help">⚠️</span>
-                    </Tip>
-                  )}
-                </TH>
-              ))}
-            </TR>
-          </THead>
-          <TBody>
-            {shown.map((row) => (
-              <TR
-                key={id(row)}
-                onClick={() => onRowClick?.(row)}
-                style={rowStyle?.(row)}
-                className={cn(onRowClick && "cursor-pointer")}
-              >
-                {columns.map((col) => {
-                  const cell = scaled(col, row)
-                  return (
-                    <TD
-                      key={col.key}
-                      num={col.num && !col.left}
-                      style={
-                        typeof cell === "number"
-                          ? backdrop(cell, peaks[col.key], "var(--chart-2)", curve)
-                          : undefined
-                      }
-                    >
-                      {share(col) && typeof cell === "number"
-                        ? pct(cell, 1)
-                        : col.cell
-                          ? col.cell(row)
-                          : cell}
-                    </TD>
-                  )
-                })}
-              </TR>
-            ))}
-            {foldable && (
-              <TR className="hover:bg-muted/50" onClick={() => setOpen(!open)}>
-                <TD colSpan={columns.length} className="text-muted-foreground cursor-pointer">
-                  {open ? "show fewer" : `show ${hidden} more`}
-                </TD>
-              </TR>
-            )}
-            {total && (
-              <TR className="bg-muted/40 font-medium">
+        {/* a picture of it holds the rows on screen, so the fold decides what is in one */}
+        <div ref={sheet}>
+          <Table>
+            <THead>
+              <TR>
                 {columns.map((col) => (
-                  <TD key={col.key} num={col.num}>
-                    {share(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
-                  </TD>
+                  <TH
+                    key={col.key}
+                    num={col.num && !col.left}
+                    onClick={() => {
+                      const next = cycle(sort, col.key)
+                      setSort(next)
+                      onSort?.(next)
+                    }}
+                    className="hover:text-foreground cursor-pointer select-none"
+                  >
+                    <Tip text={col.hint ?? HINTS[col.label]} side="bottom">
+                      <span>
+                        {col.label}
+                        {sort?.key === col.key && (sort.asc ? " ↑" : " ↓")}
+                      </span>
+                    </Tip>
+                    {/* a column of nothing but zeros is usually a number that could not be
+                      read, not a column of real zeros, and either way it says nothing */}
+                    {counted.has(col.key) && sums[col.key] === 0 && (
+                      <Tip
+                        text="every row reads 0 here, so either there is nothing to count or the number could not be read at all"
+                        side="bottom"
+                      >
+                        <span className="ml-1 cursor-help">⚠️</span>
+                      </Tip>
+                    )}
+                  </TH>
                 ))}
               </TR>
-            )}
-          </TBody>
-        </Table>
+            </THead>
+            <TBody>
+              {shown.map((row) => (
+                <TR
+                  key={id(row)}
+                  onClick={() => onRowClick?.(row)}
+                  style={rowStyle?.(row)}
+                  className={cn(onRowClick && "cursor-pointer")}
+                >
+                  {columns.map((col) => {
+                    const cell = scaled(col, row)
+                    return (
+                      <TD
+                        key={col.key}
+                        num={col.num && !col.left}
+                        style={
+                          typeof cell === "number"
+                            ? backdrop(cell, peaks[col.key], "var(--chart-2)", curve)
+                            : undefined
+                        }
+                      >
+                        {share(col) && typeof cell === "number"
+                          ? pct(cell, 1)
+                          : col.cell
+                            ? col.cell(row)
+                            : cell}
+                      </TD>
+                    )
+                  })}
+                </TR>
+              ))}
+              {foldable && (
+                <TR className="hover:bg-muted/50" onClick={() => setOpen(!open)}>
+                  <TD colSpan={columns.length} className="text-muted-foreground cursor-pointer">
+                    {open ? "show fewer" : `show ${hidden} more`}
+                  </TD>
+                </TR>
+              )}
+              {total && (
+                <TR className="bg-muted/40 font-medium">
+                  {columns.map((col) => (
+                    <TD key={col.key} num={col.num}>
+                      {share(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
+                    </TD>
+                  ))}
+                </TR>
+              )}
+            </TBody>
+          </Table>
+        </div>
       </CardContent>
     </Card>
   )

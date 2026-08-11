@@ -46,6 +46,7 @@ export function Matrix({
   cuts,
   rings,
   order,
+  label,
   onPick,
 }: {
   units: Unit[]
@@ -59,6 +60,8 @@ export function Matrix({
   rings?: Set<string>
   /** an order chosen elsewhere */
   order?: (a: Unit, b: Unit) => number
+  /** what to call a group, when the grouping derives a name for it */
+  label?: (path: string) => string
   onPick?: (path: string) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -250,7 +253,7 @@ export function Matrix({
                     onClick={() => onPick?.(row.path)}
                     className="text-muted-foreground hover:text-foreground w-full cursor-pointer truncate text-right"
                   >
-                    {shortPath(row.path, 34)}
+                    {label?.(row.path) ?? shortPath(row.path, 34)}
                   </button>
                 </Tip>
               </div>

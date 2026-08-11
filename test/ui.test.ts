@@ -10,6 +10,7 @@ import { effective, shares } from "../ui/lib/scale.ts"
 import { bucket, defaultGrain } from "../ui/lib/format.ts"
 import { expand, rows } from "../ui/lib/series.ts"
 import { isId, nameOf, namesOf } from "../ui/lib/naming.ts"
+import { FORMATS } from "../ui/lib/formats.ts"
 import { shapeOf } from "../ui/lib/verdict.ts"
 import { repo } from "./repo.ts"
 
@@ -169,4 +170,28 @@ test("a label decided on a handful of imports says so, an exact one does not", (
   assert.equal(sure(35, 0, 54), true, "every import inside is exact, not a near miss")
   assert.equal(sure(0, 22, 0), true, "nothing importing it is exact too")
   assert.equal(sure(0, 0, 0), true, "and so is importing nothing at all")
+})
+
+test("a table is written the way whatever opens it next expects", () => {
+  const rows = [
+    ["group", "files", "note"],
+    ["ui/lib", 24, 'a "quoted", comma'],
+    ["src", 16, "plain"],
+  ]
+  const by = (key: string) => FORMATS.find((f) => f.key === key)!.of(rows, "groups")
+
+  assert.match(by("csv"), /^group,files,note\n/, "a header, then the rows")
+  assert.ok(by("csv").includes('"a ""quoted"", comma"'), "a comma or a quote is escaped")
+  assert.deepEqual(JSON.parse(by("json"))[0], {
+    group: "ui/lib",
+    files: 24,
+    note: 'a "quoted", comma',
+  })
+  assert.ok(by("toml").includes("[[groups]]"), "one table per row, named for the panel")
+  assert.ok(by("toml").includes("files = 24"), "and a number stays a number")
+  assert.ok(by("md").includes("| group"), "a markdown table has a header row")
+  assert.ok(by("md").split("\n")[3].startsWith("| ---"), "and a rule under it")
+  assert.ok(by("xls").includes("<x:Name>groups</x:Name>"), "excel is handed a sheet name")
+  assert.ok(by("xls").includes("&quot;") === false, "and the cells are html escaped")
+  assert.ok(by("xls").includes("<td x:num>24</td>"), "with numbers marked as numbers")
 })

@@ -39,6 +39,8 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
       <Button
         variant="outline"
         size="icon"
+        // on dark the page behind is darker than the card this sits on, so it reads as a hole
+        className="bg-card"
         title={title ?? "More"}
         onClick={(event) => {
           if (onTriggerClick?.(event)) return

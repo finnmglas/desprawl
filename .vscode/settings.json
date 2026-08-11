@@ -1,0 +1,18 @@
+{
+  "//": "workspace/ holds whole repos under analysis, so it is data, not source. Watching and indexing it pins a cpu",
+  "files.watcherExclude": {
+    "**/workspace/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true
+  },
+  "search.exclude": {
+    "**/workspace/**": true,
+    "**/dist/**": true
+  },
+  "files.exclude": {
+    "**/workspace": true
+  },
+  "typescript.tsserver.watchOptions": {
+    "excludeDirectories": ["**/workspace", "**/node_modules", "**/dist"]
+  }
+}

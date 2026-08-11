@@ -18,6 +18,8 @@ import {
 } from "../../lib/display.tsx"
 import { num } from "../../lib/format.ts"
 import { callGraph, importGraph, isLive, staticPage } from "../../lib/live.ts"
+import { notes } from "../../lib/paper.ts"
+import { slides } from "../../lib/slides.ts"
 import type { Prefs } from "../../lib/prefs.ts"
 import type { Stats } from "../../../src/model.ts"
 
@@ -47,11 +49,14 @@ export function Settings({
   prefs,
   change,
   reload,
+  onPaper,
 }: {
   stats: Stats
   prefs: Prefs
   change: (next: Partial<Prefs>) => void
   reload?: () => void
+  /** renders every tab at once and paints them into one file */
+  onPaper?: (kind: "pdf" | "pptx") => void
 }) {
   const { scale, curve, region, brands } = prefs
 
@@ -73,6 +78,7 @@ export function Settings({
         <Copy />
         copy link to this page
       </MenuItem>
+      <div className="bg-border my-1 h-px" />
       <MenuItem
         onClick={() => {
           const file = named("stats.json")
@@ -128,6 +134,30 @@ export function Settings({
           full static desprawl (html)
         </MenuItem>
       )}
+      {onPaper && (
+        <>
+          <MenuItem onClick={() => onPaper("pdf")}>
+            <Download />
+            every tab (pdf)
+          </MenuItem>
+          <MenuItem onClick={() => onPaper("pptx")}>
+            <Download />
+            every tab (pptx)
+          </MenuItem>
+        </>
+      )}
+      <MenuItem
+        onClick={async () => {
+          const graph = window.__DESPRAWL_GRAPH__ ?? (isLive() ? await importGraph() : null)
+          const made = slides(stats, graph)
+          const file = named("desprawl-notes.pptx")
+          await notes(made, stats.repo, file)
+          toast(file, `${made.length} slides, the numbers as text`)
+        }}
+      >
+        <Download />
+        panels as text (pptx)
+      </MenuItem>
       <div className="bg-border my-1 h-px" />
       <Choice
         label="Number relation"

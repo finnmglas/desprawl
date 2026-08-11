@@ -1,8 +1,9 @@
 // owner: finn
 // goal: language bar + pickable list
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../atoms/card.tsx"
+import { Save } from "./save.tsx"
 import { useDisplay } from "../../lib/display.tsx"
 import { tint } from "../../lib/tint.ts"
 import { num } from "../../lib/format.ts"
@@ -29,6 +30,7 @@ export function Distribution({
   onSelect,
   paint: given,
 }: DistributionProps) {
+  const box = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const { brands } = useDisplay()
   const paint =
@@ -41,61 +43,77 @@ export function Distribution({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex-row items-start gap-2">
         <CardTitle>{title}</CardTitle>
+        <Save
+          className="-my-1 ml-auto"
+          name={title.toLowerCase().replace(/\W+/g, "-")}
+          picture={() => box.current}
+          rows={() => [
+            ["name", "lines", "share"],
+            ...entries.map(([name, loc]) => [
+              name,
+              loc,
+              `${((loc / (total || 1)) * 100).toFixed(1)}%`,
+            ]),
+          ]}
+          note={`${entries.length} rows, as`}
+        />
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 pt-3">
-        <div className="flex h-2 overflow-hidden rounded-full">
-          {entries.map(([lang, loc]) => (
-            <button
-              key={lang}
-              title={`${lang} ${((loc / (total || 1)) * 100).toFixed(1)}%`}
-              onClick={() => onSelect?.(lang === selected ? "" : lang)}
-              className={cn("transition-opacity", onSelect && "cursor-pointer hover:opacity-80")}
-              style={{
-                width: `${(loc / (total || 1)) * 100}%`,
-                background: paint(lang),
-                opacity: selected && selected !== lang ? 0.25 : 1,
-              }}
-            />
-          ))}
-        </div>
-
-        <ul className="divide-border flex flex-col divide-y text-sm">
-          {listed.map(([lang, loc]) => (
-            <li key={lang}>
+      <CardContent className="pt-3">
+        <div ref={box} className="flex flex-col gap-3">
+          <div className="flex h-2 overflow-hidden rounded-full">
+            {entries.map(([lang, loc]) => (
               <button
+                key={lang}
+                title={`${lang} ${((loc / (total || 1)) * 100).toFixed(1)}%`}
                 onClick={() => onSelect?.(lang === selected ? "" : lang)}
-                className={cn(
-                  "flex w-full items-center gap-2 px-1 py-1.5 text-left",
-                  onSelect && "hover:bg-muted/50 cursor-pointer",
-                  lang === selected && "bg-muted/70",
-                )}
-              >
-                <span
-                  className="size-2 shrink-0 rounded-[2px]"
-                  style={{ background: paint(lang) }}
-                />
-                <span className="truncate">{lang}</span>
-                <span className="text-muted-foreground ml-auto tabular-nums">{num(loc)}</span>
-                <span className="text-muted-foreground w-12 text-right tabular-nums">
-                  {((loc / (total || 1)) * 100).toFixed(1)}%
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+                className={cn("transition-opacity", onSelect && "cursor-pointer hover:opacity-80")}
+                style={{
+                  width: `${(loc / (total || 1)) * 100}%`,
+                  background: paint(lang),
+                  opacity: selected && selected !== lang ? 0.25 : 1,
+                }}
+              />
+            ))}
+          </div>
 
-        {entries.length > FEW && (
-          <button
-            onClick={() => setOpen(!open)}
-            className="text-muted-foreground hover:text-foreground cursor-pointer text-left text-xs"
-          >
-            {open
-              ? "show less"
-              : `+${num(hidden)} more, ${((entries.slice(FEW).reduce((sum, [, loc]) => sum + loc, 0) / (total || 1)) * 100).toFixed(1)}% together`}
-          </button>
-        )}
+          <ul className="divide-border flex flex-col divide-y text-sm">
+            {listed.map(([lang, loc]) => (
+              <li key={lang}>
+                <button
+                  onClick={() => onSelect?.(lang === selected ? "" : lang)}
+                  className={cn(
+                    "flex w-full items-center gap-2 px-1 py-1.5 text-left",
+                    onSelect && "hover:bg-muted/50 cursor-pointer",
+                    lang === selected && "bg-muted/70",
+                  )}
+                >
+                  <span
+                    className="size-2 shrink-0 rounded-[2px]"
+                    style={{ background: paint(lang) }}
+                  />
+                  <span className="truncate">{lang}</span>
+                  <span className="text-muted-foreground ml-auto tabular-nums">{num(loc)}</span>
+                  <span className="text-muted-foreground w-12 text-right tabular-nums">
+                    {((loc / (total || 1)) * 100).toFixed(1)}%
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+
+          {entries.length > FEW && (
+            <button
+              onClick={() => setOpen(!open)}
+              className="text-muted-foreground hover:text-foreground cursor-pointer text-left text-xs"
+            >
+              {open
+                ? "show less"
+                : `+${num(hidden)} more, ${((entries.slice(FEW).reduce((sum, [, loc]) => sum + loc, 0) / (total || 1)) * 100).toFixed(1)}% together`}
+            </button>
+          )}
+        </div>
       </CardContent>
     </Card>
   )

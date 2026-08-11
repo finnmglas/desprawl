@@ -33,6 +33,10 @@ export function shell(): string {
 /** past this the call graph is minutes of work and a file too big to send anywhere */
 const HEAVY = 1500
 
+// the first one is the document's own: bundled code holds "</head>" in strings, and
+// vite hoists its script above anything left further down
+const HEAD = "<head>"
+
 /** the page and everything it would ask a server for, reusing what a caller holds */
 export function page(
   stats: Stats,
@@ -44,11 +48,15 @@ export function page(
   const heavy = graph.stats.files > HEAVY
   const said = held?.called ?? (heavy ? null : calls(stats.repo, graph))
 
-  const html = (held?.viewer ?? shell()).replace(
-    "</head>",
+  const data =
     `<script>window.__DESPRAWL__=${inline(stats)};window.__DESPRAWL_GRAPH__=${inline(graph)}` +
-      `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}</script></head>`,
-  )
+    `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}</script>`
+  const shell_ = held?.viewer ?? shell()
+  const at = shell_.indexOf(HEAD)
+  if (at === -1) throw new Error("no <head> in the built page, run: pnpm build")
+  // set before the bundle runs, or the app mounts with nothing
+  const open = at + HEAD.length
+  const html = shell_.slice(0, open) + data + shell_.slice(open)
   return { html, skipped: heavy && !said ? graph.stats.files : 0 }
 }
 

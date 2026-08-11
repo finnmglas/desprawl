@@ -18,6 +18,10 @@ import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
 import { copy, describes } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
+import { cn } from "./lib/ui.ts"
+import { pdf, pptx } from "./lib/paper.ts"
+import { download, named } from "./lib/export.ts"
+import { canPrint, printed, printing as paperOnly } from "./lib/live.ts"
 import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
@@ -70,6 +74,38 @@ function App({
   })
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
+
+  // every tab at once while a file is being made
+  const [printing, setPrinting] = useState(paperOnly)
+  const paper = async (kind: "pdf" | "pptx") => {
+    // a browser prints text, a canvas of it cannot
+    if (kind === "pdf" && (await canPrint())) {
+      toast("Printing every tab", "Your browser is drawing it, so the text stays text")
+      const made = await printed()
+      if (made) {
+        download(named(`${stats.repo.split("/").filter(Boolean).pop() ?? "repo"}.pdf`), made)
+        return toast("Saved", "Selectable text, real fonts")
+      }
+      toast("Could not print", "Falling back to a picture of the page")
+    }
+    setPrinting(true)
+    toast(`Building the ${kind}`, "Every tab, painted as it looks right now")
+    // each has to mount and paint before it is shot
+    await new Promise((done) => setTimeout(done, 1800))
+    const shots = TABS.map((title) => ({
+      title,
+      node: document.querySelector<HTMLElement>(`[data-shot="${title}"]`),
+    })).filter((one): one is { title: string; node: HTMLElement } => !!one.node)
+    const name = stats.repo.split("/").filter(Boolean).pop() ?? "repo"
+    try {
+      if (kind === "pdf") await pdf(shots, named(`${name}.pdf`))
+      else await pptx(shots, stats.repo, named(`${name}.pptx`))
+      toast(`${name}.${kind}`, `${shots.length} tabs, in the theme you are reading in`)
+    } catch (err) {
+      toast("Could not build it", String(err))
+    }
+    setPrinting(false)
+  }
   const { scale, curve, brands } = prefs
   setSimple(scale === "simple") // before the tree below renders
 
@@ -97,6 +133,56 @@ function App({
     go(next === "Files" ? { tab: next, kind: shade ?? "", lang: "" } : { tab: next })
     if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
+
+  const view = (one: string) =>
+    one === "History" ? (
+      <Graph
+        stats={stats}
+        from={from}
+        to={to}
+        onRange={(a, b) => go({ from: a, to: b })}
+        onTab={(next) => go({ tab: next })}
+        onPath={(path) => {
+          go({ tab: "Files", path })
+          toast("Opened in Files", path.join("/") || "the repo root")
+        }}
+        faces={faces}
+      />
+    ) : one === "Overview" ? (
+      <Overview
+        stats={stats}
+        metadata={prefs.metadata || printing}
+        onMetadata={(open) => change({ metadata: open })}
+        onLang={explore}
+        onTab={opened}
+        onCommits={(a, b) => {
+          go({ tab: "History", from: a, to: b })
+          toast("Opened in History", `${a} to ${b}`)
+        }}
+        faces={faces}
+      />
+    ) : one === "Modules" ? (
+      <Modules
+        stats={stats}
+        faces={faces}
+        onTab={(next) => go({ tab: next })}
+        onPath={(path) => {
+          go({ tab: "Files", path })
+          toast("Opened in Files", path.join("/") || "the repo root")
+        }}
+      />
+    ) : (
+      <Explorer
+        stats={stats}
+        onTab={(next) => go({ tab: next })}
+        path={path}
+        setPath={(next) => go({ path: next })}
+        lang={lang}
+        setLang={(next) => go({ lang: next, kind: "" })}
+        kind={kind}
+        setKind={(next) => go({ kind: next, lang: "" })}
+      />
+    )
 
   return (
     <DisplayProvider value={{ scale, curve, brands }}>
@@ -143,7 +229,7 @@ function App({
               {busy > 0 && <span className="text-foreground"> · working…</span>}
             </p>
           </div>
-          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+          <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
             <Tabs
               grow
               icons={MARKS}
@@ -153,58 +239,23 @@ function App({
               onChange={(next) => go({ tab: next })}
             />
             <ThemeToggle {...themed} />
-            <Settings stats={stats} prefs={prefs} change={change} reload={reload} />
+            <Settings stats={stats} prefs={prefs} change={change} reload={reload} onPaper={paper} />
           </div>
         </header>
 
-        {tab === "History" ? (
-          <Graph
-            stats={stats}
-            from={from}
-            to={to}
-            onRange={(a, b) => go({ from: a, to: b })}
-            onTab={(next) => go({ tab: next })}
-            onPath={(path) => {
-              go({ tab: "Files", path })
-              toast("Opened in Files", path.join("/") || "the repo root")
-            }}
-            faces={faces}
-          />
-        ) : tab === "Overview" ? (
-          <Overview
-            stats={stats}
-            metadata={prefs.metadata}
-            onMetadata={(open) => change({ metadata: open })}
-            onLang={explore}
-            onTab={opened}
-            onCommits={(a, b) => {
-              go({ tab: "History", from: a, to: b })
-              toast("Opened in History", `${a} to ${b}`)
-            }}
-            faces={faces}
-          />
-        ) : tab === "Modules" ? (
-          <Modules
-            stats={stats}
-            faces={faces}
-            onTab={(next) => go({ tab: next })}
-            onPath={(path) => {
-              go({ tab: "Files", path })
-              toast("Opened in Files", path.join("/") || "the repo root")
-            }}
-          />
-        ) : (
-          <Explorer
-            stats={stats}
-            onTab={(next) => go({ tab: next })}
-            path={path}
-            setPath={(next) => go({ path: next })}
-            lang={lang}
-            setLang={(next) => go({ lang: next, kind: "" })}
-            kind={kind}
-            setKind={(next) => go({ kind: next, lang: "" })}
-          />
-        )}
+        {(printing ? TABS : [tab]).map((one, i) => (
+          <section
+            key={one}
+            className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
+          >
+            {printing && (
+              <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
+            )}
+            <div data-shot={one} className={cn("flex flex-col gap-4", printing && "p-6")}>
+              {view(one)}
+            </div>
+          </section>
+        ))}
       </div>
     </DisplayProvider>
   )

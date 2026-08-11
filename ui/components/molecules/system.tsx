@@ -45,6 +45,33 @@ const BANDS = [
   },
 ] as const
 
+/** the same picture as text, since a band and its groups is what anyone would paste */
+export function wall(name: string, units: Unit[], stack: Stack): string {
+  const edges = (side: Record<string, number>) => Object.values(side).reduce((sum, n) => sum + n, 0)
+  const called = namesOf(units)
+  const out: string[] = [name, ...(stack.frameworks.length ? [stack.frameworks.join(", ")] : [])]
+  for (const band of BANDS) {
+    const held = units
+      .filter(
+        (u) =>
+          shapeOf(u.internal, edges(u.out), edges(u.in), Object.keys(u.out).length).band ===
+          band.key,
+      )
+      .sort((a, b) => b.level - a.level || b.lines - a.lines)
+    if (!held.length) continue
+    out.push(`\n${band.label}`)
+    for (const u of held) {
+      const shape = shapeOf(u.internal, edges(u.out), edges(u.in), Object.keys(u.out).length)
+      out.push(
+        `  ${called.get(u.path)} (${u.path}) L${u.level} ${shape.sure ? "" : "~"}${shape.label}, ${num(u.lines)} lines`,
+      )
+    }
+  }
+  const outside = [...new Set([...stack.hosts, ...stack.apis, ...stack.connects])]
+  if (outside.length) out.push(`\nOutside it: ${outside.join(", ")}`)
+  return out.join("\n")
+}
+
 export function System({
   name,
   units,
@@ -117,6 +144,8 @@ export function System({
   const hosts = named.filter((s) => isHost(s.label))
   const services = named.filter((s) => !isHost(s.label) && !isClient(s.label))
   const clients = named.filter((s) => isClient(s.label))
+  // nothing beside it means the wall is the picture, not the room it is centred in
+  const beside = hosts.length > 0 || services.length > 0
 
   const Side = ({ side, of }: { side: "left" | "right"; of: typeof named }) => (
     <div className="hidden shrink-0 flex-col sm:flex sm:w-32 lg:w-44">
@@ -169,11 +198,12 @@ export function System({
   )
 
   return (
-    <div className="flex items-stretch gap-2 sm:gap-0">
+    <div data-picture={beside || undefined} className="flex items-stretch gap-2 sm:gap-0">
       {hosts.length > 0 && <Side side="left" of={hosts} />}
 
       {/* the wall: everything inside it is code this repo holds */}
       <div
+        data-picture={!beside || undefined}
         className={cn(
           "border-foreground/40 flex min-w-0 flex-1 flex-col rounded-xl border-2",
           // nothing beside it, so it keeps the middle

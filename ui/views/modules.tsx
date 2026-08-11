@@ -1,7 +1,7 @@
 // owner: finn
 // goal: import modules analyzed
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Button } from "../components/atoms/button.tsx"
@@ -11,19 +11,19 @@ import { Circle } from "../components/molecules/circle.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
-import { DownloadButton } from "../components/molecules/download-button.tsx"
 import { Refresh } from "../components/atoms/icons.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kpi } from "../components/molecules/kpi.tsx"
 import { Matrix } from "../components/molecules/matrix.tsx"
+import { Save } from "../components/molecules/save.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
-import { named } from "../lib/export.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
+import { namesOf } from "../lib/naming.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import {
@@ -154,6 +154,7 @@ export function Modules({
   const [keep, setKeep] = useState(KEEP[0])
   const [wide, setWide] = useState(false)
 
+  const grid = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort | null>(null)
   const [view, setView] = useState(VIEWS[0])
 
@@ -227,7 +228,39 @@ export function Modules({
   const hunted = find.trim().toLowerCase()
   const shown = hunted ? units.filter((u) => u.path.toLowerCase().includes(hunted)) : units
   const crowded = shown.length > 50
-  const picked = sort && COLUMNS.find((column) => column.key === sort.key)
+  // auto names a group for what it is, so the folder it came from moves to its own column
+  const called = namesOf(units)
+  const columns: Column<Unit>[] =
+    at === AUTO
+      ? [
+          {
+            ...COLUMNS[0],
+            get: (u) => called.get(u.path) ?? u.path,
+            cell: (u) => (
+              <Tip className="max-w-56 min-w-0" text={u.path}>
+                <span className="block truncate">{called.get(u.path) ?? u.path}</span>
+              </Tip>
+            ),
+          },
+          {
+            key: "where",
+            label: "Path",
+            get: (u) => u.path,
+            cell: (u) => (
+              <Tip className="max-w-64 min-w-0" text={u.path}>
+                <span className="text-muted-foreground block truncate font-mono text-xs">
+                  {shortPath(u.path, 40)}
+                </span>
+              </Tip>
+            ),
+            hint: "the folder the group was cut from, which its name no longer has to carry",
+          },
+          ...COLUMNS.slice(1),
+        ]
+      : COLUMNS
+  // auto derives a name, so every panel that names a group uses that one
+  const label = at === AUTO ? (path: string) => called.get(path) ?? path : undefined
+  const picked = sort && columns.find((column) => column.key === sort.key)
   const order = picked
     ? (a: Unit, b: Unit) => {
         const [x, y] = [picked.get(a), picked.get(b)]
@@ -239,6 +272,11 @@ export function Modules({
       }
     : undefined
   const cuts = new Set(loops.flatMap((l) => l.cut.map((c) => `${c.from} ${c.to}`)))
+  // deepest first, and only the levels that hold something
+  const stacked = (): [number, Unit[]][] =>
+    Array.from({ length: levels }, (_, i) => levels - 1 - i)
+      .map((level): [number, Unit[]] => [level, units.filter((u) => u.level === level)])
+      .filter(([, here]) => here.length)
   const folder = (path: string) => !/\.[a-z]+$/.test(path)
   // remainder group = "/*"
   const open = (path: string) => {
@@ -250,11 +288,16 @@ export function Modules({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Back onTab={onTab} />
-        <DownloadButton
+        <Save
           className="ml-auto"
-          name={named("imports.json")}
-          text={() => JSON.stringify(graph, null, 2)}
-          note={`${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`}
+          name="imports"
+          rows={() => [
+            ["from", "to", "type only", "lazy"],
+            ...Object.values(graph.modules).flatMap((m) =>
+              m.out.map((e) => [m.path, e.to, String(e.type), String(e.lazy)]),
+            ),
+          ]}
+          note={`${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files, as`}
         />
       </div>
 
@@ -369,7 +412,7 @@ export function Modules({
         rows={[...shown].sort((a, b) => b.files - a.files)}
         id={(u) => u.path}
         columns={[
-          ...COLUMNS,
+          ...columns,
           {
             key: "owner",
             label: "Dev",
@@ -411,27 +454,99 @@ export function Modules({
                 {wide ? "hide some" : "show all"}
               </Button>
             )}
+            <CopyButton
+              label="Copy every dependency, as text"
+              text={() =>
+                shown
+                  .flatMap((u) =>
+                    Object.entries(u.out)
+                      .filter(([to]) => kept.has(to))
+                      .map(
+                        ([to, n]) =>
+                          `${u.path}\t${to}\t${n}\t${rings.has(`${u.path} ${to}`) ? "cycle" : cuts.has(`${u.path} ${to}`) ? "break" : ""}`,
+                      ),
+                  )
+                  .join("\n")
+              }
+              message={`Copied ${plural(links, "dependency")}`}
+              note="From, to, how many files, and whether it is a cycle"
+            />
+            <Save
+              name="dependency-grid"
+              picture={() => grid.current}
+              rows={() => [
+                ["from", "to", "imports", "kind"],
+                ...shown.flatMap((u) =>
+                  Object.entries(u.out)
+                    .filter(([to]) => kept.has(to))
+                    .map(([to, n]) => [
+                      u.path,
+                      to,
+                      n,
+                      rings.has(`${u.path} ${to}`)
+                        ? "cycle"
+                        : cuts.has(`${u.path} ${to}`)
+                          ? "break"
+                          : "import",
+                    ]),
+                ),
+              ]}
+              note={`${plural(links, "dependency")}, as`}
+            />
           </div>
         </CardHead>
         <CardContent>
-          {view === VIEWS[0] ? (
-            <Matrix
-              rings={rings}
-              units={shown}
-              across={units}
-              most={crowded && !wide ? 12 : shown.length}
-              order={order}
-              cuts={cuts}
-              onPick={open}
-            />
-          ) : (
-            <Circle units={shown} cuts={cuts} rings={rings} onPick={open} />
-          )}
+          <div ref={grid}>
+            {view === VIEWS[0] ? (
+              <Matrix
+                rings={rings}
+                label={label}
+                units={shown}
+                across={units}
+                most={crowded && !wide ? 12 : shown.length}
+                order={order}
+                cuts={cuts}
+                onPick={open}
+              />
+            ) : (
+              <Circle units={shown} cuts={cuts} rings={rings} label={label} onPick={open} />
+            )}
+          </div>
         </CardContent>
       </Card>
 
       <Card>
-        <CardHead title="Dependency levels" hint="L0 imports nothing, L1 at least L0 etc" />
+        <CardHead title="Dependency levels" hint="L0 imports nothing, L1 at least L0 etc">
+          <div className="ml-auto flex items-center gap-1">
+            <CopyButton
+              label="Copy the levels, as text"
+              text={() =>
+                stacked()
+                  .map(([level, here]) => `L${level}\t${here.map((u) => u.path).join(", ")}`)
+                  .join("\n")
+              }
+              message={`Copied ${plural(levels, "level")}`}
+              note="Each level and the groups sitting on it"
+            />
+            <Save
+              name="levels"
+              rows={() => [
+                ["level", "group", "path", "files", "lines", "classification"],
+                ...stacked().flatMap(([level, here]) =>
+                  here.map((u) => [
+                    level,
+                    label?.(u.path) ?? u.path,
+                    u.path,
+                    u.files,
+                    u.lines,
+                    shaped(shapeOf(u.internal, count(u.out), count(u.in), reach(u))),
+                  ]),
+                ),
+              ]}
+              note={`${plural(units.length, "group")} over ${plural(levels, "level")}, as`}
+            />
+          </div>
+        </CardHead>
         <CardContent className="flex flex-col gap-2">
           {Array.from({ length: levels }, (_, i) => levels - 1 - i).map((level) => {
             const here = units.filter((u) => u.level === level)
@@ -453,6 +568,8 @@ export function Modules({
                         key={unit.path}
                         text={
                           <>
+                            <span className="font-mono">{unit.path}</span>
+                            <br />
                             {plural(unit.files, "file")}, {num(unit.exports)} exported names
                             <br />
                             leans on {plural(Object.keys(unit.out).length, "group")}, carried by{" "}
@@ -468,7 +585,9 @@ export function Modules({
                             unit.tangle >= 0 && "border-amber-500/60",
                           )}
                         >
-                          <span className="max-w-56 truncate">{unit.path}</span>
+                          <span className="max-w-56 truncate">
+                            {label?.(unit.path) ?? unit.path}
+                          </span>
                           <span className="text-muted-foreground tabular-nums">
                             {num(unit.files)}
                           </span>
@@ -545,7 +664,7 @@ export function Modules({
                         onClick={() => open(path)}
                         className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 text-xs"
                       >
-                        {path}
+                        {label?.(path) ?? path}
                       </button>
                     ))}
                   </Some>
@@ -759,7 +878,11 @@ const COLUMNS: Column<Unit>[] = [
     key: "path",
     label: "Group",
     get: (u) => u.path,
-    cell: (u) => <Tip text={u.path}>{shortPath(u.path)}</Tip>,
+    cell: (u) => (
+      <Tip className="max-w-64 min-w-0" text={u.path}>
+        <span className="block truncate">{shortPath(u.path, 40)}</span>
+      </Tip>
+    ),
   },
   {
     key: "lines",

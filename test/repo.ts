@@ -2,7 +2,7 @@
 // goal: a throwaway git repo per test
 
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -22,6 +22,8 @@ export interface Commit {
 /** repo({"a.ts": "x"}, {"a.ts": "x\ny"}) is two commits, dated in order */
 export function repo(...commits: (Record<string, string> | Commit)[]): string {
   const dir = mkdtempSync(join(tmpdir(), "desprawl-test-"))
+  // a suite leaves one of these per repo, and tmpfs runs out of inodes long before bytes
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }))
   const run = (when: string, ...args: string[]) =>
     execFileSync("git", args, {
       cwd: dir,

@@ -95,3 +95,38 @@
     font-family: ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+/* a browser writing a pdf. The page is shaped like the screen rather than like paper,
+   so a wide table has room and no white margin shows through a dark theme */
+@media print {
+  @page {
+    size: 1400px 1000px;
+    margin: 0;
+  }
+  /* without this a browser drops every background, and the charts come out white */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html,
+  body {
+    background: var(--background) !important;
+  }
+  header [role="tablist"],
+  header button[aria-haspopup],
+  [data-print="hide"] {
+    display: none !important;
+  }
+  /* a scroller on paper is a window onto content nobody can reach */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+  canvas,
+  tr,
+  thead {
+    break-inside: avoid;
+  }
+}

@@ -1,7 +1,7 @@
 // owner: finn
 // goal: the chart, and the controls that shape it
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Area,
   Bar,
@@ -14,7 +14,7 @@ import {
 } from "recharts"
 import { Button } from "../components/atoms/button.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
-import { DownloadButton } from "../components/molecules/download-button.tsx"
+import { Save } from "../components/molecules/save.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import {
@@ -25,7 +25,6 @@ import {
 } from "../components/atoms/chart.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Working } from "../components/atoms/working.tsx"
-import { delimit, named } from "../lib/export.ts"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { GRAINS, defaultGrain, endsAt, num, stamp, startsAt } from "../lib/format.ts"
@@ -51,6 +50,7 @@ export function OverTime({
 }) {
   const { curve } = useDisplay()
   const total = all?.total ?? stats.commits
+  const chart = useRef<HTMLDivElement>(null)
   const [grain, setGrain] = useState<Grain>(() => defaultGrain(stats.first, stats.last))
   const [grained, setGrained] = useState(false)
   const [sizes, setSizes] = useState<Sample[]>([])
@@ -184,79 +184,82 @@ export function OverTime({
             message={`Copied ${shown.length} buckets`}
             note="As json, one object per bucket"
           />
-          <DownloadButton
-            name={named("over-time.csv")}
-            text={() => delimit(matrix(), ",")}
-            note={`${shown.length} buckets, ${series.length} series`}
+          <Save
+            name="over-time"
+            picture={() => chart.current}
+            rows={matrix}
+            note={`${shown.length} buckets, ${series.length} series, as`}
           />
         </div>
       </CardHead>
       <CardContent>
-        <ChartContainer config={config} className="select-none">
-          <ComposedChart data={shown} stackOffset="sign" {...select}>
-            <CartesianGrid vertical={false} />
-            <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={32} />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              width={44}
-              tickFormatter={(v: number) =>
-                share ? `${Math.abs(v)}%` : num(untransform(Math.abs(v), curve))
-              }
-            />
-            <ChartTooltip
-              cursor={CURSOR}
-              content={<ChartTooltipContent config={config} curve={curve} />}
-            />
-            {/* moved lines as bars, a headcount as a bare line, the rest as areas */}
-            {series.map((key) =>
-              SERIES[key].heads && !sparse ? (
-                <Line
-                  key={key}
-                  dataKey={key}
-                  type="monotone"
-                  stroke={SERIES[key].color}
-                  strokeWidth={2}
-                  strokeDasharray="3 3"
-                  dot={false}
-                  activeDot={{ r: 3, strokeWidth: 0 }}
-                  isAnimationActive={false}
-                />
-              ) : SERIES[key].group === "changes" || sparse ? (
-                <Bar
-                  key={key}
-                  dataKey={key}
-                  stackId="a"
-                  fill={SERIES[key].color}
-                  radius={2}
-                  isAnimationActive={false}
-                />
-              ) : (
-                <Area
-                  key={key}
-                  dataKey={key}
-                  type="monotone"
-                  stroke={SERIES[key].color}
-                  fill={SERIES[key].color}
-                  fillOpacity={0.12}
-                  strokeWidth={2}
-                  activeDot={{ r: 3, strokeWidth: 0 }}
-                  isAnimationActive={false}
-                />
-              ),
-            )}
-            {drag && (
-              <ReferenceArea
-                x1={drag[0]}
-                x2={drag[1]}
-                fill="var(--foreground)"
-                fillOpacity={0.06}
-                strokeOpacity={0.2}
-                isAnimationActive={false}
+        <div ref={chart}>
+          <ChartContainer config={config} className="select-none">
+            <ComposedChart data={shown} stackOffset="sign" {...select}>
+              <CartesianGrid vertical={false} />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} minTickGap={32} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={44}
+                tickFormatter={(v: number) =>
+                  share ? `${Math.abs(v)}%` : num(untransform(Math.abs(v), curve))
+                }
               />
-            )}
-          </ComposedChart>
-        </ChartContainer>
+              <ChartTooltip
+                cursor={CURSOR}
+                content={<ChartTooltipContent config={config} curve={curve} />}
+              />
+              {/* moved lines as bars, a headcount as a bare line, the rest as areas */}
+              {series.map((key) =>
+                SERIES[key].heads && !sparse ? (
+                  <Line
+                    key={key}
+                    dataKey={key}
+                    type="monotone"
+                    stroke={SERIES[key].color}
+                    strokeWidth={2}
+                    strokeDasharray="3 3"
+                    dot={false}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                    isAnimationActive={false}
+                  />
+                ) : SERIES[key].group === "changes" || sparse ? (
+                  <Bar
+                    key={key}
+                    dataKey={key}
+                    stackId="a"
+                    fill={SERIES[key].color}
+                    radius={2}
+                    isAnimationActive={false}
+                  />
+                ) : (
+                  <Area
+                    key={key}
+                    dataKey={key}
+                    type="monotone"
+                    stroke={SERIES[key].color}
+                    fill={SERIES[key].color}
+                    fillOpacity={0.12}
+                    strokeWidth={2}
+                    activeDot={{ r: 3, strokeWidth: 0 }}
+                    isAnimationActive={false}
+                  />
+                ),
+              )}
+              {drag && (
+                <ReferenceArea
+                  x1={drag[0]}
+                  x2={drag[1]}
+                  fill="var(--foreground)"
+                  fillOpacity={0.06}
+                  strokeOpacity={0.2}
+                  isAnimationActive={false}
+                />
+              )}
+            </ComposedChart>
+          </ChartContainer>
+        </div>
 
         {/* the legend is the control */}
         <div className="mt-3 flex flex-wrap gap-1.5">

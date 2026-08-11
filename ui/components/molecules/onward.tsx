@@ -40,7 +40,7 @@ export function Onward({
   ].filter((link) => link.to !== current)
 
   return (
-    <>
+    <div data-print="hide" className="contents">
       <div className="grid gap-3 sm:grid-cols-2">
         {links.map((link) => (
           <Card
@@ -70,6 +70,6 @@ export function Onward({
           github
         </a>
       </p>
-    </>
+    </div>
   )
 }

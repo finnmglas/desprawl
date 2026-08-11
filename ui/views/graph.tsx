@@ -7,7 +7,8 @@ import { Back } from "../components/atoms/back.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Button } from "../components/atoms/button.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
-import { DownloadButton } from "../components/molecules/download-button.tsx"
+import { Save } from "../components/molecules/save.tsx"
+import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { CommitDetail, DETAIL } from "../components/molecules/commit-detail.tsx"
@@ -16,10 +17,10 @@ import { Onward } from "../components/molecules/onward.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
 import { Working } from "../components/atoms/working.tsx"
 import { toast } from "../components/atoms/toast.tsx"
-import { copy, named } from "../lib/export.ts"
+import { copy } from "../lib/export.ts"
 import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
-import { backdrop, cycle, day, num } from "../lib/format.ts"
+import { backdrop, cycle, day, num, plural } from "../lib/format.ts"
 import { commitDetail, isLive, olderCommits, trueCount } from "../lib/live.ts"
 import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
@@ -174,28 +175,21 @@ export function Graph({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Back onTab={onTab} />
-        <DownloadButton
+        <Save
           className="ml-auto"
-          name={named("history.json")}
-          // the history and who made it, without the tree and the series the report also holds
-          text={() =>
-            JSON.stringify(
-              {
-                repo: stats.repo,
-                head: stats.head,
-                first: stats.first,
-                last: stats.last,
-                commits: stats.commits,
-                truncated: stats.truncated,
-                remotes: stats.remotes,
-                contributors: stats.contributors,
-                log: stats.log,
-              },
-              null,
-              2,
-            )
-          }
-          note={`${num(stats.log.length)} commits and ${num(stats.contributors.length)} contributors`}
+          name="history"
+          rows={() => [
+            ["date", "hash", "author", "added", "removed", "subject"],
+            ...shown.map((c) => [
+              c.date.slice(0, 10),
+              c.hash,
+              stats.contributors[c.who]?.name ?? "unknown",
+              c.insertions,
+              c.deletions,
+              c.subject,
+            ]),
+          ]}
+          note={`${plural(shown.length, "commit")}, as`}
         />
       </div>
       <Card>
@@ -219,6 +213,19 @@ export function Graph({
           }
         >
           <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
+            <CopyButton
+              label="Copy these commits, as text"
+              text={() =>
+                shown
+                  .map(
+                    (c) =>
+                      `${c.date.slice(0, 10)}\t${c.hash}\t${stats.contributors[c.who]?.name ?? "unknown"}\t+${c.insertions}\t-${c.deletions}\t${c.subject}`,
+                  )
+                  .join("\n")
+              }
+              message={`Copied ${plural(shown.length, "commit")}`}
+              note="Date, hash, who, lines moved and the subject"
+            />
             {(from || to) && (
               <Button variant="outline" size="sm" onClick={() => onRange("", "")}>
                 {from} to {to} ✕
@@ -267,7 +274,7 @@ export function Graph({
           </div>
           <div className="flex min-w-[52rem]">
             {railed && (
-              <svg width={width} height={height} className="shrink-0">
+              <svg data-print="hide" width={width} height={height} className="shrink-0">
                 {rows.map((row, i) => {
                   const top = tops[i] ?? i * ROW
                   const grown = row.commit.hash === open ? DETAIL : 0

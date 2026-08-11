@@ -8,9 +8,8 @@ import { Card, CardContent } from "../atoms/card.tsx"
 import { Chip } from "./chip.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
-import { DownloadButton } from "./download-button.tsx"
+import { Save } from "./save.tsx"
 import { Tip } from "../atoms/tip.tsx"
-import { named } from "../../lib/export.ts"
 import { num } from "../../lib/format.ts"
 import { HINTS } from "../../lib/hints.ts"
 import { byWeight } from "../../lib/rank.ts"
@@ -225,10 +224,17 @@ export function StackCard({
       className="-m-2 ml-auto flex cursor-default items-center gap-1 p-2"
     >
       <CopyButton text={asText} message="Metadata copied" note="Every detected fact, as text" />
-      <DownloadButton
-        name={named("project-metadata.json")}
-        text={() => JSON.stringify(stack, null, 2)}
-        note="Every detected fact, as json"
+      <Save
+        name="project-metadata"
+        rows={() => [
+          ["kind", "fact", "from"],
+          ...sections.flatMap((section) =>
+            kept(section.rows).flatMap(([label, items]) =>
+              items.map((one) => [label, String(one), stack.from[String(one)] ?? ""]),
+            ),
+          ),
+        ]}
+        note="Every detected fact, as"
       />
     </div>
   )

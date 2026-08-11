@@ -36,8 +36,8 @@ export async function copy(text: string): Promise<boolean> {
   }
 }
 
-export function download(name: string, text: string, type = "text/csv"): void {
-  const url = URL.createObjectURL(new Blob([text], { type }))
+export function download(name: string, text: string | Blob, type = "text/csv"): void {
+  const url = URL.createObjectURL(typeof text === "string" ? new Blob([text], { type }) : text)
   const a = document.createElement("a")
   a.href = url
   a.download = name
