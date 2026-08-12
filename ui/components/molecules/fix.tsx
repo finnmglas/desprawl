@@ -1,5 +1,5 @@
 // owner: finn
-// goal: hand one task to the claude on this machine, and watch it
+// goal: hand one task to an agent on this machine, and watch it
 
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
@@ -9,6 +9,7 @@ import { Sparkle } from "../atoms/icons.tsx"
 import { Tabs } from "../atoms/tabs.tsx"
 import { toast } from "../atoms/toast.tsx"
 import { agentHere, aliveActions, isLive, startFix, stopAction } from "../../lib/live.ts"
+import { readPrefs, savePrefs, type Prefs } from "../../lib/prefs.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Agent } from "../../../src/agent.ts"
 import type { Alive } from "../../../src/actions.ts"
@@ -25,8 +26,15 @@ export function Fix({ task }: { task: Task }) {
   const [agent, setAgent] = useState<Agent | null>(null)
   const [open, setOpen] = useState(false)
   const [extra, setExtra] = useState("")
-  const [model, setModel] = useState("opus")
-  const [mode, setMode] = useState("unstaged")
+  // every row has one of these panels, so the choice is read off the saved settings rather
+  // than held anywhere a second row could miss
+  const [pick, setPick] = useState(() => readPrefs().agent)
+  const set = (next: Partial<Prefs["agent"]>) => {
+    const merged = { ...pick, ...next }
+    setPick(merged)
+    savePrefs({ ...readPrefs(), agent: merged })
+  }
+  const [more, setMore] = useState(false)
   const [run, setRun] = useState<Alive | null>(null)
   const [at, setAt] = useState({ top: 0, left: 0 })
   const host = useRef<HTMLButtonElement>(null)
@@ -51,7 +59,7 @@ export function Fix({ task }: { task: Task }) {
   // once it is there, it can be measured, and once measured it can be put where it fits
   useEffect(() => {
     if (open) place()
-  }, [open, run?.running, mode])
+  }, [open, run?.running, more, pick.mode])
 
   useEffect(() => {
     if (!open) return
@@ -83,8 +91,7 @@ export function Fix({ task }: { task: Task }) {
         const mine = list.find((one) => one.id === `fix:${task.id}`)
         if (!mine) return
         setRun(mine)
-        if (!mine.running)
-          toast(mine.code ? "Claude stopped" : "Claude finished", `exit ${mine.code}`)
+        if (!mine.running) toast(mine.code ? "It stopped" : "It finished", `exit ${mine.code}`)
       })
     }, 1500)
     return () => clearInterval(timer)
@@ -92,12 +99,23 @@ export function Fix({ task }: { task: Task }) {
 
   if (!isLive() || !agent) return null
 
-  const said = agent.modes.find((one) => one.id === mode)
+  const said = agent.modes.find((one) => one.id === pick.mode) ?? agent.modes[0]
+  const chosen = agent.installs.find((one) => one.id === pick.install) ?? agent.installs[0]
+  // switching from claude to codex leaves "opus" selected, which codex has never heard of
+  const picked = chosen.models.includes(pick.model) ? pick.model : chosen.models[0]
+  const leash = chosen.trusts.includes(pick.trust) ? pick.trust : "auto"
   const start = () => {
-    void startFix({ ...task, extra, model, mode }).then((made) => {
-      if (!made) return toast("Could not start it", "claude did not take the task")
+    void startFix({
+      ...task,
+      extra,
+      model: picked,
+      mode: said.id,
+      install: chosen.id,
+      trust: leash,
+    }).then((made) => {
+      if (!made) return toast("Could not start it", `${chosen.tool} did not take the task`)
       setRun(made)
-      toast(`Claude is on it, ${model}`, said?.note ?? "")
+      toast(`${chosen.tool} is on it, ${picked}`, said.note)
     })
   }
 
@@ -105,10 +123,13 @@ export function Fix({ task }: { task: Task }) {
     <>
       <button
         ref={host}
-        title={`Hand "${task.title}" to claude`}
+        title={`Hand "${task.title}" to an agent`}
         onClick={(event) => {
           // the row underneath opens the file, and pressing this is not asking for that
           event.stopPropagation()
+          // the settings on disk land after this page did, and every other row's panel
+          // saves to the same place
+          if (!open) setPick(readPrefs().agent)
           place()
           setOpen(!open)
         }}
@@ -136,7 +157,9 @@ export function Fix({ task }: { task: Task }) {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5 text-xs font-medium">
                 <Sparkle />
-                Hand this to claude
+                {/* which account, since the picker that says so is folded away by default */}
+                Hand this to {chosen.tool}
+                {chosen.who && `, ${chosen.who}`}
               </div>
               <div className="text-sm">{task.title}</div>
               {/* two lines and a hover: the reason can be a paragraph, and this is a panel */}
@@ -145,43 +168,94 @@ export function Fix({ task }: { task: Task }) {
               </div>
             </div>
 
-            <textarea
-              value={extra}
-              onChange={(event) => setExtra(event.target.value)}
-              placeholder="anything else it should know, or leave it empty"
-              className="border-input focus-visible:ring-ring h-16 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none"
-            />
-
             <div className="flex flex-col gap-1">
               <span className="text-muted-foreground text-xs">Model</span>
-              <Tabs grow tabs={agent.models} value={model} onChange={setModel} />
+              <Tabs grow tabs={chosen.models} value={picked} onChange={(model) => set({ model })} />
             </div>
 
+            {/* everything anybody sets once and never touches again. Folded away, the panel is
+                a model and a button that says what pressing it does */}
             <div className="flex flex-col gap-1">
-              <span className="text-muted-foreground text-xs">What it does with the work</span>
-              {/* one line whatever it holds: four of these as tabs cut the last one off, and
-                  four as a list made the panel taller than the screen it opens on */}
-              <Select value={mode} onChange={(event) => setMode(event.target.value)}>
-                {agent.modes.map((one) => (
-                  <option key={one.id} value={one.id}>
-                    {one.label}
-                    {one.blocked ? " (not here)" : ""}
-                  </option>
-                ))}
-              </Select>
-              <span
-                className={cn(
-                  "text-xs",
-                  said?.blocked ? "text-amber-500" : "text-muted-foreground",
-                )}
+              <button
+                onClick={() => setMore(!more)}
+                className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1 text-xs"
               >
-                {said?.blocked ?? said?.note}
-              </span>
+                <span className="w-3">{more ? "▾" : "▸"}</span>
+                {more ? "less" : "more, and what it will run"}
+              </button>
+
+              {more && (
+                <div className="flex flex-col gap-2 pt-1">
+                  {agent.installs.length > 1 && (
+                    <div className="flex flex-col gap-1">
+                      <span className="text-muted-foreground text-xs">Which AI</span>
+                      <Select
+                        value={chosen.id}
+                        onChange={(event) => set({ install: event.target.value })}
+                      >
+                        {agent.installs.map((one) => (
+                          <option key={one.id} value={one.id}>
+                            {one.label}
+                          </option>
+                        ))}
+                      </Select>
+                      <span className="text-muted-foreground text-xs">
+                        {chosen.who
+                          ? `billed to ${chosen.who}`
+                          : "billed to whatever account it is signed in as, which nothing here could read"}
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs">
+                      What it does with the work
+                    </span>
+                    {/* one line whatever it holds: four of these as tabs cut the last one off,
+                        and four as a list made the panel taller than the screen */}
+                    <Select value={said.id} onChange={(event) => set({ mode: event.target.value })}>
+                      {agent.modes.map((one) => (
+                        <option key={one.id} value={one.id}>
+                          {one.label}
+                          {one.blocked ? " (not here)" : ""}
+                        </option>
+                      ))}
+                    </Select>
+                    <span className="text-muted-foreground text-xs">{said.note}</span>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs">What it may do unasked</span>
+                    <Select value={leash} onChange={(event) => set({ trust: event.target.value })}>
+                      <option value="auto">auto, whatever the work above needs</option>
+                      {chosen.trusts.map((one) => (
+                        <option key={one} value={one}>
+                          {one}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <span className="text-muted-foreground text-xs">Anything else to tell it</span>
+                    <textarea
+                      value={extra}
+                      onChange={(event) => setExtra(event.target.value)}
+                      placeholder="or leave it empty"
+                      className="border-input focus-visible:ring-ring h-16 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none"
+                    />
+                  </div>
+
+                  <code className="text-muted-foreground bg-muted/40 rounded px-2 py-1 text-[10px] break-all">
+                    {chosen.bin.split(/[\\/]/).pop()}{" "}
+                    {chosen.config && `(${chosen.config.split(/[\\/]/).pop()}) `}… {picked}, {leash}
+                  </code>
+                </div>
+              )}
             </div>
 
-            <code className="text-muted-foreground bg-muted/40 rounded px-2 py-1 text-[10px] break-all">
-              claude -p … --model {model} --permission-mode {said?.permission}
-            </code>
+            {/* folded or not: the button is about to be disabled and this says why */}
+            {said.blocked && <span className="text-xs text-amber-500">{said.blocked}</span>}
 
             {run?.running ? (
               <div className="flex flex-col gap-2">
@@ -205,8 +279,8 @@ export function Fix({ task }: { task: Task }) {
                     {run.output.slice(-1400)}
                   </pre>
                 )}
-                <Button variant="outline" size="sm" onClick={start} disabled={!!said?.blocked}>
-                  {said?.label === "plan only" ? "ask it for a plan" : (said?.label ?? "fix it")}
+                <Button variant="outline" size="sm" onClick={start} disabled={!!said.blocked}>
+                  {said.id === "plan" ? "ask it for a plan" : said.label}
                 </Button>
               </div>
             )}

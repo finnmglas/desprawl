@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { ask, fix } from "../src/agent.ts"
+import { ask, fix, installs } from "../src/agent.ts"
 import { repo } from "./repo.ts"
 
 test("the prompt carries the task, why it was raised, and where to look", () => {
@@ -39,8 +39,29 @@ test("what the person typed is passed on, and nothing of theirs is a command", (
   assert.match(said, /Extra instructions from the person asking: use the existing helper/)
 })
 
+test("every cli here is offered with its own models, never with another one's", () => {
+  const here = installs()
+  assert.ok(here.length, "this machine has at least one of them")
+  for (const one of here) {
+    assert.ok(one.models.length, `${one.label} offers nothing to run`)
+    assert.ok(one.bin, "and names the file it would run")
+  }
+  const claude = here.find((one) => one.tool === "claude")
+  if (claude) assert.ok(claude.models.includes("opus"), "claude keeps its own aliases")
+})
+
 test("a model or a mode that was never offered is refused before anything runs", () => {
   const dir = repo({ "a.ts": "export const a = 1\n" })
   assert.throws(() => fix(dir, "one", "do it", "gpt", "plan"), /no model called gpt/)
   assert.throws(() => fix(dir, "one", "do it", "opus", "rm -rf"), /no mode called/)
+})
+
+test("every cli offers its own leashes, and auto is never one of them", () => {
+  for (const one of installs()) {
+    assert.ok(one.trusts.length, `${one.label} offers no permission mode`)
+    assert.ok(!one.trusts.includes("auto"), "auto is the absence of a choice, not a choice")
+    // read off disk, so an unreadable one is empty rather than a guess
+    assert.equal(typeof one.who, "string")
+    if (one.who) assert.ok(one.label.endsWith(one.who), "the account is what tells them apart")
+  }
 })

@@ -198,6 +198,8 @@ export const startFix = (said: {
   extra: string
   model: string
   mode: string
+  install: string
+  trust: string
 }): Promise<Alive | null> =>
   ask<Alive | null>("/api/agent/fix", null, {
     method: "POST",
@@ -209,5 +211,7 @@ export const startFix = (said: {
       extra: said.extra,
       model: said.model,
       mode: said.mode,
+      install: said.install,
+      trust: said.trust,
     }),
   })

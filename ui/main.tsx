@@ -351,7 +351,9 @@ function Root() {
   // spend that minute in the wrong theme
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const change = (next: Partial<Prefs>) => {
-    const merged = { ...prefs, ...next }
+    // read back rather than merged onto state: the fix panel saves without coming through
+    // here, and its choices would be written back over by the next theme click
+    const merged = { ...readPrefs(), ...next }
     setPrefs(merged)
     savePrefs(merged)
     if (next.region) setLocale(next.region)

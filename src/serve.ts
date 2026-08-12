@@ -305,7 +305,17 @@ export function serve(
                 said.mode ?? "",
                 said.id ?? "task",
               )
-              json(fix(repo, said.id ?? "task", prompt, said.model ?? "", said.mode ?? ""))
+              json(
+                fix(
+                  repo,
+                  said.id ?? "task",
+                  prompt,
+                  said.model ?? "",
+                  said.mode ?? "",
+                  said.install ?? "",
+                  said.trust ?? "auto",
+                ),
+              )
             } catch (err) {
               json({ error: (err as Error).message }, 400)
             }

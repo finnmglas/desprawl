@@ -14,6 +14,8 @@ export interface Prefs {
   /** whether the metadata under the architecture card stays open. Open by default: it is
    * the answer to what is this repo, and folding it hides that behind a click */
   metadata: boolean
+  /** what the fix panel was last set to: nobody picks a different cli every time */
+  agent: { install: string; model: string; mode: string; trust: string }
 }
 
 export const FALLBACK: Prefs = {
@@ -23,6 +25,7 @@ export const FALLBACK: Prefs = {
   region: "auto",
   brands: "flashy",
   metadata: true,
+  agent: { install: "", model: "", mode: "local", trust: "auto" },
 }
 
 const KEY = "desprawl-prefs"
