@@ -14,6 +14,7 @@ import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
 import { run as runTests, tests } from "./tests.ts"
 import { act, actions, alive, begin, stop as stopAction } from "./actions.ts"
+import { agent, ask, fix } from "./agent.ts"
 import type { Suite } from "./tests.ts"
 import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
@@ -279,6 +280,38 @@ export function serve(
         if (url.pathname === "/api/tests") return json((suite ||= tests(repo)))
 
         if (url.pathname === "/api/actions") return json(actions(repo))
+
+        // whether there is a claude here, which is what decides if the button is offered
+        if (url.pathname === "/api/agent") return json(agent(repo))
+
+        // the task comes over as text and goes in as one argument, never as a command
+        if (url.pathname === "/api/agent/fix" && req.method === "POST") {
+          let body = ""
+          req.on("data", (chunk) => {
+            body += chunk
+            if (body.length > 64_000) {
+              send(413, "a prompt is smaller than this", "text/plain")
+              req.destroy()
+            }
+          })
+          req.on("end", () => {
+            try {
+              const said = JSON.parse(body) as Record<string, string>
+              const prompt = ask(
+                said.task ?? "",
+                said.why ?? "",
+                said.where ?? "",
+                said.extra ?? "",
+                said.mode ?? "",
+                said.id ?? "task",
+              )
+              json(fix(repo, said.id ?? "task", prompt, said.model ?? "", said.mode ?? ""))
+            } catch (err) {
+              json({ error: (err as Error).message }, 400)
+            }
+          })
+          return
+        }
 
         // a server is started and left up, and asked about or stopped from the same panel
         if (url.pathname === "/api/actions/start") {

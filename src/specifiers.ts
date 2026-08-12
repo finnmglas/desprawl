@@ -58,8 +58,10 @@ export function scrub(source: string): { code: string; strings: string[] } {
     for (let back = code.length - 1; back >= 0; back--) {
       const ch = code[back]
       if (/\s/.test(ch)) continue
-      // `</div>` closes a tag and `{on} />` ends one, and tsx is full of both
-      return WORD.test(ch) || ch === ")" || ch === "]" || ch === "<" || ch === "}"
+      // `</div>` closes a tag and `{on} />` ends one, and tsx is full of both. A marker is a
+      // string that was already read: `<Icon className="x" />` ends with one, and so does
+      // plain division by a string, so a slash after it never opens a regex either
+      return WORD.test(ch) || ch === ")" || ch === "]" || ch === "<" || ch === "}" || ch === MARK
     }
     return false
   }

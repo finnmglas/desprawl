@@ -6,6 +6,7 @@ import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
 import type { Run, Suite } from "../../src/tests.ts"
 import type { Action, Alive } from "../../src/actions.ts"
+import type { Agent } from "../../src/agent.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -35,12 +36,12 @@ const busy = (step: number) => {
   watching.forEach((fn) => fn(inflight))
 }
 
-async function ask<T>(path: string, fallback: T): Promise<T> {
+async function ask<T>(path: string, fallback: T, sent?: RequestInit): Promise<T> {
   const t = token()
   if (!t) return fallback
   busy(1)
   try {
-    const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}`)
+    const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}`, sent)
     if (res.ok) return (await res.json()) as T
     const body = (await res.json().catch(() => null)) as { error?: string } | null
     failed(path, body?.error ?? `${res.status} ${res.statusText}`)
@@ -77,16 +78,25 @@ export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
 export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/api/timeline", null)
 
 /** built on the first ask, or carried by a static page */
+// the heavy three, held for as long as the page lives: a tab is left and opened again all the
+// time, and every one of those was fetching a megabyte of graph it already had
+const held = new Map<string, Promise<unknown>>()
+const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
+  const found = held.get(path) ?? made()
+  held.set(path, found)
+  return found as Promise<T>
+}
+
 export const importGraph = (): Promise<Graph | null> =>
   window.__DESPRAWL_GRAPH__
     ? Promise.resolve(window.__DESPRAWL_GRAPH__)
-    : ask<Graph | null>("/api/graph", null)
+    : once("/api/graph", () => ask<Graph | null>("/api/graph", null))
 
 /** every declaration and what calls it */
 export const callGraph = (): Promise<Calls | null> =>
   window.__DESPRAWL_CALLS__
     ? Promise.resolve(window.__DESPRAWL_CALLS__)
-    : ask<Calls | null>("/api/calls", null)
+    : once("/api/calls", () => ask<Calls | null>("/api/calls", null))
 
 /** the whole thing as one file, built by the server */
 export async function staticPage(): Promise<string | null> {
@@ -146,7 +156,8 @@ export async function printed(): Promise<Blob | null> {
 export const dependencies = (): Promise<Deps | null> =>
   window.__DESPRAWL_DEPS__
     ? Promise.resolve(window.__DESPRAWL_DEPS__)
-    : ask<Deps | null>("/api/deps", null)
+    : // the server only reaches the registry once, and now the page only asks it once either
+      once("/api/deps", () => ask<Deps | null>("/api/deps", null))
 
 /** what the repo would run, counted rather than run */
 export const testSuite = (): Promise<Suite | null> =>
@@ -175,3 +186,28 @@ export const stopAction = (id: string): Promise<{ stopped: boolean }> =>
   ask(`/api/actions/stop?id=${encodeURIComponent(id)}`, { stopped: false })
 
 export const aliveActions = (): Promise<Alive[]> => ask<Alive[]>("/api/actions/alive", [])
+
+export const agentHere = (): Promise<Agent | null> => ask<Agent | null>("/api/agent", null)
+
+/** the task goes over as text: the argv it turns into is built on the other side */
+export const startFix = (said: {
+  id: string
+  title: string
+  why: string
+  where: string
+  extra: string
+  model: string
+  mode: string
+}): Promise<Alive | null> =>
+  ask<Alive | null>("/api/agent/fix", null, {
+    method: "POST",
+    body: JSON.stringify({
+      id: said.id,
+      task: said.title,
+      why: said.why,
+      where: said.where,
+      extra: said.extra,
+      model: said.model,
+      mode: said.mode,
+    }),
+  })

@@ -21,6 +21,7 @@ import { namesOf } from "../lib/naming.ts"
 import { shapeOf } from "../lib/verdict.ts"
 import { hands, worked } from "../lib/people.ts"
 import { net, type Box, type Grain, type Net, type Spot, type Wire } from "../lib/network.ts"
+import { asRows, knowledge } from "../lib/knowledge.ts"
 import { balanced, fold } from "../../src/layers.ts"
 import { cn } from "../lib/ui.ts"
 import type { Calls } from "../../src/calls.ts"
@@ -640,6 +641,13 @@ export function Network({
           ]}
           note={`${plural(drawn?.wires.length ?? 0, "link")} between ${plural(drawn?.spots.length ?? 0, "node")}, as`}
         />
+        {graph && layout && split && (
+          <Save
+            name="knowledge-graph"
+            rows={() => asRows(knowledge(stats.repo, graph, calls, layout, grain, split))}
+            note="every module, file, declaration and install as one set of things and the relations between them, at this grain, as"
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

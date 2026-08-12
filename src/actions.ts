@@ -213,20 +213,33 @@ process.on("exit", () => {
   for (const one of held.values()) if (one.alive.running) signal(one.child, "SIGKILL")
 })
 
-/** started and left running, since a server has no end to wait for */
-export function begin(repo: string, id: string): Alive {
+/**
+ * Started and left running, since a server has no end to wait for. An id names one of the
+ * actions above and nothing else; `given` is for the agent, whose argv this file builds
+ * itself rather than reading it off a request.
+ */
+export function begin(
+  repo: string,
+  id: string,
+  given?: string[],
+  /** handed to the child only, for the one thing that needs a credential */
+  extra?: Record<string, string>,
+): Alive {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
-  const found = actions(repo).find((one) => one.id === id)
+  const found = given ? { command: given.join(" ") } : actions(repo).find((one) => one.id === id)
   if (!found) throw new Error(`no action called ${id}`)
   stop(id)
 
-  const [file, ...rest] = found.command.split(" ")
+  const [file, ...rest] = given ?? found.command.split(" ")
   // its own group: a manager spawns the real server as a child, and signalling only the
   // manager leaves that child running and holding the port, which is not what stop means
   const child = spawn(file, rest, {
     cwd: root,
-    env: { ...process.env, FORCE_COLOR: "0" },
+    env: { ...process.env, FORCE_COLOR: "0", ...extra },
     detached: true,
+    // nothing here can type, and a cli given an open stdin waits a few seconds for input
+    // that is never coming, then says so in the output the panel is showing
+    stdio: given ? ["ignore", "pipe", "pipe"] : undefined,
   })
   const alive: Alive = {
     id,

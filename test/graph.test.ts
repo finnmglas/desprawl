@@ -45,6 +45,21 @@ test("a scrub hands back the lines it was given, so a line number still means on
   assert.match(code.split("\n")[7], /function Below/, "so the last line is still the last line")
 })
 
+test("a self closing tag after a string is not a regex, so the brace after it survives", () => {
+  // `<Icon className="x" />` ends with a string, and a slash after a string divides rather
+  // than opening a regex. Reading it as one ate the closing brace and let one declaration
+  // swallow every one below it: 1011 of finn's declarations read as unreachable because of it
+  const source = [
+    "function Card() {",
+    '  return <div>{icon ?? <Gauge className="size-3.5" />}</div>',
+    "}",
+    "function Below() { return 1 }",
+  ].join("\n")
+  const { code } = scrub(source)
+  assert.equal(count(code, /\{/g), count(code, /\}/g), "every brace still closes")
+  assert.match(code.split("\n")[3], /function Below/, "and the line below is still there")
+})
+
 test("every form of import is found, and told apart", () => {
   const found = specifiers(`
     import a from "./a"

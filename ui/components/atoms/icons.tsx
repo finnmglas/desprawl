@@ -38,6 +38,13 @@ export const FolderMark = () => (
 )
 export const Clock = () => <Line circle d="M12 7v5l3 2" />
 export const Run = () => <Line d="M5 4h4l6 8-6 8H5l6-8-6-8ZM15 4h4" />
+export const Checks = () => <Line d="M4 7l2.5 2.5L11 5M4 17l2.5 2.5L11 15M14 8h6M14 18h6" />
+export const Sparkle = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3ZM18 15l.9 2.1 2.1.9-2.1.9L18 21l-.9-2.1-2.1-.9 2.1-.9L18 15Z"
+  />
+)
 export const Dots = () => (
   <Line d="M6 7a2 2 0 1 0 0-.1ZM18 6a2 2 0 1 0 0-.1ZM12 18a2 2 0 1 0 0-.1ZM7.5 8.5l3 8M16.8 7.6l-3.4 8.6M8 6.6h8" />
 )

@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Blocks, Clock, Dots, FolderMark, NpmMark, Run } from "./components/atoms/icons.tsx"
+import { Blocks, Checks, Clock, Dots, FolderMark, NpmMark, Run } from "./components/atoms/icons.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
 import { ThemeToggle } from "./components/molecules/theme-toggle.tsx"
@@ -13,6 +13,7 @@ import { Tabs } from "./components/atoms/tabs.tsx"
 import { Toaster, toast } from "./components/atoms/toast.tsx"
 import { Execution } from "./views/execution.tsx"
 import { Network } from "./views/network.tsx"
+import { Tasks } from "./views/tasks.tsx"
 import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Modules } from "./views/modules.tsx"
@@ -50,13 +51,14 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Modules", "Execution", "Files", "History", "Graph"]
+const TABS = ["Overview", "Modules", "Execution", "Files", "History", "Tasks", "Graph"]
 
 const MARKS: Record<string, React.ReactNode> = {
   Modules: <Blocks />,
   Execution: <Run />,
   Files: <FolderMark />,
   History: <Clock />,
+  Tasks: <Checks />,
   Graph: <Dots />,
 }
 
@@ -176,6 +178,15 @@ function App({
       <Modules
         stats={stats}
         faces={faces}
+        onTab={(next) => go({ tab: next })}
+        onPath={(path) => {
+          go({ tab: "Files", path })
+          toast("Opened in Files", path.join("/") || "the repo root")
+        }}
+      />
+    ) : one === "Tasks" ? (
+      <Tasks
+        stats={stats}
         onTab={(next) => go({ tab: next })}
         onPath={(path) => {
           go({ tab: "Files", path })

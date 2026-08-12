@@ -43,6 +43,11 @@ export function Onward({
       desc: `${num(stats.log.length)} commits as a branch graph, sized by the lines each moved`,
     },
     {
+      to: "Tasks",
+      title: "See what there is to do",
+      desc: "every cycle, dead declaration, licence and crowded folder the other tabs found, as work with a size on it",
+    },
+    {
       to: "Graph",
       title: "Look at the whole thing",
       desc: "every file a dot inside the module holding it, with imports one way and calls the other",
