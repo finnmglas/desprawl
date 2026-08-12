@@ -393,12 +393,12 @@ export function fix(
   trust = "auto",
 ): Alive {
   const here = agent(repo)
-  const found = here?.modes.find((one) => one.id === mode)
-  if (!found) throw new Error(`no mode called ${mode}`)
-  if (found.blocked) throw new Error(found.blocked)
   // the path comes from the list this machine produced, never from the request
   const which = here?.installs.find((one) => one.id === install) ?? here?.installs[0]
   if (!which) throw new Error("no agent cli on this machine, so there is nothing to ask")
+  const found = here?.modes.find((one) => one.id === mode)
+  if (!found) throw new Error(`no mode called ${mode}`)
+  if (found.blocked) throw new Error(found.blocked)
   if (!which.models.includes(model)) throw new Error(`${which.tool} has no model called ${model}`)
   const tool = TOOLS.find((one) => one.id === which.tool)!
   // a token read off a helper is handed on rather than asked for again, and never anywhere

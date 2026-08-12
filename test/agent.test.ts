@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { ask, fix, installs } from "../src/agent.ts"
+import { agent, ask, fix, installs } from "../src/agent.ts"
 import { repo } from "./repo.ts"
 
 test("the prompt carries the task, why it was raised, and where to look", () => {
@@ -41,7 +41,7 @@ test("what the person typed is passed on, and nothing of theirs is a command", (
 
 test("every cli here is offered with its own models, never with another one's", () => {
   const here = installs()
-  assert.ok(here.length, "this machine has at least one of them")
+  if (!here.length) return assert.equal(agent(), null, "nothing installed is nothing offered")
   for (const one of here) {
     assert.ok(one.models.length, `${one.label} offers nothing to run`)
     assert.ok(one.bin, "and names the file it would run")
@@ -52,6 +52,8 @@ test("every cli here is offered with its own models, never with another one's", 
 
 test("a model or a mode that was never offered is refused before anything runs", () => {
   const dir = repo({ "a.ts": "export const a = 1\n" })
+  if (!installs().length)
+    return assert.throws(() => fix(dir, "one", "do it", "opus", "plan"), /no agent cli/)
   assert.throws(() => fix(dir, "one", "do it", "gpt", "plan"), /no model called gpt/)
   assert.throws(() => fix(dir, "one", "do it", "opus", "rm -rf"), /no mode called/)
 })
