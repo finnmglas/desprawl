@@ -19,6 +19,14 @@ export function human(n: number, digits: number): string {
 
 export const tokens = (chars: number): number => Math.round(chars / 4)
 
+// what a disk says, so 1000 rather than 1024
+export const weight = (bytes: number): string =>
+  bytes < 1000
+    ? `${bytes} B`
+    : bytes < 1e6
+      ? `${Math.round(bytes / 1000)} kB`
+      : `${(bytes / 1e6).toFixed(bytes < 1e7 ? 1 : 0)} MB`
+
 export const pct = (n: number, of: number): string =>
   of ? `${((n / of) * 100).toFixed(1)}%` : "0.0%"
 

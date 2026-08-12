@@ -3,7 +3,7 @@
 
 import type { Curve } from "./display.tsx"
 import { locale } from "./locale.ts"
-export { nest, pct, tokens } from "../../src/human.ts"
+export { nest, pct, tokens, weight } from "../../src/human.ts"
 import { human } from "../../src/human.ts"
 import type { Node } from "../../src/model.ts"
 
@@ -20,6 +20,22 @@ export const plural = (n: number, word: string) => `${num(n)} ${word}${n === 1 ?
 // tables sort on raw iso, this is display only
 /** the date a filter or an api compares, unlike day() below, which is for reading */
 export const stamp = (at: Date): string => at.toISOString().slice(0, 10)
+
+/** how long ago, in the largest unit that still says something */
+export function ago(iso: string): string {
+  const at = Date.parse(iso)
+  if (!at) return ""
+  const days = Math.round((at - Date.now()) / 864e5)
+  const [n, unit]: [number, Intl.RelativeTimeFormatUnit] =
+    Math.abs(days) < 7
+      ? [days, "day"]
+      : Math.abs(days) < 31
+        ? [Math.round(days / 7), "week"]
+        : Math.abs(days) < 365
+          ? [Math.round(days / 30.4), "month"]
+          : [Math.round(days / 365.25), "year"]
+  return new Intl.RelativeTimeFormat(locale(), { numeric: "auto" }).format(n, unit)
+}
 
 export const day = (iso: string) => {
   const date = iso.slice(0, 10)

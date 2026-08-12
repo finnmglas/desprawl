@@ -20,7 +20,8 @@ import { Waiting } from "../components/atoms/waiting.tsx"
 import { System, wall } from "../components/molecules/system.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
-import { day, num, pct, plural, tokens } from "../lib/format.ts"
+import { Find } from "../components/molecules/find.tsx"
+import { ago, day, num, pct, plural, tokens, weight } from "../lib/format.ts"
 import {
   commentsOf,
   contextOf,
@@ -101,7 +102,7 @@ const Fact = ({
 )
 
 // what this repo asked for, against everything that arrived with it
-const SCOPE = ["named here", "whole tree"]
+const SCOPE = ["direct deps", "all deps"]
 
 /** two years without a release: not dead, but worth knowing before leaning on it */
 const quiet = (released: string) => !!released && Date.now() - Date.parse(released) > 730 * 864e5
@@ -110,6 +111,7 @@ const FAMILY: Record<string, string> = {
   permissive: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
   weak: "border-amber-500/60 text-amber-700 dark:text-amber-300",
   strong: "border-red-500/60 text-red-700 dark:text-red-300",
+  closed: "border-foreground/40",
   unknown: "text-muted-foreground",
 }
 
@@ -137,17 +139,22 @@ const DEPS: Column<Row>[] = [
     key: "version",
     label: "Version",
     get: (one) => one.version || one.range,
-    cell: (one) => (
-      <Tip
-        text={
-          one.version
-            ? `${one.range} in the manifest, ${one.version} on disk`
-            : "not installed here, so the range is all there is"
-        }
-      >
-        <span className="font-mono text-xs">{one.version || one.range}</span>
-      </Tip>
-    ),
+    cell: (one) =>
+      one.every ? (
+        <span className="text-muted-foreground">
+          {new Set(one.every.map((d) => d.name)).size} named
+        </span>
+      ) : (
+        <Tip
+          text={
+            one.version
+              ? `${one.range} in the manifest, ${one.version} on disk`
+              : "not installed here, so the range is all there is"
+          }
+        >
+          <span className="font-mono text-xs">{one.version || one.range}</span>
+        </Tip>
+      ),
     hint: "what is installed, falling back to what the manifest asks for",
   },
   {
@@ -178,7 +185,7 @@ const DEPS: Column<Row>[] = [
             .join(" · ")}
         >
           <span className="flex flex-wrap gap-1">
-            {(["permissive", "weak", "strong", "unknown"] as const)
+            {(["permissive", "weak", "strong", "closed", "unknown"] as const)
               .filter((kind) => by.get(kind))
               .map((kind) => (
                 <Badge key={kind} variant="outline" className={FAMILY[kind]}>
@@ -189,14 +196,37 @@ const DEPS: Column<Row>[] = [
         </Tip>
       )
     },
-    hint: "read from the installed package, never guessed. Permissive asks for attribution, weak copyleft asks for changes to the package itself back, strong copyleft asks about the code around it",
+    hint: "read from the installed package, never guessed. Permissive asks for attribution, weak copyleft asks for changes to the package itself back, strong copyleft asks about the code around it, closed is a package nobody licensed to you",
+  },
+  {
+    key: "bytes",
+    label: "Size",
+    num: true,
+    get: (one) => (one.every ? one.every.reduce((n, d) => n + d.bytes, 0) : one.bytes),
+    cell: (one) => {
+      const bytes = one.every ? one.every.reduce((n, d) => n + d.bytes, 0) : one.bytes
+      return bytes ? (
+        <Tip
+          text={
+            one.every
+              ? "every package here added up, each counted once"
+              : "its own files, without whatever it installed under itself"
+          }
+        >
+          <span>{weight(bytes)}</span>
+        </Tip>
+      ) : (
+        <span className="text-muted-foreground">—</span>
+      )
+    },
+    hint: "what it weighs on disk, its own files only: what it pulled in weighs its own row",
   },
   {
     key: "released",
     label: "Last release",
     num: true,
     flat: true,
-    get: (one) => one.released,
+    get: (one) => one.released.slice(0, 10),
     cell: (one) => {
       if (one.every)
         return (
@@ -211,9 +241,9 @@ const DEPS: Column<Row>[] = [
           </Tip>
         )
       return (
-        <Tip text={`npm last published anything for it on ${one.released.slice(0, 10)}`}>
+        <Tip text={`npm last published anything for it on ${day(one.released)}`}>
           <span className={quiet(one.released) ? "text-amber-600 dark:text-amber-400" : ""}>
-            {day(one.released)}
+            {ago(one.released)}
           </span>
         </Tip>
       )
@@ -221,9 +251,37 @@ const DEPS: Column<Row>[] = [
     hint: "when npm last saw any release, asked for the packages this repo names. Quiet for over two years is worth a look, not a verdict",
   },
   {
+    key: "used",
+    label: "This version",
+    num: true,
+    flat: true,
+    get: (one) => one.used.slice(0, 10),
+    cell: (one) => {
+      if (one.every) {
+        const behind = one.every.filter((d) => d.latest && d.version !== d.latest).length
+        return <span className="text-muted-foreground">{behind} behind</span>
+      }
+      if (!one.used)
+        return (
+          <Tip text="asked for the packages this repo names, not for everything they pull in">
+            <span className="text-muted-foreground">—</span>
+          </Tip>
+        )
+      const stale = !!one.latest && one.version !== one.latest
+      return (
+        <Tip
+          text={`${one.version} was published on ${day(one.used)}${stale ? `, and ${one.latest} is out since` : ", which is the newest there is"}`}
+        >
+          <span>{ago(one.used)}</span>
+        </Tip>
+      )
+    },
+    hint: "when the version installed here was published. Amber means a newer version exists, whatever this clone has",
+  },
+  {
     key: "kind",
-    label: "Asked for",
-    get: (one) => (one.direct ? (one.dev ? "direct dev" : "direct") : "pulled in"),
+    label: "Imported by",
+    get: (one) => (one.direct ? (one.dev ? "dev" : "prod") : "indirectly"),
     cell: (one) =>
       one.every ? (
         <span className="text-muted-foreground">
@@ -231,18 +289,18 @@ const DEPS: Column<Row>[] = [
         </span>
       ) : one.direct ? (
         <Tip text={one.dev ? "a dev dependency, so it never ships" : "named in package.json"}>
-          <Badge variant="outline">{one.dev ? "direct dev" : "direct"}</Badge>
+          <Badge variant="outline">{one.dev ? "dev" : "prod"}</Badge>
         </Tip>
       ) : (
         <Tip text="nothing here asked for it, something it depends on did">
-          <span className="text-muted-foreground">pulled in</span>
+          <span className="text-muted-foreground">indirectly</span>
         </Tip>
       ),
-    hint: "whether this repo names it. Dev or runtime is only known for the ones it does, since a pulled in package is whatever pulled it",
+    hint: "whether this repo imports it. Dev or runtime is only known for the ones it does, since a pulled in package is whatever pulled it",
   },
   {
     key: "advisories",
-    label: "Advisories",
+    label: "Security issues",
     num: true,
     flat: true,
     good: true,
@@ -283,7 +341,7 @@ const DEPS: Column<Row>[] = [
       ) : (
         <span className="text-muted-foreground">none</span>
       ),
-    hint: "open advisories for this exact version, from osv.dev, worst first",
+    hint: "open sec issues for this version, from osv.dev",
   },
 ]
 
@@ -440,6 +498,16 @@ export function Overview({
   const wall_ = useRef<HTMLDivElement>(null)
   const [kit, setKit] = useState<Deps | null>(null)
   const [scope, setScope] = useState(SCOPE[0])
+  const [hunt, setHunt] = useState("")
+  // the scope decides which rows there are, the search which of them are worth showing,
+  // and the totals row counts whatever survived both
+  const picked = useMemo(() => {
+    const rows = (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct)
+    const said = hunt.trim().toLowerCase()
+    return said
+      ? rows.filter((one) => `${one.name} ${one.license}`.toLowerCase().includes(said))
+      : rows
+  }, [kit, scope, hunt])
   const [suite, setSuite] = useState<Suite | null>(null)
   const [running, setRunning] = useState("")
   useEffect(() => {
@@ -737,28 +805,26 @@ export function Overview({
           title="External dependencies"
           hint={
             kit.offline
-              ? "licences read off node_modules. The advisory check could not reach osv.dev"
-              : `${plural(kit.list.length, "package")}, licences off disk and advisories from osv.dev on ${day(kit.checked)}`
+              ? "licences from node_modules, check didn't reach osv.dev"
+              : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
           }
-          // worst first: a table of 185 packages is read for the handful that are filed against
-          rows={[...(scope === SCOPE[0] ? kit.list.filter((one) => one.direct) : kit.list)].sort(
+          // worst first
+          rows={[...picked].sort(
             (a, b) =>
               b.advisories.length - a.advisories.length ||
               RANK.indexOf(worst(a.advisories)) - RANK.indexOf(worst(b.advisories)) ||
               a.name.localeCompare(b.name),
           )}
-          // 134 packages here are installed at two versions, and a repeated key stops react
-          // reordering the rows at all, so a click on a header looked like it did nothing
+          // dupes
           id={(one) => `${one.name}@${one.version}`}
           columns={DEPS}
-          total={{
-            ...kit.list[0],
-            name: "",
-            every: scope === SCOPE[0] ? kit.list.filter((one) => one.direct) : kit.list,
-          }}
+          total={{ ...kit.list[0], name: "", every: picked }}
           fold={8}
         >
-          <Tabs className="ml-auto" tabs={SCOPE} value={scope} onChange={setScope} />
+          <div className="ml-auto flex items-center gap-2">
+            <Find value={hunt} onChange={setHunt} placeholder="Find a package or a licence" />
+            <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
+          </div>
         </DataTable>
       )}
 

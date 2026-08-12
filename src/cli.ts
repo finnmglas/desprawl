@@ -182,20 +182,19 @@ function report(s: Stats): string {
 }
 
 try {
-  // say it here in a sentence, a served failure is a 500 nobody can read
   if (!existsSync(target)) fail(`no such path as ${target}`)
-  // --git-dir passes on a bare repo and on one with no commits, these do not
+  // --git-dir passes on bare repo / no commits these not
   git(target, "rev-parse", "--show-toplevel")
   git(target, "rev-parse", "HEAD")
 
-  // live analyses per request, so it never needs the report up front
+  // analyses live not static
   if (viewing && !values.static) {
     const live = await serve(target, cap, values.keep)
     open(live)
     console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
   } else {
     const stats = analyze(target, cap)
-    // licences come off disk, advisories off the network, and a saved page keeps both
+    // licences in disk, advisories network saved in page
     const held = viewing
       ? { deps: await deps(target).catch(() => null), suite: tests(target) }
       : undefined

@@ -81,7 +81,12 @@ function fromDeps(deps: Deps | null): Task[] {
     // nothing installed means nothing was read: an uninstalled package has no licence here to
     // doubt, and a repo without node_modules is not a repo with a licensing problem
     const family = familyOf(dep.license)
-    if (dep.direct && !dep.dev && dep.version && (family === "strong" || family === "unknown"))
+    if (
+      dep.direct &&
+      !dep.dev &&
+      dep.version &&
+      (family === "strong" || family === "closed" || family === "unknown")
+    )
       found.push({
         id: `licence:${dep.name}`,
         title: `Check ${dep.name}, licensed ${dep.license || "unknown"}`,
@@ -90,7 +95,9 @@ function fromDeps(deps: Deps | null): Task[] {
         why:
           family === "strong"
             ? "a strong copyleft licence reaches whatever ships with it"
-            : "nothing here says what it is licensed as, which is not the same as permissive",
+            : family === "closed"
+              ? "it says nobody licensed it to you, which is a question for whoever added it"
+              : "nothing here says what it is licensed as, which is not the same as permissive",
         lines: 1,
         reach: 1,
         minutes: 6,

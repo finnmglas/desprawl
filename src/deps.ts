@@ -1,7 +1,7 @@
 // owner: finn
 // goal: what each dependency is licensed as, and what is filed against it
 
-import { readFileSync, readdirSync, realpathSync } from "node:fs"
+import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
 import { jsonc } from "./graph.ts"
@@ -25,26 +25,45 @@ export interface Dep {
   direct: boolean
   /** when npm last saw any release of it, asked for the named ones only */
   released: string
+  /** when the version installed here was published, which is what says how far behind it is */
+  used: string
+  /** the version the registry calls latest, so behind is a version and not a timestamp */
+  latest: string
+  /** what it weighs on disk, its own files only, since what it installed is its own row */
+  bytes: number
   advisories: Advisory[]
 }
 
 const PACE = 16
 
-/** when the registry last saw a release, which is the only maintained signal on offer */
-async function released(names: string[]): Promise<Map<string, string>> {
-  const when = new Map<string, string>()
+/** what the registry says about one package: when each version landed, and which is current */
+interface Told {
+  times: Record<string, string>
+  latest: string
+}
+
+/**
+ * When each version of a package was published. The abbreviated document is smaller but
+ * carries no dates at all, and the date of the version actually installed is the one that
+ * says whether this clone is behind, so the whole document is what gets asked for.
+ */
+async function published(names: string[]): Promise<Map<string, Told>> {
+  const when = new Map<string, Told>()
   const queue = [...names]
   await Promise.all(
     Array.from({ length: PACE }, async () => {
       for (let name = queue.pop(); name; name = queue.pop()) {
         try {
-          const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2f")}`, {
-            headers: { accept: "application/vnd.npm.install-v1+json" },
-          })
+          const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2f")}`)
           if (!res.ok) continue
-          const body = (await res.json()) as { modified?: string; time?: Record<string, string> }
-          const at = body.modified ?? body.time?.modified
-          if (at) when.set(name, at)
+          const body = (await res.json()) as {
+            modified?: string
+            time?: Record<string, string>
+            "dist-tags"?: Record<string, string>
+          }
+          const times = body.time ?? {}
+          if (body.modified) times.modified ??= body.modified
+          when.set(name, { times, latest: body["dist-tags"]?.latest ?? "" })
         } catch {
           // one package failing to answer is not the whole panel failing
         }
@@ -73,8 +92,32 @@ interface Held {
   name: string
   version: string
   license: string
+  bytes: number
   /** installed at the top of node_modules, so it is what the manifest resolved to */
   top: boolean
+}
+
+/** every file of a package, minus whatever it installed under itself */
+const weigh = (dir: string): number => {
+  let bytes = 0
+  let listed: Dirent[]
+  try {
+    listed = readdirSync(dir, { withFileTypes: true })
+  } catch {
+    return 0
+  }
+  for (const entry of listed) {
+    if (entry.name === "node_modules") continue
+    const at = join(dir, entry.name)
+    if (entry.isDirectory()) bytes += weigh(at)
+    else if (entry.isFile())
+      try {
+        bytes += statSync(at).size
+      } catch {
+        // a broken link weighs nothing
+      }
+  }
+  return bytes
 }
 
 const licensed = (own: Record<string, any> | null): string => {
@@ -112,13 +155,17 @@ function tree(root: string): Map<string, Held> {
       if (entry.startsWith(".") && entry !== ".pnpm") continue
       const at = join(dir, entry)
       const own = read(join(at, "package.json"))
-      if (own?.name && own?.version)
-        found.set(`${own.name}@${own.version}`, {
+      if (own?.name && own?.version) {
+        const key = `${own.name}@${own.version}`
+        found.set(key, {
           name: own.name,
           version: own.version,
           license: licensed(own),
+          // weighed once per name and version: the same package is reached down many paths
+          bytes: found.get(key)?.bytes ?? weigh(at),
           top,
         })
+      }
       // a scope holds packages at the same level, a store and a nested tree hold their own
       else look(at, top && entry.startsWith("@"))
       look(join(at, "node_modules"), false)
@@ -211,6 +258,8 @@ export async function deps(repo: string): Promise<Deps> {
       dev: wanted.get(one.name) ?? false,
       direct: wanted.has(one.name) && one.top,
       released: "",
+      used: "",
+      latest: "",
       advisories: [] as Advisory[],
     }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version))
@@ -222,10 +271,13 @@ export async function deps(repo: string): Promise<Deps> {
         name,
         version: "",
         license: "",
+        bytes: 0,
         range: range(name),
         dev,
         direct: true,
         released: "",
+        used: "",
+        latest: "",
         advisories: [] as Advisory[],
       })),
     )
@@ -235,11 +287,14 @@ export async function deps(repo: string): Promise<Deps> {
     const [found, when] = await Promise.all([
       osv(list),
       // the whole tree would be thousands of calls, and a transitive package is not chosen
-      released([...new Set(list.filter((one) => one.direct).map((one) => one.name))]),
+      published([...new Set(list.filter((one) => one.direct).map((one) => one.name))]),
     ])
     for (const one of list) {
       one.advisories = found.get(`${one.name}@${one.version}`) ?? []
-      one.released = when.get(one.name) ?? ""
+      const told = when.get(one.name)
+      one.released = told?.times.modified ?? ""
+      one.used = told?.times[one.version] ?? ""
+      one.latest = told?.latest ?? ""
     }
   } catch {
     // no network, or osv is down: the licences still came off disk

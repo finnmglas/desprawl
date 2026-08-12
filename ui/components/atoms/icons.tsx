@@ -75,6 +75,9 @@ export const File = ({ className }: { className?: string }) => (
 )
 
 // the actions, drawn from lucide's own paths
+export const Search = ({ className }: { className?: string }) => (
+  <Line className={className} d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12ZM14.5 14.5 20 20" />
+)
 export const Copy = ({ className }: { className?: string }) => (
   <Line
     className={className}
