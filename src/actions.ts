@@ -19,6 +19,10 @@ export interface Action {
   outward?: boolean
   /** a server or a watcher: it is started and stopped rather than waited for */
   long?: boolean
+  /** why it cannot work here, which is only ever said when it is certain */
+  blocked?: string
+  /** it may well not work, and why, which is not the same as knowing it will not */
+  caution?: string
 }
 
 /** one of those, while it is up */
@@ -64,6 +68,74 @@ const GIT: Action[] = [
   },
 ]
 
+/** github.com/microsoft/vscode is microsoft, and so is git@github.com:microsoft/vscode.git */
+const ownerOf = (url: string) => url.trim().match(/[:/]([^/:]+)\/[^/]+?(?:\.git)?$/)?.[1] ?? ""
+
+/**
+ * Whether this branch was ever pushed, read off the reflog of the one ref a push would move.
+ * Only that one: a clone can track thousands of branches, and asking each costs a process.
+ */
+function everPushed(root: string, upstream: string): boolean {
+  try {
+    return git(root, "reflog", "show", `refs/remotes/${upstream}`).includes("update by push")
+  } catch {
+    // no reflog for it, which is the same answer as never
+    return false
+  }
+}
+
+/** the words a person is known by here, so a one letter owner cannot match one by accident */
+const namesOf = (who: string) =>
+  new Set(
+    who
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  )
+
+/**
+ * Whether pushing is worth offering. A clone that has pushed before can push again, and a
+ * remote owned by the name on the commits is probably yours. Neither is proof, and the one
+ * thing that would be proof needs the network, so anything unclear is said rather than blocked.
+ */
+function pushable(root: string): Pick<Action, "blocked" | "caution"> {
+  const remote = (() => {
+    try {
+      return git(root, "remote").split("\n")[0]?.trim() ?? ""
+    } catch {
+      return ""
+    }
+  })()
+  if (!remote) return { blocked: "this repo has no remote, so there is nowhere to push it" }
+  let url = ""
+  let upstream = ""
+  try {
+    url = git(root, "remote", "get-url", remote).trim()
+  } catch {
+    // a remote without a url is not one to push to
+  }
+  try {
+    upstream = git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}").trim()
+  } catch {
+    // no upstream, which `git push` on its own cannot invent
+  }
+  if (!upstream)
+    return {
+      blocked: `this branch tracks nothing, so plain \`git push\` has no ${remote} branch to send it to`,
+    }
+  if (everPushed(root, upstream)) return {}
+  const owner = ownerOf(url).toLowerCase()
+  // the configured identity, or failing that whoever the last commit says wrote it
+  const named = `${git(root, "config", "user.name")} ${git(root, "config", "user.email")}`.trim()
+  const me = namesOf(named || git(root, "log", "-1", "--format=%an %ae"))
+  // a whole word of it, or a long enough piece of one: finnmglas is in finn@finnmglas.com
+  if (owner && (me.has(owner) || (owner.length >= 4 && [...me].some((w) => w.includes(owner)))))
+    return {}
+  return {
+    caution: `nothing has ever been pushed from this clone, and ${owner || url} is not a name on its commits. If it is somebody else's repo, fork it first`,
+  }
+}
+
 const read = (path: string): Record<string, any> | null => {
   try {
     return jsonc(readFileSync(path, "utf8")) as Record<string, any>
@@ -103,7 +175,9 @@ export function actions(repo: string): Action[] {
     const at = first.findIndex((name) => one.label === name)
     return at === -1 ? first.length : at
   }
-  return [...GIT, ...project.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))]
+  const said = pushable(root)
+  const listed = GIT.map((one) => (one.id === "push" ? { ...one, ...said } : one))
+  return [...listed, ...project.sort((a, b) => rank(a) - rank(b) || a.label.localeCompare(b.label))]
 }
 
 const LIMIT = 10 * 60_000
@@ -113,6 +187,7 @@ export function act(repo: string, id: string): Promise<Run> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const found = actions(repo).find((one) => one.id === id)
   if (!found) return Promise.reject(new Error(`no action called ${id}`))
+  if (found.blocked) return Promise.reject(new Error(found.blocked))
 
   const [file, ...rest] = found.command.split(" ")
   const started = Date.now()

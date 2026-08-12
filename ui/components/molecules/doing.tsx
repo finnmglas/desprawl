@@ -44,7 +44,16 @@ export function Doing({ onDone }: { onDone?: () => void }) {
 
   const press = (one: Action) => {
     // it leaves this machine, so it is asked about rather than just done
-    if (one.outward && !confirm(`Run "${one.command}"? This pushes to the remote.`)) return
+    if (one.blocked) return
+    if (
+      one.outward &&
+      !confirm(
+        one.caution
+          ? `${one.caution}.\n\nRun "${one.command}" anyway?`
+          : `Run "${one.command}"? This pushes to the remote.`,
+      )
+    )
+      return
     // a server has no end to wait for, so it is started and then watched
     if (one.long) {
       void startAction(one.id).then((made) => {
@@ -88,13 +97,20 @@ export function Doing({ onDone }: { onDone?: () => void }) {
                 {group.title}
               </span>
               {shown.map((one) => (
-                <Tip key={one.id} text={`${one.command} · ${one.note}`}>
+                <Tip
+                  key={one.id}
+                  text={one.blocked ?? one.caution ?? `${one.command} · ${one.note}`}
+                >
                   <Button
                     variant="outline"
                     size="sm"
-                    disabled={!!busy}
+                    disabled={!!busy || !!one.blocked}
                     onClick={() => press(one)}
-                    className={cn(one.outward && "border-amber-500/60")}
+                    className={cn(
+                      one.outward && "border-amber-500/60",
+                      one.blocked && "cursor-not-allowed opacity-40",
+                      one.caution && "border-dashed",
+                    )}
                   >
                     {busy === one.id ? "running…" : one.long ? `▶ ${one.label}` : one.label}
                   </Button>
