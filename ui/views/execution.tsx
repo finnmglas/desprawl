@@ -9,11 +9,11 @@ import { CardHead } from "../components/molecules/card-head.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Input } from "../components/atoms/input.tsx"
-import { Kpi } from "../components/molecules/kpi.tsx"
+import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Tip } from "../components/atoms/tip.tsx"
+import { Path, Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph } from "../lib/live.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
@@ -143,7 +143,7 @@ export function Execution({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         <Kpi
           label="Declarations"
           value={num(declared.length)}
@@ -151,7 +151,7 @@ export function Execution({
           verdict={{
             label: `${plural(calls.stats.files, "file")}`,
             tone: "plain",
-            why: "every function, class and component declared at the top level of a file. A closure inside one is part of it, not its own",
+            why: "every top level function, class and component. A closure inside one belongs to it",
           }}
         />
         <Kpi
@@ -161,7 +161,7 @@ export function Execution({
           verdict={{
             label: `${(calls.stats.edges / Math.max(1, declared.length)).toFixed(1)} each`,
             tone: "plain",
-            why: "a call from one declaration to another in this repo, counted once per pair however often the line repeats",
+            why: "one declaration calling another, counted once per pair",
           }}
         />
         <Kpi
@@ -182,7 +182,7 @@ export function Execution({
               : {
                   label: "partial",
                   tone: "watch",
-                  why: "a large share of call sites resolve to nothing, so read the tables below as a floor rather than the whole picture",
+                  why: "many call sites resolve to nothing, so read the tables as a floor",
                 }
           }
         />
@@ -192,14 +192,14 @@ export function Execution({
           sub={`${plural(deadLines, "line")} nothing arrives at`}
           verdict={deadOf(deadLines, declaredLines)}
         />
-      </div>
+      </Kpis>
 
       <div className="flex flex-wrap items-center gap-1">
         <Tabs tabs={KINDS} value={kind} onChange={setKind} />
         <Tabs className="ml-auto" tabs={ROOTS} value={roots} onChange={setRoots} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         <Kpi
           label="Only exported"
           value={num(only.length)}
@@ -207,7 +207,7 @@ export function Execution({
           verdict={{
             label: roots === ROOTS[0] ? "counted as reached" : "counted as dead",
             tone: "plain",
-            why: "an export nothing here calls is either a public surface or a leftover, and only you know which. The switch above decides how the tables read it",
+            why: "an export nothing calls is a public surface or a leftover, and only you know which. The switch above decides how the tables read it",
           }}
         />
         <Kpi
@@ -234,7 +234,7 @@ export function Execution({
           verdict={{
             label: loops.length ? `biggest ${Math.max(...loops.map((r) => r.length))}` : "none",
             tone: "plain",
-            why: "declarations that call each other round a ring. A call to itself is not recorded, so every ring here spans at least two",
+            why: "declarations calling each other round a ring. Self calls are not recorded, so a ring spans two",
           }}
         />
         <Kpi
@@ -244,10 +244,10 @@ export function Execution({
           verdict={{
             label: repeated[0] ? `${repeated[0].name} in ${repeated[0].files.length}` : "none",
             tone: "plain",
-            why: "the same name declared in more than one file. Sometimes a convention, sometimes the same code written twice: the table below says which files, you say which it is",
+            why: "one name declared in several files. A convention, or the same code twice: the table says where, you say which",
           }}
         />
-      </div>
+      </Kpis>
 
       <DataTable
         title="Declarations"
@@ -376,13 +376,7 @@ const WHAT: Column<Symbol>[] = [
     key: "file",
     label: "File",
     get: (s) => s.file,
-    cell: (s) => (
-      <Tip className="max-w-64 min-w-0" text={s.file}>
-        <span className="text-muted-foreground block truncate font-mono text-xs">
-          {shortPath(s.file, 36)}
-        </span>
-      </Tip>
-    ),
+    cell: (s) => <Path of={s.file} as={shortPath(s.file, 36)} />,
   },
   {
     key: "kind",
@@ -405,7 +399,7 @@ const COUNTS: Column<Symbol>[] = [
     label: "Calls",
     num: true,
     get: (s) => s.calls.length,
-    hint: "how many it reaches for itself. A high count next to a high line count is the one that does everything",
+    hint: "how many it reaches. High beside a high line count is the one doing everything",
   },
   {
     key: "lines",
@@ -514,11 +508,7 @@ const LOST: Column<{ name: string; sites: number; from: string[] }>[] = [
     label: "Used in",
     get: (row) => row.from.join(", "),
     cell: (row) => (
-      <Tip className="max-w-96 min-w-0" text={row.from.join("\n")}>
-        <span className="text-muted-foreground block truncate font-mono text-xs">
-          {row.from.map((one) => one.split("/").pop()).join(", ")}
-        </span>
-      </Tip>
+      <Path of={row.from.join("\n")} as={row.from.map((one) => one.split("/").pop()).join(", ")} />
     ),
   },
 ]
@@ -549,11 +539,10 @@ const TWINS: Column<{ name: string; files: string[]; lines: number }>[] = [
     label: "Declared in",
     get: (row) => row.files.join(", "),
     cell: (row) => (
-      <Tip className="max-w-96 min-w-0" text={row.files.join("\n")}>
-        <span className="text-muted-foreground block truncate font-mono text-xs">
-          {row.files.map((file) => file.split("/").pop()).join(", ")}
-        </span>
-      </Tip>
+      <Path
+        of={row.files.join("\n")}
+        as={row.files.map((file) => file.split("/").pop()).join(", ")}
+      />
     ),
   },
 ]

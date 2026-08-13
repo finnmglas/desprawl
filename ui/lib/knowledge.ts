@@ -32,9 +32,8 @@ export interface Knowledge {
 }
 
 /**
- * Everything desprawl knows, at the grain asked for, as one set of things and one set of
- * relations between them. It is the same graphs the tabs draw, said in a shape something
- * else can read: nothing here is derived that a panel does not already show.
+ * Everything desprawl knows at this grain, as things and relations. The same graphs the
+ * tabs draw, in a shape something else can read: nothing here a panel does not show.
  */
 export function knowledge(
   repo: string,

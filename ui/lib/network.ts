@@ -48,7 +48,7 @@ export interface Net {
   wires: Wire[]
   width: number
   height: number
-  /** force passes it could afford at this size, so a slow layout says so rather than hanging */
+  /** passes it could afford, so a slow layout says so rather than hanging */
   passes: number
 }
 
@@ -61,7 +61,7 @@ const BUDGET = 900_000
 
 const rounded = (n: number) => Math.max(1, Math.ceil(Math.sqrt(n)))
 
-/** shelf packing: children left to right, wrapping once a row would run past the width given */
+/** shelf packing: left to right, wrapping past the width given */
 function pack(sizes: { w: number; h: number }[], want: number) {
   const places: { x: number; y: number }[] = []
   let x = PAD
@@ -153,10 +153,7 @@ function settle(
   }
 }
 
-/**
- * No boxes, so every node is loose and the whole picture arranges itself. Repulsion is read
- * off a grid rather than every other node, or a thousand files would be a million sums a pass.
- */
+/** no boxes: repulsion off a grid, or a thousand files is a million sums a pass */
 function loose(
   spots: Spot[],
   pulls: [number, number][],
@@ -167,7 +164,7 @@ function loose(
   const room = Math.sqrt((wide * tall) / Math.max(1, spots.length))
   const middle = { x: wide / 2, y: tall / 2 }
   spots.forEach((spot, i) => {
-    // a spiral rather than a ring: a thousand nodes on one circle take a hundred passes to fill in
+    // a spiral, not a ring: a thousand on one circle take a hundred passes to fill
     const turn = i * 2.4
     const out = Math.sqrt(i / spots.length) * Math.min(wide, tall) * 0.45
     spot.x = middle.x + Math.cos(turn) * out
@@ -363,7 +360,7 @@ export function net(
   const fitted = (files: string[], room: number) =>
     files.map((file) => ({ w: Math.min(sized.get(file)!.w, room), h: sized.get(file)!.h }))
 
-  // what a box has to hold, in square pixels: a module with ten times the files gets ten times the room
+  // square pixels: ten times the files, ten times the room
   const load = (path: string) =>
     grain === "function"
       ? (kids.get(path) ?? []).reduce((sum, file) => {
@@ -372,7 +369,7 @@ export function net(
         }, 0) * 1.3
       : (inner.get(path) ?? []).length * ROW * ROW
 
-  // a level is a band, deepest at the top, so reading down is reading toward what everything stands on
+  // a level is a band, deepest at the top
   // the frame is wider than it is tall, so the layout is given that shape up front. Laying
   // out narrow and scaling to fit would leave the picture in a column with the sides empty
   const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
@@ -468,7 +465,7 @@ export function net(
   y *= squash
 
   const placed = new Map(boxes.map((b) => [b.id, b]))
-  // one pass costs a pass over every pair in a box, so the budget decides how many there are
+  // a pass costs every pair in a box, so the budget decides how many
   const cost = [...inner.values()].reduce((sum, mine) => sum + mine.length * mine.length, 1)
   const passes = Math.max(12, Math.min(140, Math.floor(BUDGET / cost)))
 

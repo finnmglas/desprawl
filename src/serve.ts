@@ -29,7 +29,7 @@ import { page as onePage, shell } from "./view.ts"
 
 const HOST = "127.0.0.1"
 
-// long enough for a reload to reconnect, short enough that closing the tab ends the command
+// long enough to reconnect, short enough that closing the tab ends it
 const GRACE = 2_000
 
 // fixed port, one origin, so the browser keeps its storage
@@ -165,7 +165,7 @@ export function serve(
             if (tabs.size) return
             const working = alive().filter((one) => one.running)
             if (working.length) {
-              // said once: a run of twenty minutes would otherwise print this six hundred times
+              // said once, not six hundred times over a long run
               if (!waited)
                 console.log(
                   `\nTab closed, but ${working.length} agent run${working.length === 1 ? " is" : "s are"} still going, so desprawl stayed up.\n`,
@@ -296,10 +296,10 @@ export function serve(
 
         if (url.pathname === "/api/actions") return json(actions(repo))
 
-        // whether there is a claude here, which is what decides if the button is offered
+        // whether the button is worth offering
         if (url.pathname === "/api/agent") return json(agent(repo))
 
-        // the task comes over as text and goes in as one argument, never as a command
+        // text, and one argument, never a command
         if (url.pathname === "/api/agent/fix" && req.method === "POST") {
           let body = ""
           req.on("data", (chunk) => {
@@ -319,7 +319,7 @@ export function serve(
                 said.extra ?? "",
                 said.mode ?? "",
                 said.id ?? "task",
-                // typed into the box, so it may be a question rather than an instruction
+                // typed by hand, so it may be a question
                 (said.id ?? "").startsWith("asked:"),
               )
               json(
@@ -343,7 +343,7 @@ export function serve(
 
         if (url.pathname === "/api/agent/talks") return json(talks())
 
-        // asked for by name, and refused while it is working: closing one throws it away
+        // refused while it works: closing throws it away
         if (url.pathname === "/api/agent/close")
           return json(close(url.searchParams.get("id") ?? ""))
 
@@ -367,7 +367,7 @@ export function serve(
           return
         }
 
-        // a server is started and left up, and asked about or stopped from the same panel
+        // started and left up, asked about or stopped from one panel
         if (url.pathname === "/api/actions/start") {
           try {
             return json(begin(repo, url.searchParams.get("id") ?? ""))
@@ -381,9 +381,9 @@ export function serve(
         if (url.pathname === "/api/actions/stop") {
           return json({ stopped: stopAction(url.searchParams.get("id") ?? "") })
         }
-        // an agent run is watched here like anything else long, but it is not one of this
-        // repo's commands, and listing it beside pnpm dev reads as one
-        // a finished one is only a line on a page by then, and the page is allowed to drop it
+        // an agent is watched like anything long, but listing it beside pnpm dev reads
+        // as one of this repo's commands
+        // by then it is a line on a page, and the page may drop it
         if (url.pathname === "/api/actions/forget")
           return json({ forgotten: forget(url.searchParams.get("id") ?? "") })
 
@@ -420,8 +420,8 @@ export function serve(
           return
         }
 
-        // read once a page asks, since it reaches the network. A read that did not get an
-        // answer is not kept: cached silence reads as "nothing filed" for the whole session
+        // read once a page asks. A read that got no answer is not kept: cached silence
+        // reads as "nothing filed" all session
         if (url.pathname === "/api/deps") {
           ;(known
             ? Promise.resolve(known)

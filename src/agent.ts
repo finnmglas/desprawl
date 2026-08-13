@@ -8,19 +8,19 @@ import { dirname, join } from "node:path"
 import { begin, type Alive } from "./actions.ts"
 
 export interface Install {
-  /** what the panel sends back, and the only thing ever taken from a request */
+  /** the only thing a request may name */
   id: string
   label: string
-  /** which cli this is, since they take different flags and different models */
+  /** which cli: they take different flags and models */
   tool: string
-  /** the file to run, found on this machine rather than typed by anybody */
+  /** found on this machine, never typed */
   bin: string
   models: string[]
-  /** what this cli calls the leashes it can be run on, in its own words */
+  /** its own words for the leashes it takes */
   trusts: string[]
-  /** the account it is signed in as, since one machine holds several and they bill apart */
+  /** the account it bills */
   who: string
-  /** the config dir to run it against, which is what decides the account it bills */
+  /** the config dir, which decides the account */
   config?: string
 }
 
@@ -28,21 +28,21 @@ export interface Mode {
   id: string
   label: string
   note: string
-  /** why it cannot be offered here, when something says so before it is tried */
+  /** why it cannot be offered, known before trying */
   blocked?: string
 }
 
 export interface Agent {
-  /** what the first one answered when asked, so the panel can name a version */
+  /** what the first one answered */
   version: string
   modes: Mode[]
-  /** every agent cli here: one machine can hold several, billing different accounts */
+  /** every cli here, billing different accounts */
   installs: Install[]
 }
 
 const last = (path: string) => path.split(/[\\/]/).pop() ?? path
 
-/** whatever a cli wrote down about the account it is signed in as, or nothing */
+/** what a cli wrote down about its account, or nothing */
 const signedIn = (path: string, take: (held: any) => string | undefined) => {
   try {
     return take(JSON.parse(readFileSync(path, "utf8"))) ?? ""
@@ -51,7 +51,7 @@ const signedIn = (path: string, take: (held: any) => string | undefined) => {
   }
 }
 
-/** a jwt is three parts and the middle one is the claims, one of which says who */
+/** a jwt's middle part is the claims */
 const claims = (token: string) => {
   try {
     return JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString()) as {
@@ -62,29 +62,24 @@ const claims = (token: string) => {
   }
 }
 
-/**
- * What each cli is called, what it answers to and how it is told to do one thing and stop.
- * Claude's half is measured: every flag here has been run on this machine. Codex's is read
- * off its own `exec` documentation and has never run here, so the first person with it
- * installed is the one who finds out, and its own error lands in the panel where it shows.
- */
+/** claude's flags are measured here. Codex's are read off its docs and never run */
 interface Tool {
   id: string
-  /** the plain name it installs as, and the prefix a wrapper around it would use */
+  /** the name it installs as, and a wrapper's prefix */
   name: string
-  /** aliases, not ids: a cli resolves an alias to whatever the latest of that model is */
+  /** aliases, not ids: the cli resolves them */
   models: string[]
-  /** the env var that points it at an account, when it has one */
+  /** the env var pointing at an account */
   home?: string
-  /** every leash it takes, its own spelling, and the two auto picks between */
+  /** every leash, and the two auto picks between */
   trust: string[]
   reads: string
   writes: string
-  /** who a config dir is signed in as, read off whatever file that cli keeps it in */
+  /** who a config dir is signed in as */
   who: (config?: string) => string
-  /** the whole command, since no two of these spell "do this and stop" the same way */
+  /** no two spell "do this and stop" alike */
   argv: (bin: string, prompt: string, model: string, trust: string) => string[]
-  /** the same run, saying what it does as it does it, and picking a conversation back up */
+  /** the same run, narrated, and resumable */
   watch?: (bin: string, prompt: string, model: string, trust: string, session: string) => string[]
 }
 
@@ -95,7 +90,7 @@ const TOOLS: Tool[] = [
     models: ["opus", "sonnet", "fable"],
     home: "CLAUDE_CONFIG_DIR",
     trust: ["acceptEdits", "bypassPermissions", "plan", "default"],
-    // inside the config dir, except for the default one, which keeps it a level up
+    // in the config dir, except the default one, a level up
     who: (config) => {
       const email = (held: any) => held.oauthAccount?.emailAddress
       const dir = config ?? process.env.CLAUDE_CONFIG_DIR ?? homedir()
@@ -112,8 +107,7 @@ const TOOLS: Tool[] = [
       "--permission-mode",
       trust,
     ],
-    // one json object per line, which is the only way to know what it is doing while it
-    // does it rather than after. --resume carries the same conversation into another run
+    // one json object per line, the only way to watch it work. --resume continues it
     watch: (bin, prompt, model, trust, session) => [
       bin,
       "-p",
@@ -152,7 +146,7 @@ const TOOLS: Tool[] = [
   },
 ]
 
-/** auto is the mode deciding: planning reads, everything else writes as it goes */
+/** auto: plan reads, the rest write */
 const trustOf = (tool: Tool, mode: string, said: string) =>
   said && said !== "auto" && tool.trust.includes(said)
     ? said
@@ -160,7 +154,7 @@ const trustOf = (tool: Tool, mode: string, said: string) =>
       ? tool.reads
       : tool.writes
 
-// whoever did the work goes on the commit, and neither of these two is a person
+// on the commit, and neither is a person
 const CREW = [
   "Co-authored-by: Claude <noreply@anthropic.com>",
   "Co-authored-by: desprawl <desprawl@finnmglas.com>",
@@ -203,7 +197,7 @@ const ran = (...args: string[]) => {
       encoding: "utf8",
       timeout: 8000,
       stdio: "pipe",
-      // a cli installed by npm is a .cmd on windows, and only a shell knows how to run one
+      // npm installs a .cmd on windows, and only a shell runs one
       shell: WINDOWS,
     }).trim()
   } catch {
@@ -211,7 +205,7 @@ const ran = (...args: string[]) => {
   }
 }
 
-/** every one of these on the path, however this machine spells "look it up" */
+/** every one on the path, however this machine spells it */
 const onPath = (name: string): string[] => {
   const found = ran(WINDOWS ? "where" : "which", ...(WINDOWS ? [] : ["-a"]), name)
     .split("\n")
@@ -219,7 +213,7 @@ const onPath = (name: string): string[] => {
     .filter(Boolean)
   const first = found[0]
   if (!first) return []
-  // a wrapper sits beside the thing it wraps: claude-private is next to claude
+  // a wrapper sits beside what it wraps
   const beside = (() => {
     try {
       return readdirSync(dirname(first))
@@ -234,7 +228,7 @@ const onPath = (name: string): string[] => {
   return [...new Set([...found, ...beside])]
 }
 
-/** a config dir is an account: ~/.claude bills one thing and ~/.claude-private another */
+/** a config dir is an account */
 const profiles = (name: string): string[] => {
   try {
     return readdirSync(homedir())
@@ -258,11 +252,7 @@ const profiles = (name: string): string[] => {
   }
 }
 
-/**
- * What can be run and against which account. A wrapper carries its own config dir, so it is
- * listed as it is; every other config dir is offered against the plain cli. Nothing here is
- * taken from a request: the panel sends back an id, and the id has to be one of these.
- */
+/** what can be run and against which account. A request names an id, and it must be one of these */
 export function installs(): Install[] {
   return TOOLS.flatMap((tool) => {
     const bins = onPath(tool.name)
@@ -270,7 +260,7 @@ export function installs(): Install[] {
     const [plain] = bins
     const of = (bin: string, name: string, config?: string, who = tool.who(config)) => ({
       id: config ? `${bin} ${config}` : bin,
-      // the account is the label: five of these read as the same word otherwise
+      // the account tells five claudes apart
       label: who ? `${name}, ${who}` : name,
       tool: tool.id,
       bin,
@@ -281,11 +271,11 @@ export function installs(): Install[] {
     })
     return [
       of(plain, tool.name),
-      // a wrapper sets its own config dir, and the one it is named after is the one to read
+      // a wrapper sets its own config dir, named after it
       ...bins
         .slice(1)
         .map((bin) => of(bin, last(bin), undefined, tool.who(join(homedir(), `.${last(bin)}`)))),
-      // the dir the plain one already uses is not a second thing to offer
+      // the plain one's own dir is not a second entry
       ...(tool.home
         ? profiles(tool.name)
             .filter(
@@ -297,17 +287,13 @@ export function installs(): Install[] {
   })
 }
 
-/**
- * Whatever github will already take from this machine, asked for in the order that costs
- * least. The third is the useful one: a credential helper is what vs code installs when a
- * github account is connected to it, and `gh` takes that token as happily as its own login.
- */
+/** whatever github already takes here, cheapest first. The helper is what vs code installs */
 export function ticket(repo?: string): { how: string; token?: string } | null {
   const held = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
   if (held) return { how: "the token in this environment" }
   if (ran("gh", "auth", "status")) return { how: "the gh cli login" }
   try {
-    // never interactive: with no helper to answer, git would sit asking a terminal nobody has
+    // never interactive: git would sit asking a terminal nobody has
     const filled = execFileSync("git", ["credential", "fill"], {
       cwd: repo ?? process.cwd(),
       input: "protocol=https\nhost=github.com\n\n",
@@ -319,19 +305,18 @@ export function ticket(repo?: string): { how: string; token?: string } | null {
     const token = filled.match(/^password=(.+)$/m)?.[1]
     if (token) return { how: "the github account this machine is already signed in with", token }
   } catch {
-    // nothing answered, which is the same as having nothing
+    // nothing answered
   }
   return null
 }
 
-/** whether there is any agent cli here, since the button is worth nothing without one */
+/** whether there is any cli here at all */
 export function agent(repo?: string): Agent | null {
   const here = installs()
   if (!here.length) return null
   const version = ran(here[0].bin, "--version")
   if (!version) return null
-  // a pull request needs somewhere to send it and something to send it with, and finding
-  // that out when the agent is already half way through the work is finding out too late
+  // a pr needs a remote and a token, and finding out mid run is too late
   const gh = ran("gh", "--version")
   const signed = ticket(repo)
   const remote = repo ? ran("git", "-C", repo, "remote") : "yes"
@@ -355,7 +340,7 @@ export function agent(repo?: string): Agent | null {
   }
 }
 
-/** a branch named after the task, since a fix in its own branch is one to read on its own */
+/** a branch named after the task */
 const branchOf = (id: string) =>
   `desprawl/${id
     .replace(/[^a-zA-Z0-9]+/g, "-")
@@ -363,18 +348,13 @@ const branchOf = (id: string) =>
     .toLowerCase()
     .slice(0, 40)}`
 
-// what it is told about writing, whoever it is talking to: an agent that opens with a
-// paragraph about what it is about to do has already wasted the answer
+// an agent that opens with a paragraph about what it will do has wasted the answer
 const VOICE = [
   "Answer the way a colleague would in chat: short, direct, the outcome first.",
   "No preamble, no restating what was asked, no summary of what you just did.",
 ]
 
-/**
- * Whether what somebody typed is a question rather than an instruction. Read off the words
- * because a person typing into a box should not have to say which one it was: the cost of
- * getting it wrong is one sentence of an answer, and it is told to work it out itself too.
- */
+/** a question, read off the words: nobody should have to say which it was */
 const asking = (said: string) =>
   /\?\s*$/.test(said.trim()) ||
   /^(what|which|who|whom|whose|where|when|why|how|is|are|was|were|do|does|did|can|could|should|would|will|has|have|any|list|show|tell|explain|count|find out)\b/i.test(
@@ -389,10 +369,10 @@ export function ask(
   extra: string,
   mode = "unstaged",
   id = "task",
-  /** typed into the box rather than found by reading the repo, so it may be a question */
+  /** typed by hand, so it may be a question */
   loose = false,
 ): string {
-  // a question gets an answer and nothing else, whatever the mode says to do with the work
+  // a question gets an answer, whatever the mode says
   if (loose && asking(task))
     return [
       `Answer this question about the repository you are in: ${task}`,
@@ -431,12 +411,12 @@ export function ask(
     .join("\n")
 }
 
-/** what would be run, decided here and refused here, so nothing is spawned to find out */
+/** decided and refused here, so nothing spawns to find out */
 export interface Sent {
   argv: string[]
   env: Record<string, string>
   tool: string
-  /** whether it will narrate itself as json, which is what makes a transcript possible */
+  /** whether it narrates itself as json */
   streams: boolean
 }
 
@@ -450,7 +430,7 @@ export function plan(
   session = "",
 ): Sent {
   const here = agent(repo)
-  // the path comes from the list this machine produced, never from the request
+  // the path comes from this machine's list, never the request
   const which = here?.installs.find((one) => one.id === install) ?? here?.installs[0]
   if (!which) throw new Error("no agent cli on this machine, so there is nothing to ask")
   const found = here?.modes.find((one) => one.id === mode)
@@ -459,8 +439,7 @@ export function plan(
   if (!which.models.includes(model)) throw new Error(`${which.tool} has no model called ${model}`)
   const tool = TOOLS.find((one) => one.id === which.tool)!
   const leash = trustOf(tool, mode, trust)
-  // a token read off a helper is handed on rather than asked for again, and never anywhere
-  // it could be read back: it goes in the child's environment and nowhere else
+  // handed on in the child's environment, nowhere it could be read back
   const signed = mode === "pr" ? ticket(repo) : null
   return {
     argv: tool.watch
@@ -475,7 +454,7 @@ export function plan(
   }
 }
 
-/** started and watched like any other long thing here, so one panel stops it */
+/** started and watched like any other long thing */
 export function fix(
   repo: string,
   id: string,

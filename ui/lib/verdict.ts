@@ -107,7 +107,7 @@ export const layeringOf = (levels: number, units: number): Verdict =>
         why: "the longest chain of units that depend on each other. Deep is not worse, it is further to trace",
       }
 
-/** what opening it would show: a pile with no substructure, or too small to be a folder */
+/** what opening it shows: a pile, or too small to be a folder */
 export function spreadOf(
   entries: number,
   folders?: number,
@@ -121,24 +121,24 @@ export function spreadOf(
   if (entries >= (roomy ? 100 : 60))
     return {
       label: "bloated",
-      tone: "border-red-500/60 text-red-700 dark:text-red-300",
+      tone: OUTLINE.bad,
       why: `${entries} entries side by side${held}. This is not a folder any more, it is a directory listing${allowed}`,
     }
   if (entries >= (roomy ? 40 : 26))
     return {
       label: "oversize",
-      tone: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+      tone: OUTLINE.warn,
       why: `${entries} entries${held}. Past what anyone scans at once, though still a list you could sort out in an afternoon${allowed}`,
     }
   if (entries >= 4)
     return {
       label: "healthy",
-      tone: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+      tone: OUTLINE.good,
       why: `${entries} entries, a folder you can open and take in at once`,
     }
   return {
     label: "thin",
-    tone: "text-muted-foreground",
+    tone: OUTLINE.quiet,
     why: `${entries} entries. Not a problem, but a folder this small may belong inside its neighbour`,
   }
 }
@@ -154,21 +154,16 @@ export interface Shape {
   edges: number
 }
 
-/** only imports itself: a module. Otherwise placed by which way its edges lean, entry to foundation */
+/** imports only itself: a module. Otherwise placed by which way its edges lean */
 function read(
   inside: number,
   out: number,
   into: number,
   reach: number,
 ): Omit<Shape, "sure" | "edges"> & { firm?: boolean } {
-  // a hue per shape, and a star is its neighbour: near misses read as near, never as the same
-  const MODULE = "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
-  const NEAR = "border-lime-500/60 text-lime-700 dark:text-lime-300"
-  const FLOOR = "border-sky-500/50 text-sky-700 dark:text-sky-300"
-  const EVEN = "border-cyan-500/50 text-cyan-700 dark:text-cyan-300"
-  const MIDDLE = "border-amber-500/60 text-amber-700 dark:text-amber-300"
-  const ENTRY = "border-violet-500/50 text-violet-700 dark:text-violet-300"
-  const TOP = "border-fuchsia-500/50 text-fuchsia-700 dark:text-fuchsia-300"
+  // a hue per shape, a star its neighbour: near misses read near, never the same
+  const { good: MODULE, near: NEAR, cool: FLOOR, even: EVEN, warn: MIDDLE } = OUTLINE
+  const { entry: ENTRY, top: TOP } = OUTLINE
   if (!inside && !out)
     return {
       label: "Module",
@@ -267,6 +262,19 @@ export function shapeOf(inside: number, out: number, into = 0, reach = 2): Shape
   }
 }
 
+/** an outlined badge, one colour per meaning, spelled once for every panel */
+export const OUTLINE = {
+  bad: "border-red-500/60 text-red-700 dark:text-red-300",
+  warn: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+  good: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
+  cool: "border-sky-500/50 text-sky-700 dark:text-sky-300",
+  near: "border-lime-500/60 text-lime-700 dark:text-lime-300",
+  even: "border-cyan-500/50 text-cyan-700 dark:text-cyan-300",
+  entry: "border-violet-500/50 text-violet-700 dark:text-violet-300",
+  top: "border-fuchsia-500/50 text-fuchsia-700 dark:text-fuchsia-300",
+  quiet: "text-muted-foreground",
+}
+
 export const TONES: Record<Verdict["tone"], string> = {
   plain: "bg-muted text-muted-foreground",
   fine: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
@@ -275,12 +283,12 @@ export const TONES: Record<Verdict["tone"], string> = {
 
 export const RANK = ["CRITICAL", "HIGH", "MODERATE", "LOW"]
 
-/** the worst one filed against a package, since a list of five is read by its top entry */
+/** the worst filed against a package */
 export const worst = (found: { severity: string }[]): string =>
   RANK.find((one) => found.some((a) => a.severity === one)) ?? (found.length ? "UNKNOWN" : "")
 
-// the families every licence list sorts into, by what they ask of the code around them.
-// Prefix matches, since a package writes "MIT", "MIT License" and "MIT-0" for the same thing
+// by what they ask of the code around them. Prefix matches, since one package writes
+// "MIT", another "MIT License", another "MIT-0"
 // prettier-ignore
 const PERMISSIVE =
   /^(MIT|ISC|0BSD|BSD|Apache|Unlicense|CC0|CC-BY(?!-(NC|ND|SA))|WTFPL|OFL|SIL|Zlib|Libpng|libtiff|Python-2|PSF|BlueOak|X11|NCSA|AFL|UPL|BSL-1|Boost|PostgreSQL|Zope|HPND|FTL|IJG|bzip2|curl|W3C|Ruby|TCL|JSON|Unicode|ICU|Beerware|OpenSSL|ODC-By|PDDL|CeCILL-B|Intel|MirOS|Xnet|AAL)/i
@@ -290,7 +298,7 @@ const WEAK =
 // prettier-ignore
 const STRONG =
   /^(GPL|AGPL|SSPL|OSL|RPL|RPSL|EUPL|CeCILL|Sleepycat|Watcom|GFDL|CC-BY-N|Elastic|BUSL|Commons-Clause|PolyForm|Prosperity|Parity|CAL-1|Hippocratic|Fair-Source|FSL|RSAL|Confluent)/i
-/** npm's word for "nobody licensed this to you", which is not a missing answer */
+/** npm's word for "nobody licensed this to you" */
 const CLOSED = /^(UNLICENSED|Proprietary|Commercial|Closed|All[- ]Rights[- ]Reserved|Private)/i
 
 export type Family = "permissive" | "weak" | "strong" | "closed" | "unknown"
@@ -313,12 +321,11 @@ const one = (said: string): Family =>
 const worstOf = (parts: string[]) =>
   parts.map(one).reduce((a, b) => (ORDER.indexOf(a) > ORDER.indexOf(b) ? a : b))
 
-/** what a licence asks of the code that uses it, which is a fact rather than a verdict */
+/** what it asks of the code using it: a fact, not a verdict */
 export const familyOf = (license: string): Family => {
   const said = license.trim().replace(/^the\s+/i, "")
   if (!said) return "unknown"
-  // "MIT OR Apache-2.0" is satisfied by either, so the gentler side counts. "MIT AND OFL"
-  // asks for both, so the stricter one does
+  // an either takes the gentler side, a both takes the stricter
   return said
     .split(/\s+OR\s+/i)
     .map((part) =>
@@ -348,7 +355,7 @@ export const coverageOf = (pct: number): Verdict =>
           why: `${pct}% of lines run, so most of it is never exercised`,
         }
 
-/** unreachable code is read, moved and merged like the rest of it, so its share is the cost */
+/** dead code is still read, moved and merged, so its share is the cost */
 export const deadOf = (lines: number, whole: number): Verdict =>
   !lines
     ? { label: "none", tone: "fine", why: "every declaration is reached by something that runs" }
@@ -364,7 +371,7 @@ export const deadOf = (lines: number, whole: number): Verdict =>
           why: `${((lines / whole) * 100).toFixed(1)}% of declared lines nothing arrives at, which is read and maintained anyway`,
         }
 
-/** a suite is green or it is not, and the count of what it holds says how much that means */
+/** green or not, and the count says how much that means */
 export const suiteOf = (ran: { ok: boolean } | null, cases: number): Verdict =>
   !ran
     ? {

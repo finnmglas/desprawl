@@ -58,7 +58,7 @@ async function ask<T>(path: string, fallback: T, sent?: RequestInit): Promise<T>
 export function attach(): void {
   // a static file has no server to tell, and must never try to reach one
   if (!isLive()) return
-  // a headless printer waits on a stream that never ends, and is not a tab worth keeping
+  // a headless printer waits on a stream that never ends
   if (printing()) return
   // the browser drops this the moment the tab goes, and reopens it after a sleep
   new EventSource(`/api/session?t=${token()}`)
@@ -153,7 +153,7 @@ export async function printed(): Promise<Blob | null> {
   return null
 }
 
-/** licences off disk and advisories from osv, carried by a saved page or asked for once */
+/** licences off disk, advisories from osv, asked for once */
 export const dependencies = (): Promise<Deps | null> =>
   window.__DESPRAWL_DEPS__
     ? Promise.resolve(window.__DESPRAWL_DEPS__)
@@ -188,13 +188,13 @@ export const stopAction = (id: string): Promise<{ stopped: boolean }> =>
 
 export const aliveActions = (): Promise<Alive[]> => ask<Alive[]>("/api/actions/alive", [])
 
-/** dropped from the list for good, which only a stopped one allows */
+/** dropped for good, which only a stopped one allows */
 export const forgetAction = (id: string): Promise<{ forgotten: boolean }> =>
   ask(`/api/actions/forget?id=${encodeURIComponent(id)}`, { forgotten: false })
 
 export const agentHere = (): Promise<Agent | null> => ask<Agent | null>("/api/agent", null)
 
-/** anything watching agent runs, so a new one shows up on the press rather than on the beat */
+/** so a new run shows on the press, not on the next beat */
 const watchers = new Set<(made: Talk) => void>()
 export const onAgent = (told: (made: Talk) => void) => {
   watchers.add(told)
@@ -234,11 +234,11 @@ export const startFix = (said: {
 /** every agent run this desprawl started, with everything said in it */
 export const talksNow = (): Promise<Talk[]> => ask<Talk[]>("/api/agent/talks", [])
 
-/** thrown away on purpose: a run is kept for as long as it is not asked to go */
+/** thrown away on purpose: a run is kept until asked to go */
 export const closeTalk = (id: string): Promise<{ closed: boolean; why?: string }> =>
   ask(`/api/agent/close?id=${encodeURIComponent(id)}`, { closed: false, why: "not live" })
 
-/** one more thing said into a run that has stopped talking */
+/** one more thing said into a stopped run */
 export const sayToAgent = (said: {
   id: string
   text: string

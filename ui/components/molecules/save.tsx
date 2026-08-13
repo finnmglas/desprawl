@@ -32,15 +32,9 @@ async function pixels(node: HTMLElement, paint: string) {
   return padded(drawn ? own : await shoot(node, paint), paint)
 }
 
-/**
- * Only a drawing that is genuinely vectors. Any node holds svg icons, and the first one
- * found was once exported as the whole picture: a framework logo, blown up to full size.
- */
-/**
- * A chart is already vectors, so it is taken as it is. Anything else is html, which goes
- * into a foreignObject with every computed style written onto it, since an svg carries no
- * stylesheet of its own.
- */
+/** genuinely vectors: every node holds svg icons, and the first was once the whole export */
+/** a chart is already vectors. The rest is html in a foreignObject with every computed
+ * style written on, since an svg carries no stylesheet */
 async function vectors(node: HTMLElement, paint: string): Promise<string> {
   const chart = node.querySelector("svg.recharts-surface")
   if (chart) {
@@ -48,9 +42,8 @@ async function vectors(node: HTMLElement, paint: string): Promise<string> {
     copy.setAttribute("xmlns", "http://www.w3.org/2000/svg")
     return new XMLSerializer().serializeToString(copy)
   }
-  // the clone is laid out on its own, where flex-1 and max-w mean nothing and it spreads
-  // wider than the box it was measured at, so it is pinned to the size it had on screen.
-  // No padding here: a margin around it moved the frame and the content apart again
+  // laid out alone, flex-1 and max-w mean nothing and it spreads, so it is pinned to the
+  // size it had on screen. No padding: a margin moved frame and content apart again
   const box = node.getBoundingClientRect()
   const wide = Math.ceil(box.width)
   const tall = Math.ceil(box.height)

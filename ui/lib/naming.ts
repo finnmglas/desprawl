@@ -106,10 +106,9 @@ export function isId(segment: string): boolean {
 const VARIES = /^\[.+\]$/
 
 /**
- * What a group would be called out loud. A remainder says whether opening it shows
- * folders or files, a route parameter is named for what it is a detail of, and an id
- * is left exactly as written since only its characters tell two of them apart.
- * `deep` is how many folders a clash has had to climb, and every step adds one.
+ * What a group is called out loud. A remainder says whether opening it shows folders or
+ * files, a route parameter is named for what it details, and an id is left as written
+ * since only its characters tell two apart. `deep` is how far a clash has climbed.
  */
 export function nameOf(path: string, folders = 0, deep = 0): string {
   if (path === LOOSE_FILES) return "Repo root [files]"

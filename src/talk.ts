@@ -14,7 +14,7 @@ export interface Turn {
 }
 
 export interface Talk {
-  /** the task it was handed, which is also the action id watching it */
+  /** the task, and the action id watching it */
   id: string
   task: string
   tool: string
@@ -25,26 +25,23 @@ export interface Talk {
   until: number
   running: boolean
   code: number | null
-  /** what the cli calls this conversation, and the only way to say more into it */
+  /** what the cli calls this conversation */
   session: string
-  /** whether more can be said at all: only a cli that resumes can be answered */
+  /** only a cli that resumes can be answered */
   answerable: boolean
   turns: Turn[]
-  /** what the run has cost so far, when the cli says */
+  /** what it cost, when the cli says */
   cost: number
-  /** what it printed that was not json, so nothing is quietly dropped */
+  /** what it printed that was not json */
   raw: string
 }
 
 const going = new Map<string, Talk>()
 
-/**
- * Nothing is dropped here on its own. A finished run stays until somebody closes it, since
- * the answer to "what did it do" is worth more after it stops than while it runs.
- */
+/** nothing is dropped on its own: what it did is worth more after it stops */
 export const talks = (): Talk[] => [...going.values()].sort((a, b) => b.since - a.since)
 
-/** a second go at the same task is its own conversation, never a write over the first */
+/** a second go is its own conversation, never a write over the first */
 const free = (id: string): string => {
   if (!going.has(id)) return id
   for (let n = 2; ; n++) if (!going.has(`${id} #${n}`)) return `${id} #${n}`
@@ -59,7 +56,7 @@ export function close(id: string): { closed: boolean; why?: string } {
   return { closed: true }
 }
 
-/** the one field of a tool call worth reading in a list */
+/** the one field worth reading in a list */
 const about = (input: Record<string, any> = {}): string => {
   const first =
     input.file_path ?? input.path ?? input.command ?? input.pattern ?? input.url ?? input.prompt
@@ -69,7 +66,7 @@ const about = (input: Record<string, any> = {}): string => {
 
 const add = (talk: Talk, turn: Omit<Turn, "at">) => {
   const last = talk.turns.at(-1)
-  // a model streams a paragraph in pieces, and a transcript of pieces is unreadable
+  // a paragraph arrives in pieces, and a transcript of pieces is unreadable
   if (last && last.who === turn.who && !turn.tool && !last.tool && turn.who === "agent")
     last.text += turn.text
   else talk.turns.push({ ...turn, at: Date.now() })
@@ -94,7 +91,7 @@ function swallow(talk: Talk, line: string) {
         add(talk, { who: "tool", tool: part.name, text: about(part.input) })
     }
   else if (said.type === "user") {
-    // a tool result is noise until it is a failure, and then it is the whole story
+    // noise until it fails, and then the whole story
     for (const part of (said.message?.content ?? []) as Record<string, any>[])
       if (part.type === "tool_result" && part.is_error)
         add(talk, { who: "note", text: `that failed: ${String(part.content).slice(0, 200)}` })
@@ -104,7 +101,7 @@ function swallow(talk: Talk, line: string) {
   }
 }
 
-/** whole lines only: a chunk boundary lands mid object often enough to matter */
+/** whole lines only: a chunk lands mid object often enough to matter */
 const feed = (talk: Talk, chunk: string, rest: { left: string }) => {
   const parts = (rest.left + chunk).split("\n")
   rest.left = parts.pop() ?? ""
@@ -129,7 +126,7 @@ const run = (repo: string, talk: Talk, prompt: string, install: string, trust: s
   })
 }
 
-/** a transcript out of raw chunks, which is what the tests hold on to */
+/** a transcript out of raw chunks */
 export function read(...chunks: string[]): Talk {
   const talk = blank("read", "", "", "")
   talk.answerable = true
@@ -139,7 +136,7 @@ export function read(...chunks: string[]): Talk {
   return talk
 }
 
-/** hand one task over, and keep everything said about it from here on */
+/** hand one task over, and keep everything said about it */
 const blank = (id: string, task: string, model: string, mode: string): Talk => ({
   id,
   task,
@@ -186,7 +183,7 @@ export function say(repo: string, id: string, text: string, install = "", trust 
   return talk
 }
 
-/** stopped by hand, and said so in the transcript rather than only in the exit code */
+/** said in the transcript, not only in the exit code */
 export function hush(id: string): boolean {
   const talk = going.get(id)
   if (talk?.running) {

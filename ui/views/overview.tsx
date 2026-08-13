@@ -7,7 +7,7 @@ import { Avatar } from "../components/atoms/avatar.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
-import { Kpi } from "../components/molecules/kpi.tsx"
+import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/atoms/moved.tsx"
 import { Mark } from "../components/molecules/mark.tsx"
@@ -27,6 +27,7 @@ import {
   coverageOf,
   historyOf,
   familyOf,
+  OUTLINE,
   shapeOf,
   sizeOf,
   suiteOf,
@@ -107,11 +108,11 @@ const SCOPE = ["direct deps", "all deps"]
 const quiet = (released: string) => !!released && Date.now() - Date.parse(released) > 730 * 864e5
 
 const FAMILY: Record<string, string> = {
-  permissive: "border-emerald-500/50 text-emerald-700 dark:text-emerald-300",
-  weak: "border-amber-500/60 text-amber-700 dark:text-amber-300",
-  strong: "border-red-500/60 text-red-700 dark:text-red-300",
+  permissive: OUTLINE.good,
+  weak: OUTLINE.warn,
+  strong: OUTLINE.bad,
   closed: "border-foreground/40",
-  unknown: "text-muted-foreground",
+  unknown: OUTLINE.quiet,
 }
 
 const DEPS: Column<Row>[] = [
@@ -154,7 +155,7 @@ const DEPS: Column<Row>[] = [
           <span className="font-mono text-xs">{one.version || one.range}</span>
         </Tip>
       ),
-    hint: "what is installed, falling back to what the manifest asks for",
+    hint: "installed, or what the manifest asks for",
   },
   {
     key: "license",
@@ -195,7 +196,7 @@ const DEPS: Column<Row>[] = [
         </Tip>
       )
     },
-    hint: "read from the installed package, never guessed. Permissive asks for attribution, weak copyleft asks for changes to the package itself back, strong copyleft asks about the code around it, closed is a package nobody licensed to you",
+    hint: "off the installed package, never guessed. Permissive asks for attribution, weak asks for changes to the package back, strong asks about the code around it, closed licensed you nothing",
   },
   {
     key: "bytes",
@@ -218,7 +219,7 @@ const DEPS: Column<Row>[] = [
         <span className="text-muted-foreground">—</span>
       )
     },
-    hint: "what it weighs on disk, its own files only: what it pulled in weighs its own row",
+    hint: "its own files on disk: what it pulled in weighs its own row",
   },
   {
     key: "released",
@@ -247,7 +248,7 @@ const DEPS: Column<Row>[] = [
         </Tip>
       )
     },
-    hint: "when npm last saw any release, asked for the packages this repo names. Quiet for over two years is worth a look, not a verdict",
+    hint: "when npm last saw a release, for the packages this repo names. Two quiet years is worth a look, not a verdict",
   },
   {
     key: "used",
@@ -275,7 +276,7 @@ const DEPS: Column<Row>[] = [
         </Tip>
       )
     },
-    hint: "when the version installed here was published. Amber means a newer version exists, whatever this clone has",
+    hint: "when the installed version was published. Hover says whether a newer one is out",
   },
   {
     key: "kind",
@@ -295,7 +296,7 @@ const DEPS: Column<Row>[] = [
           <span className="text-muted-foreground">indirectly</span>
         </Tip>
       ),
-    hint: "whether this repo names it, and whether anything that ships reaches it. Dev only is worked out through the whole tree, so a package pulled in by a dev one is dev too",
+    hint: "whether this repo names it, and whether anything that ships reaches it. Read through the whole tree, so what a dev package pulls in is dev too",
   },
   {
     key: "advisories",
@@ -525,7 +526,7 @@ export function Overview({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         {[
           {
             label: "Lines of code",
@@ -562,7 +563,7 @@ export function Overview({
         ].map(({ shade, ...card }) => (
           <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to, shade)} />
         ))}
-      </div>
+      </Kpis>
 
       {stats.files === 0 && (
         <Card>

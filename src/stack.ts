@@ -189,7 +189,7 @@ const TABLES: [string, Table][] = [
   ["formatters", FORMATTERS],
 ]
 
-/** a file whose presence names the host it deploys to */
+/** its presence names the host */
 // prettier-ignore
 const HOSTED: [RegExp, string][] = [
   [/^(.*\/)?vercel\.json$/, "Vercel"],
@@ -218,11 +218,8 @@ const HOSTED: [RegExp, string][] = [
   [/^(.*\/)?skaffold\.ya?ml$/, "Kubernetes"],
 ]
 
-/**
- * A file whose name half the world uses. app.yaml is app engine only when it names a
- * runtime, template.yaml is SAM only when it says so, and serverless.yml can target
- * any cloud. Each has to say what it is before it counts as anything.
- */
+/** a name half the world uses: app.yaml, template.yaml, serverless.yml. Each has to say
+ * what it is before it counts */
 // prettier-ignore
 const AMBIGUOUS: [RegExp, RegExp, string][] = [
   [/^(.*\/)?app\.ya?ml$/, /^\s*runtime:\s*\S/m, "Google Cloud"],
@@ -253,11 +250,7 @@ const DEPLOYS: [RegExp, string][] = [
   [/\bkubectl\s+apply|azure\/k8s-deploy|helm\s+upgrade/, "Kubernetes"],
 ]
 
-/**
- * A package that only works on one platform, which is the same as saying it runs there.
- * An ignored link folder is not evidence, whatever it looks like: `create-next-app`
- * writes `.vercel` into every repo it makes, deployed there or not.
- */
+/** a package that only works on one platform. An ignored link folder is not evidence */
 // prettier-ignore
 const PLATFORM: Table = {
   "@vercel/analytics": "Vercel", "@vercel/speed-insights": "Vercel", "@vercel/blob": "Vercel",
@@ -268,11 +261,7 @@ const PLATFORM: Table = {
   "@aws-sdk/client-lambda": "AWS", "@azure/static-web-apps-cli": "Azure",
 }
 
-/**
- * A package that says this repo is built into an app for something other than a browser.
- * A shell framework says how, the platform packages say which: Capacitor with only
- * `@capacitor/android` builds an android app and not an iphone one.
- */
+/** what it is built into besides a page: the platform packages say which */
 // prettier-ignore
 const BUILT_FOR: Table = {
   "@capacitor/android": "Android", "@capacitor/ios": "iOS", "@capacitor/electron": "Desktop",
@@ -283,7 +272,7 @@ const BUILT_FOR: Table = {
   "@lynx-js/rspeedy": "Android,iOS",
 }
 
-/** a folder or file that only exists once a shell has actually been added for a platform */
+/** only there once a shell was really added */
 // prettier-ignore
 const NATIVE: [RegExp, string][] = [
   [/(^|\/)android\/(app\/)?build\.gradle(\.kts)?$/, "Android"],
@@ -294,7 +283,7 @@ const NATIVE: [RegExp, string][] = [
   [/(^|\/)src-tauri\/tauri\.conf\.json$/, "Desktop"],
 ]
 
-/** a package whose whole job is putting this repo somewhere */
+/** its whole job is putting this repo somewhere */
 // prettier-ignore
 const SHIPS: Table = {
   vercel: "Vercel", wrangler: "Cloudflare", "netlify-cli": "Netlify",
@@ -460,11 +449,8 @@ const label = (table: Table, name: string): string =>
 /** newest commits only, a signature further back says little about the code now */
 const SIGNED_MAX = 20_000
 
-/**
- * Who signed the history. Only the author line and the trailers count, so a commit
- * that merely writes about an assistant is not counted as written by one.
- */
-/** the tool a trailer names, without its model suffix, so Copilot:Claude reads as Copilot */
+/** who signed it: the author line and the trailers, so writing about one is not being one */
+/** the tool a trailer names, so Copilot:Claude reads as Copilot */
 const signer = (line: string): string =>
   line.replace(/^\s*[a-z-]+-by:\s*/i, "").replace(/^([^\s:]+):\S+/, "$1")
 
@@ -623,8 +609,7 @@ function shipped(
     add(parts, "monorepo root")
   if (manifests.some((m) => m.workspaces) || workspaces) add(parts, "monorepo")
   if (manifests.some((m) => m.bin)) add(parts, "cli")
-  // what it is built into is a part of the project as much as a frontend is: a repo that
-  // ships an android app says android, not "mobile", since only one of those is checkable
+  // the platform, not "mobile": only one of those is checkable
   for (const made of apps) add(parts, made.toLowerCase())
   if (boxes.dockerfiles || boxes.compose || boxes.kubernetes || boxes.terraform) add(parts, "infra")
   return parts

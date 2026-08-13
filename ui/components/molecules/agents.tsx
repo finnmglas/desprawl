@@ -12,6 +12,7 @@ import { Transcript } from "./transcript.tsx"
 import { toast } from "../atoms/toast.tsx"
 import { closeTalk, isLive, onAgent, sayToAgent, stopAction, talksNow } from "../../lib/live.ts"
 import { readPrefs } from "../../lib/prefs.ts"
+import { OUTLINE } from "../../lib/verdict.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Talk } from "../../../src/talk.ts"
 
@@ -68,11 +69,7 @@ function One({
   }
 
   const state = talk.running ? "working" : talk.code ? "stopped" : "done"
-  const tone = talk.running
-    ? "border-sky-500/50 text-sky-700 dark:text-sky-300"
-    : talk.code
-      ? "border-amber-500/60 text-amber-700 dark:text-amber-300"
-      : "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
+  const tone = talk.running ? OUTLINE.cool : talk.code ? OUTLINE.warn : OUTLINE.good
   // what it was told to do with the work, since that is the difference between a diff to
   // read and a pull request somebody has to close
   const did = talk.mode === "unstaged" ? "left in the working tree" : talk.mode

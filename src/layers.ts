@@ -41,9 +41,9 @@ export interface Unit {
   instability: number
   /** its tangle, -1 when alone */
   tangle: number
-  /** the file the most imports arrive at, since one file can carry a whole group's shape */
+  /** where the most imports arrive: one file can carry a group's shape */
   loudest: string
-  /** the same measures without that file, so a verdict resting on it can be told apart */
+  /** the same without it, so a verdict resting on it shows */
   without: { internal: number; out: number; into: number; reach: number }
 }
 
@@ -74,7 +74,7 @@ export interface Layout {
   units: Unit[]
   levels: number
   tangles: Tangle[]
-  /** files that really import each other in a ring, which no grouping invents or hides */
+  /** a real ring, which no grouping invents or hides */
   cycles: string[][]
   /** and the ones levelling cannot explain */
   edges: number
@@ -111,7 +111,7 @@ interface Branch {
   files: string[]
 }
 
-/** a file belongs to the deepest chosen folder above it, and the heaviest keeps opening */
+/** the deepest chosen folder above it, and the heaviest keeps opening */
 export function balanced(
   graph: Graph,
   { ideal = 10, least = 4, max = 128, share = 6 } = {},
@@ -385,7 +385,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
           glue: seen(from).glue[to] ?? 0,
           alone: opens(group, (p) => Object.keys(seen(p).out), [from, to]),
         }))
-        // the cheap ones first: a type or a barrel is a move, anything else is a refactor
+        // cheap first: a type or a barrel is a move, the rest a refactor
         .sort(
           (a, b) =>
             (b.types + b.glue) / b.imports - (a.types + a.glue) / a.imports ||
@@ -425,7 +425,7 @@ function opens(group: string[], out: (path: string) => string[], edge: [string, 
   return left.every((part) => part.length < group.length)
 }
 
-/** Eades, Lin and Smyth: sources front, sinks back, what still points back is the cut */
+/** Eades, Lin and Smyth: sources front, sinks back, what points back is the cut */
 function cut(group: string[], out: (path: string) => string[]): [string, string][] {
   const inside = new Set(group)
   const to = new Map(group.map((u) => [u, out(u).filter((v) => inside.has(v) && v !== u)]))

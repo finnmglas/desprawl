@@ -31,7 +31,7 @@ import type { Stats } from "../../src/model.ts"
 const GRAINS: Grain[] = ["module", "file", "function"]
 // a graph reads by its shape, so it gets most of the screen rather than a strip of it
 const TALLEST = 0.78
-// past this a layout takes longer than a reader will wait, so it is offered rather than run
+// past this a layout is slower than anyone waits, so it is offered rather than run
 const MOST = 9000
 // heads on every wire stop reading as direction once they overlap
 const HEADS = 2600
@@ -42,10 +42,10 @@ const IMPORT = PAINT.down
 const CALL = PAINT.loop
 const PAINTS = ["module", "language", "size", "shape", "level", "kind", "one colour"]
 const WIRED = ["kind", "module", "leaving"]
-// green through amber to red: a file is bloated against the ones around it, not in the abstract
+// green to red: bloated against its neighbours, not in the abstract
 const ramp = (share: number) => `hsl(${Math.round(140 - 140 * share)}, 65%, 55%)`
 
-/** a hue off the name itself, so a palette never runs out and a module keeps its colour */
+/** a hue off the name, so a palette never runs out */
 const hued = (name: string) => {
   let hash = 0
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 360
@@ -123,7 +123,7 @@ export function Network({
     [layout, graph, split, calls, grain, wide, tall, heavy, bounds],
   )
 
-  // drawing is not a render: a wheel turn that goes through react repaints the page to move
+  // drawing is not a render: a wheel turn through react repaints the page to move
   // a camera, and every one of them waits for the frame after it
   const drawing = useRef<() => void>(() => {})
   const queued = useRef(0)
@@ -134,7 +134,7 @@ export function Network({
       drawing.current()
     })
   }
-  // while a gesture or a move is running, heads and names are skipped and come back after
+  // heads and names are skipped mid gesture and come back after
   const busy = useRef(0)
   const rushed = () => {
     busy.current = performance.now() + 140
@@ -147,7 +147,7 @@ export function Network({
   const framed = useRef({ w: 0, h: 0 })
   const moving = useRef<{ from: Map<string, { x: number; y: number }>; at: number } | null>(null)
 
-  // a fresh picture opens whole: a reader who has to hunt for it has already lost the shape
+  // a fresh picture opens whole: hunting for it loses the shape
   const whole = () => {
     const scale = drawn
       ? Math.min(1.6, (wide - 24) / Math.max(1, drawn.width), tall / Math.max(1, drawn.height))
@@ -163,11 +163,11 @@ export function Network({
   useEffect(() => {
     if (!drawn) return
     setNear(null)
-    // the nodes walk from where they were to where they now are, so a grain change is followed
+    // the nodes walk to where they now are, so a grain change is followed
     if (moves && seats.current.size) moving.current = { from: seats.current, at: performance.now() }
-    // a reader who zoomed in wants the same corner at the next grain, not the whole picture
-    // back. The corner is kept as a share of the drawing, since the next one is a new size
-    // a chosen module is what the reader is looking at, so it is what the next grain frames
+    // zoomed in, the same corner is wanted at the next grain: kept as a share, since the
+    // next drawing is a new size
+    // a chosen module is what the next grain frames
     const kept = only && drawn.boxes.find((b) => b.id === only)
     const was = framed.current
     if (kept) {
@@ -245,7 +245,7 @@ export function Network({
   const at = useMemo(() => new Map((drawn?.spots ?? []).map((s) => [s.id, s])), [drawn])
   const boxAt = useMemo(() => new Map((drawn?.boxes ?? []).map((b) => [b.id, b])), [drawn])
 
-  // react listens passively, so preventDefault there is ignored and the page scrolls away
+  // react listens passively, so preventDefault there is ignored
   // under the cursor. The zoom has to own the wheel, which means binding it by hand
   useEffect(() => {
     const canvas = board.current
@@ -283,7 +283,7 @@ export function Network({
     const now = performance.now()
     const walk = moving.current
     const step = walk ? Math.min(1, (now - walk.at) / 500) : 1
-    // slow out: it settles rather than stopping dead, which is what makes it read as movement
+    // slow out: settling rather than stopping dead is what reads as movement
     const eased = 1 - (1 - step) ** 3
     const seat = (spot: Spot) => {
       const was = step < 1 && walk ? walk.from.get(spot.id) : undefined
@@ -305,7 +305,7 @@ export function Network({
       for (const box of drawn.boxes) {
         const picked = box.id === only
         if (box.depth === 0) {
-          // a level is said once down the side: a box around every module of it is a line to look past
+          // said once down the side: a box per module is a line to look past
           pen.setLineDash([])
           pen.fillStyle = `rgba(${PAINT.quiet}, 0.55)`
           pen.font = `${text(12)}px ui-sans-serif, system-ui, sans-serif`
@@ -332,7 +332,7 @@ export function Network({
             ] as [string, number, number][]
             let line = box.y + text(16)
             for (const [say, size, alpha] of said) {
-              // a card too small for a line simply does not say it, rather than saying it over itself
+              // too small for a line says nothing rather than saying it over itself
               if (!say || line > box.y + box.h - 2 || box.w * scale < 90) continue
               pen.fillStyle = `rgba(${PAINT.quiet}, ${alpha})`
               pen.font = `${text(size)}px ui-sans-serif, system-ui, sans-serif`
@@ -348,7 +348,7 @@ export function Network({
           : `rgba(${PAINT.quiet}, ${box.depth === 1 ? 0.4 : 0.24})`
         pen.lineWidth = (picked ? 2 : 1) / scale
         pen.strokeRect(box.x, box.y, box.w, box.h)
-        // the name sits on a strip of its own, so there is always somewhere to click it
+        // its own strip, so there is always somewhere to click
         if (box.depth === 1) {
           pen.setLineDash([])
           pen.fillStyle = `rgba(${picked ? PAINT.down : PAINT.quiet}, ${picked ? 0.22 : 0.1})`
@@ -385,7 +385,7 @@ export function Network({
         if (wire.to === near.id) touching.add(wire.from)
       }
 
-    // one path per colour: forty thousand separate strokes is what makes a canvas crawl
+    // one path per colour: forty thousand strokes is what makes a canvas crawl
     const lines = new Map<string, Path2D>()
     const heads = new Map<string, Path2D>()
     const ink = (colour: string, alpha: number) => `rgba(${colour}, ${alpha})`
@@ -397,7 +397,7 @@ export function Network({
     }
     const styles = new Map<string, string>()
 
-    // one wire per module pair instead of one per file: at this size the lines are the noise
+    // one wire per module pair: at this size the lines are the noise
     const shown =
       bundle || plan
         ? [
@@ -425,7 +425,7 @@ export function Network({
         : drawn.wires.map((wire) => ({ ...wire, held: 1 }))
 
     for (const wire of shown) {
-      // an architecture drawing has no dots, so a line that stays inside one has nothing to join
+      // no dots here, so a line staying inside one has nothing to join
       if (plan && unitOfSpot(wire.from) === unitOfSpot(wire.to)) continue
       const from = where(wire.from)
       const to = where(wire.to)
@@ -433,7 +433,7 @@ export function Network({
       const quiet =
         (lit && !lit.has(wire.from) && !lit.has(wire.to)) ||
         (!!only && !chosen(wire.from) && !chosen(wire.to))
-      // what a line is coloured by: its kind, the module it leaves, or whether it leaves one
+      // by kind, by the module it leaves, or by whether it leaves one
       const leaves = unitOfSpot(wire.from) !== unitOfSpot(wire.to)
       const tint =
         edges === "module"
@@ -452,7 +452,7 @@ export function Network({
         const alpha = quiet ? 0.03 : lit ? 0.85 : wire.types ? 0.13 : 0.22 + 0.3 * heft
         const key = `${tint ?? colour} ${alpha.toFixed(2)}`
         const { line, head } = draw(colour, alpha, key)
-        // a named colour cannot take an alpha the way three numbers can, so it carries its own
+        // a named colour takes no alpha, so it carries its own
         styles.set(key, tint ? tint : ink(colour, alpha))
         if (tint) pen.globalAlpha = alpha
         const mx = (from.x + to.x) / 2
@@ -467,13 +467,13 @@ export function Network({
         line.moveTo(from.x, from.y)
         line.quadraticCurveTo(cx, cy, to.x, to.y)
         if (!rough && (shown.length <= HEADS || lit)) {
-          // the head sits where the curve arrives, which is the direction it arrived from
+          // the head sits where the curve arrives
           const ax = to.x - cx
           const ay = to.y - cy
           const long = Math.hypot(ax, ay) || 1
           const tipX = to.x - (ax / long) * (to.r + 1)
           const tipY = to.y - (ay / long) * (to.r + 1)
-          // sized on screen like the line it ends, or zooming in grows fans instead of arrows
+          // sized on screen like its line, or zoom grows fans instead of arrows
           const back = 5 / scale
           head.moveTo(tipX, tipY)
           head.lineTo(
@@ -529,8 +529,8 @@ export function Network({
 
     if (names && !rough && !plan)
       for (const spot of drawn.spots) {
-        // every dot named at once is a wall of text, so a name waits for the zoom that fits it
-        // sized against the screen, not the graph: a name is for reading at whatever zoom
+        // every dot named at once is a wall of text, so a name waits for the zoom that
+        // fits it, and is sized against the screen rather than the graph
         if (!lit?.has(spot.id) && spot.r * scale < 4.5) continue
         pen.fillStyle = `rgba(${PAINT.quiet}, 0.8)`
         pen.font = `${text(13)}px ui-sans-serif, system-ui, sans-serif`
@@ -541,7 +541,7 @@ export function Network({
 
     // where everything ended up, so the next arrangement knows where to walk from
     seats.current = new Map(drawn.spots.map((spot) => [spot.id, seat(spot)]))
-    // one more frame while it is still moving, and one after the gesture to put the detail back
+    // one frame more while moving, and one after to put the detail back
     if (step < 1) schedule()
     else if (rough) setTimeout(schedule, 150)
     else moving.current = null
@@ -646,7 +646,7 @@ export function Network({
                   {
                     name: "knowledge-graph",
                     label: "Knowledge graph",
-                    note: "every module, file, declaration and install as one set of things and the relations between them, at this grain, as",
+                    note: "every module, file, declaration and install, and what relates them, at this grain, as",
                     rows: () => asRows(knowledge(stats.repo, graph, calls, layout, grain, split)),
                   },
                 ]

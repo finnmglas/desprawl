@@ -12,17 +12,18 @@ import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Fix } from "../components/molecules/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Agents } from "../components/molecules/agents.tsx"
-import { Kpi } from "../components/molecules/kpi.tsx"
+import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Tip } from "../components/atoms/tip.tsx"
+import { Path, Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph, dependencies, importGraph } from "../lib/live.ts"
 import { hands, handsOf, worked } from "../lib/people.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
 import { balanced, fold } from "../../src/layers.ts"
+import { OUTLINE } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
@@ -46,10 +47,10 @@ const spell = (minutes: number) =>
   minutes < 90 ? `${Math.round(minutes)}m` : `${(minutes / 60).toFixed(1)}h`
 
 const TOLL: Record<Hits, string> = {
-  runtime: "border-red-500/60 text-red-700 dark:text-red-300",
-  shipping: "border-amber-500/60 text-amber-700 dark:text-amber-300",
-  "local dev": "border-sky-500/50 text-sky-700 dark:text-sky-300",
-  maintainability: "text-muted-foreground",
+  runtime: OUTLINE.bad,
+  shipping: OUTLINE.warn,
+  "local dev": OUTLINE.cool,
+  maintainability: OUTLINE.quiet,
 }
 
 export function Tasks({
@@ -172,18 +173,17 @@ export function Tasks({
           {one.kind}
         </Badge>
       ),
-      hint: "which reading of the repo turned it up",
+      hint: "which reading turned it up",
     },
     {
       key: "where",
       label: "Where",
       get: (one) => one.where,
       cell: (one) => (
-        <Tip className="max-w-64 min-w-0" text={one.where}>
-          <span className="text-muted-foreground block truncate font-mono text-xs">
-            {one.where === "." ? "across the repo" : shortPath(one.where, 32)}
-          </span>
-        </Tip>
+        <Path
+          of={one.where}
+          as={one.where === "." ? "across the repo" : shortPath(one.where, 32)}
+        />
       ),
     },
     {
@@ -191,14 +191,14 @@ export function Tasks({
       label: "Clears",
       num: true,
       get: (one) => one.reach,
-      hint: "how many things stop being wrong when it is done: files in the ring, packages exposed, folders untangled",
+      hint: "what stops being wrong: files in the ring, packages exposed, folders untangled",
     },
     {
       key: "lines",
       label: "Lines",
       num: true,
       get: (one) => one.lines,
-      hint: "what it would touch, which is the closest thing to a size there is before starting",
+      hint: "the closest thing to a size before starting",
     },
     {
       key: "minutes",
@@ -210,7 +210,7 @@ export function Tasks({
           <span className="underline decoration-dotted">{spell(one.minutes)}</span>
         </Tip>
       ),
-      hint: "an agent's time, scaled off the two runs anybody has timed here rather than off a feeling. Sort by it against Clears to pick",
+      hint: "an agent's time, off the two runs anybody has timed here. Sort against Clears to pick",
     },
     {
       key: "who",
@@ -229,7 +229,7 @@ export function Tasks({
           </Tip>
         )
       },
-      hint: "who has committed most where this task is, so it lands with whoever knows it",
+      hint: "who has committed most where this is",
     },
     {
       key: "hits",
@@ -242,7 +242,7 @@ export function Tasks({
           </Badge>
         </Tip>
       ),
-      hint: "who feels it if nobody does it. Not severity: a folder nobody can open and a dead export both cost only the people working here",
+      hint: "who feels it if nobody does it. Not severity: a bloated folder and a dead export cost only us",
     },
     {
       key: "how",
@@ -256,7 +256,7 @@ export function Tasks({
         ) : (
           <span className="text-muted-foreground">judgement</span>
         ),
-      hint: "whether the fix is mechanical or a decision somebody has to make",
+      hint: "mechanical, or a decision somebody makes",
     },
     {
       key: "fix",
@@ -305,7 +305,7 @@ export function Tasks({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         <Kpi
           label="Tasks"
           value={num(found.length)}
@@ -313,7 +313,7 @@ export function Tasks({
           verdict={{
             label: found.length ? "collected" : "nothing found",
             tone: found.length ? "plain" : "fine",
-            why: "every task the other tabs imply, in one place. Nothing here is a score: each row is a thing that was found, with what it would take",
+            why: "every task the other tabs imply. Not a score: each row is a thing found, with what it takes",
           }}
         />
         <Kpi
@@ -323,7 +323,7 @@ export function Tasks({
           verdict={{
             label: "a guess",
             tone: "plain",
-            why: "the files each one opens and the lines it reads, scaled off two timed plan runs of 1.2 and 1.9 minutes. A fix writes as well as reads, so it is taken as a few times a plan",
+            why: "the files each opens and the lines it reads, off two timed plan runs of 1.2 and 1.9 minutes. A fix writes too, so it counts as a few plans",
           }}
         />
         <Kpi
@@ -333,7 +333,7 @@ export function Tasks({
           verdict={{
             label: found.length ? `${Math.round((easy.length / found.length) * 100)}%` : "none",
             tone: "plain",
-            why: "the cure is already known for these: a type import moves, a barrel import is renamed, an unreachable declaration goes",
+            why: "the cure is known: a type import moves, a barrel import is renamed, dead code goes",
           }}
         />
         <Kpi
@@ -343,10 +343,10 @@ export function Tasks({
           verdict={{
             label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",
             tone: found.some((one) => one.hits === "runtime") ? "watch" : "fine",
-            why: "how many of these can be felt by somebody running this, rather than by whoever works on it. The badge names the worst impact on the list",
+            why: "how many can be felt by somebody running this rather than working on it. The badge names the worst on the list",
           }}
         />
-      </div>
+      </Kpis>
 
       <Agents />
 
@@ -366,7 +366,7 @@ export function Tasks({
 
       <DataTable
         title="What there is to do"
-        hint="sort by Clears against Est. to find the ones worth doing first"
+        hint="sort Clears against Est. for what is worth doing first"
         rows={shown}
         id={(one) => one.id}
         columns={columns}

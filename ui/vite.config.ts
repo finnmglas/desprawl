@@ -8,12 +8,9 @@ import react from "@vitejs/plugin-react"
 import { defineConfig, type Plugin } from "vite"
 import { viteSingleFile } from "vite-plugin-singlefile"
 
-// viteSingleFile inlines js and css and leaves a linked icon as a sibling file,
-// but view.ts copies index.html alone into a temp dir, so a sibling never
-// follows it. Fold the icon into the html and drop the emitted copy. Runs after
-// viteSingleFile, which is why it is enforce post and last in the list: before
-// that, the href is still an unresolved asset placeholder. Dev is untouched,
-// there the plain href resolves off disk.
+// viteSingleFile leaves the icon a sibling file, and view.ts copies the html alone.
+// So fold the icon in and drop the copy, after viteSingleFile: before it the href is
+// still a placeholder. Dev resolves off disk and is untouched.
 function inlineFavicon(): Plugin {
   return {
     name: "desprawl:inline-favicon",

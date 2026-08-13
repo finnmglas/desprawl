@@ -186,7 +186,7 @@ const ASSIGNED =
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
-/** the first brace outside the parameter list, matched. An arrow ends with its line */
+/** the first brace past the parameters, matched. An arrow ends with its line */
 function span(code: string, from: number): number {
   let depth = 0
   for (let at = from; at < code.length; at++) {
@@ -350,8 +350,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         })
       const [from, to] = top ? [0, 0] : bodies.get(id)!
       const body = top ? tops.get(file)! : code.slice(from, to)
-      // names it is handed, with the defaults stripped off: `isEqual = defaultIsEqual` names
-      // isEqual and reaches for defaultIsEqual, and only the first of those is a parameter
+      // defaults stripped: `isEqual = defaultIsEqual` declares one and reaches the other
       const takes = new Set(
         (body.match(/\(([^)]*)\)/)?.[1] ?? "").replace(/=[^,]*/g, "").match(/[A-Za-z_$][\w$]*/g) ??
           [],

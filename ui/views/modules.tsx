@@ -13,12 +13,12 @@ import { CardHead } from "../components/molecules/card-head.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Refresh } from "../components/atoms/icons.tsx"
 import { Input } from "../components/atoms/input.tsx"
-import { Kpi } from "../components/molecules/kpi.tsx"
+import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Matrix } from "../components/molecules/matrix.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Tip } from "../components/atoms/tip.tsx"
+import { Path, Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
@@ -246,13 +246,7 @@ export function Modules({
             key: "where",
             label: "Path",
             get: (u) => u.path,
-            cell: (u) => (
-              <Tip className="max-w-64 min-w-0" text={u.path}>
-                <span className="text-muted-foreground block truncate font-mono text-xs">
-                  {shortPath(u.path, 40)}
-                </span>
-              </Tip>
-            ),
+            cell: (u) => <Path of={u.path} as={shortPath(u.path, 40)} />,
             hint: "the folder the group was cut from, which its name no longer has to carry",
           },
           ...COLUMNS.slice(1),
@@ -301,7 +295,7 @@ export function Modules({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         <Kpi
           label="Importing files"
           value={num(graph.stats.files)}
@@ -354,14 +348,14 @@ export function Modules({
                 }
           }
         />
-      </div>
+      </Kpis>
 
       <div className="flex flex-wrap items-center gap-1">
         <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
         <Tabs className="ml-auto" tabs={GROUPS} value={at} onChange={setGroup} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <Kpis>
         <Kpi
           label="Module groups"
           value={num(units.length)}
@@ -404,7 +398,7 @@ export function Modules({
             why: "Link = 1+ files in a group importing another",
           }}
         />
-      </div>
+      </Kpis>
 
       <DataTable
         title="Module groups"
@@ -786,7 +780,7 @@ const costOf = (edge: Cut): { label: string; why: string; work: boolean } =>
     : edge.types + edge.glue === edge.imports
       ? {
           label: "name the file",
-          why: "every one of these goes through a file that only forwards, so importing what declares it removes the edge without moving any code",
+          why: "each goes through a file that only forwards, so importing the declaring file removes the edge without moving code",
           work: false,
         }
       : {
@@ -820,7 +814,7 @@ const CUTS: Column<Removal>[] = [
         </Tip>
       )
     },
-    hint: "a type import is erased by the build and a barrel import only needs a different path, so both are cheaper than a refactor",
+    hint: "a type import is erased by the build, a barrel import needs a different path: both cheaper than a refactor",
   },
   {
     key: "alone",
@@ -900,7 +894,7 @@ const COLUMNS: Column<Unit>[] = [
     left: true,
     get: (u) => Math.round((u.internal / Math.max(1, u.internal + count(u.out))) * 100),
     cell: (u) => <Balance unit={u} />,
-    hint: "imports that never leave the group against those reaching another. A group that mostly imports itself can be moved on its own",
+    hint: "imports that stay against those reaching out. One that mostly imports itself can move on its own",
   },
   {
     key: "spread",
@@ -961,7 +955,7 @@ const COLUMNS: Column<Unit>[] = [
         </Tip>
       )
     },
-    hint: "read off Inside, Leaves and Arrives together: what it keeps, what it needs, and who needs it. A star is the near miss, a tilde means one import would move it elsewhere",
+    hint: "Inside, Leaves and Arrives together: what it keeps, needs and is needed for. A star is the near miss, a tilde means one import would move it",
   },
   {
     key: "exports",

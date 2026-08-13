@@ -46,9 +46,8 @@ test("a scrub hands back the lines it was given, so a line number still means on
 })
 
 test("a self closing tag after a string is not a regex, so the brace after it survives", () => {
-  // `<Icon className="x" />` ends with a string, and a slash after a string divides rather
-  // than opening a regex. Reading it as one ate the closing brace and let one declaration
-  // swallow every one below it: 1011 of finn's declarations read as unreachable because of it
+  // a slash after a string divides, it does not open a regex. Reading it as one ate the
+  // closing brace: 1011 of finn's declarations read as unreachable
   const source = [
     "function Card() {",
     '  return <div>{icon ?? <Gauge className="size-3.5" />}</div>',

@@ -70,7 +70,7 @@ export interface Commit {
 
 export const LOG_MAX = 10000
 
-// ex. a full linux kernel log is twenty minutes, so history is read newest first up to here
+// a full linux kernel log is twenty minutes, so history is read newest first to here
 export const COMMIT_MAX = 20000
 
 export interface Remote {
@@ -117,7 +117,7 @@ export interface Pinning {
 }
 
 export interface Ai {
-  /** every ai coding tool the repo shows a trace of, from files or from the history */
+  /** every ai tool the repo shows a trace of */
   tools: string[]
   /** the instruction files, as markers, and how many of each the tree holds */
   files: Record<string, number>
@@ -138,7 +138,7 @@ export interface Stack {
   /** what the root manifest calls this project */
   name?: string
   version?: string
-  /** declared by the root manifest or a licence file beside it, never a vendored one */
+  /** the root manifest's or the file beside it, never a vendored one */
   license?: string
   /** a manifest marked private is not meant to be published */
   private: boolean
@@ -170,9 +170,9 @@ export interface Stack {
   ci: string[]
   bundlers: string[]
   ports: number[]
-  /** where this repo looks like it deploys, from config, infrastructure and workflows */
+  /** where it looks like it deploys */
   hosts: string[]
-  /** what it is built into besides a web page: a phone app, a desktop one */
+  /** what it is built into besides a page */
   apps: string[]
   /** node versions asked for, from engines and .nvmrc */
   node: string[]

@@ -105,3 +105,9 @@ export function Tip({
     </span>
   )
 }
+
+export const Path = ({ of, as }: { of: string; as?: string }) => (
+  <Tip className="max-w-96 min-w-0" text={of}>
+    <span className="text-muted-foreground block truncate font-mono text-xs">{as ?? of}</span>
+  </Tip>
+)

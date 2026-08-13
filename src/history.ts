@@ -171,7 +171,7 @@ export interface Timeline {
 
 const SAMPLES = 80
 
-// every commit, dates and authors only. no diff, so fifteen seconds not twenty minutes
+// dates and authors only, no diff: fifteen seconds not twenty minutes
 export function timeline(repo: string): Timeline {
   const log = git(repo, "log", "--format=%at%x1f%aE%x1f%h")
   const byDay = new Map<string, Set<string>>()
@@ -305,9 +305,8 @@ export const count = (repo: string): number =>
 
 // authors, output, loc, ...
 /**
- * A blobless clone has the commits and the trees but not the contents. Asking it for
- * --numstat makes git fetch every blob in the history back over the network, one round
- * trip at a time, which never finishes. Names it still knows for free.
+ * A blobless clone has commits and trees, not contents: --numstat would fetch every blob
+ * back one round trip at a time and never finish. Names it still knows for free.
  */
 function thinly(repo: string): boolean {
   try {
@@ -317,7 +316,7 @@ function thinly(repo: string): boolean {
   }
 }
 
-/** name-status carries no counts, so it is reshaped into the numstat the parser knows */
+/** name-status carries no counts, so it is reshaped into numstat */
 const counted = (line: string): string => {
   const parts = line.split("\t")
   if (parts.length < 2) return ""
@@ -338,7 +337,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
   const byPath = new Map<string, Churn>()
   // path to author key to commits, so a folder can say who actually works in it
   const byWho = new Map<string, Map<string, number>>()
-  // the log runs newest first, so a rename is met before the commits under the old name
+  // newest first, so a rename is met before the old name's commits
   const renamed = new Map<string, string>()
   const now = (path: string): string => {
     let at = path
@@ -363,7 +362,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
     if (!name) continue
 
     commits++
-    // min and max, not first and last seen, so one wrong clock cannot invert the range
+    // min and max, so one wrong clock cannot invert the range
     if (sane(date)) {
       if (!first || Date.parse(date) < Date.parse(first)) first = date
       if (!last || Date.parse(date) > Date.parse(last)) last = date

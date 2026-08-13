@@ -16,7 +16,7 @@ const KEY: { colour: string; label: string; why: string; cross?: boolean }[] = [
   {
     colour: PAINT.loop,
     label: "Not isolated",
-    why: "these two folders reach each other both ways. Nothing breaks when it runs, but neither can be lifted out, tested or read without the other",
+    why: "they reach each other both ways: nothing breaks, but neither can be lifted out, tested or read alone",
   },
   {
     colour: PAINT.cut,
@@ -27,7 +27,7 @@ const KEY: { colour: string; label: string; why: string; cross?: boolean }[] = [
     colour: PAINT.cut,
     label: "Cycle",
     cross: true,
-    why: "a file in the row really does import one that imports it back. This one is a ring at runtime, not a matter of tidiness. On the diagonal it means the whole ring sits inside that one group",
+    why: "a file here really does import one that imports it back: a ring at runtime, not tidiness. On the diagonal the whole ring sits in that group",
   },
   {
     colour: PAINT.quiet,

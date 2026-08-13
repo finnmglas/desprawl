@@ -20,34 +20,30 @@ export interface Dep {
   /** what is actually installed, when it is */
   version: string
   license: string
-  /** nothing that ships reaches it, however it got installed: a build or test only package */
+  /** nothing that ships reaches it, however it got installed */
   dev: boolean
   /** named by this repo's manifest, rather than pulled in by something that was */
   direct: boolean
   /** when npm last saw any release of it, asked for the named ones only */
   released: string
-  /** when the version installed here was published, which is what says how far behind it is */
+  /** when the installed version was published */
   used: string
-  /** the version the registry calls latest, so behind is a version and not a timestamp */
+  /** what the registry calls latest, so behind is a version not a date */
   latest: string
-  /** what it weighs on disk, its own files only, since what it installed is its own row */
+  /** its own files on disk: what it installed is its own row */
   bytes: number
   advisories: Advisory[]
 }
 
 const PACE = 16
 
-/** what the registry says about one package: when each version landed, and which is current */
+/** when each version landed, and which is current */
 interface Told {
   times: Record<string, string>
   latest: string
 }
 
-/**
- * When each version of a package was published. The abbreviated document is smaller but
- * carries no dates at all, and the date of the version actually installed is the one that
- * says whether this clone is behind, so the whole document is what gets asked for.
- */
+/** the whole document, since the abbreviated one carries no dates at all */
 async function published(names: string[]): Promise<Map<string, Told>> {
   const when = new Map<string, Told>()
   const queue = [...names]
@@ -76,9 +72,9 @@ async function published(names: string[]): Promise<Map<string, Told>> {
 
 export interface Deps {
   list: Dep[]
-  /** why a column is empty, rather than leaving the reader to guess */
+  /** why a column is empty */
   offline: boolean
-  /** advisories osv named but would not describe, so an empty column is not read as a clean one */
+  /** named but not described, so an empty column is not read as clean */
   missed: number
   checked: string
 }
@@ -96,13 +92,13 @@ interface Held {
   version: string
   license: string
   bytes: number
-  /** what it asks for at runtime, which is how dev only is worked out for the whole tree */
+  /** what it asks for at runtime, which is how dev only is worked out */
   needs: string[]
   /** installed at the top of node_modules, so it is what the manifest resolved to */
   top: boolean
 }
 
-/** every file of a package, minus whatever it installed under itself */
+/** its files, minus what it installed under itself */
 const weigh = (dir: string): number => {
   let bytes = 0
   let listed: Dirent[]
@@ -130,17 +126,12 @@ const licensed = (own: Record<string, any> | null): string => {
   return one ?? own?.licenses?.[0]?.type ?? ""
 }
 
-/**
- * Every package on disk, not only the ones the manifest names. What a tree is licensed as
- * and what is filed against it is decided by the whole tree: the copyleft and the
- * advisories are almost always in something nobody chose directly.
- */
+/** every package on disk: the copyleft and the advisories are in what nobody chose */
 function tree(root: string): Map<string, Held> {
   const found = new Map<string, Held>()
   // pnpm links a package back into its own store, so a walk without this never ends
   const seen = new Set<string>()
-  // the copy sitting directly under node_modules is the one the manifest resolved to, the
-  // rest are somebody else's copies of the same name
+  // the copy directly under node_modules is what the manifest resolved to
   const look = (dir: string, top: boolean) => {
     let real: string
     try {
@@ -167,12 +158,12 @@ function tree(root: string): Map<string, Held> {
           version: own.version,
           license: licensed(own),
           needs: Object.keys({ ...own.dependencies, ...own.optionalDependencies }),
-          // weighed once per name and version: the same package is reached down many paths
+          // weighed once per name and version
           bytes: found.get(key)?.bytes ?? weigh(at),
           top,
         })
       }
-      // a scope holds packages at the same level, a store and a nested tree hold their own
+      // a scope holds packages at the same level, a store holds its own
       else look(at, top && entry.startsWith("@"))
       look(join(at, "node_modules"), false)
     }
@@ -184,7 +175,7 @@ function tree(root: string): Map<string, Held> {
 const CHUNK = 500
 const TRIES = 3
 
-/** what osv answered, and whether it answered all of it: silence is not the same as none */
+/** silence is not the same as none */
 interface Filed {
   found: Map<string, Advisory[]>
   missed: number
@@ -211,21 +202,19 @@ async function osv(list: Dep[]): Promise<Filed> {
     const body = (await res.json()) as { results: { vulns?: { id: string }[] }[] }
     hits.push(
       ...body.results.flatMap((one, i) =>
-        // keyed by name and version: one package at two versions is two different answers
+        // one package at two versions is two answers
         (one.vulns ?? []).map((v) => ({ id: v.id, at: `${part[i].name}@${part[i].version}` })),
       ),
     )
   }
-  // the batch answers with ids only, so each match is read for its summary and severity.
-  // Paced rather than capped: a cap would quietly under report a repo with a long list
+  // the batch answers with ids only. Paced not capped: a cap under reports quietly
   const wanted = [...new Map(hits.map((h) => [h.id + h.at, h])).values()]
   const details: { at: string; advisory: Advisory }[] = []
   let missed = 0
   await Promise.all(
     Array.from({ length: PACE }, async () => {
       for (let one = wanted.pop(); one; one = wanted.pop()) {
-        // the batch already said this one exists, so failing to read it is a gap rather than
-        // an answer, and it is worth asking twice before calling it one
+        // the batch said it exists, so failing to read it is a gap, not an answer
         for (let go = 0; go < TRIES; go++) {
           try {
             const res = await fetch(`https://api.osv.dev/v1/vulns/${one.id}`)
@@ -256,7 +245,7 @@ async function osv(list: Dep[]): Promise<Filed> {
   return { found, missed }
 }
 
-/** every declared dependency, with its licence from disk and its advisories from osv */
+/** licences from disk, advisories from osv */
 export async function deps(repo: string): Promise<Deps> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const manifest = read(join(root, "package.json"))
@@ -272,8 +261,7 @@ export async function deps(repo: string): Promise<Deps> {
       "") as string
 
   const held = tree(root)
-  // a package named in devDependencies does not ship, and neither does anything only it
-  // asks for: image-size is not a runtime dependency because pptxgenjs is not one
+  // nor does anything only a dev dependency asks for
   const ships = new Set(Object.keys((manifest?.dependencies ?? {}) as Record<string, string>))
   const byName = new Map<string, Held[]>()
   for (const one of held.values()) byName.set(one.name, [...(byName.get(one.name) ?? []), one])
@@ -315,7 +303,7 @@ export async function deps(repo: string): Promise<Deps> {
   try {
     const [filed, when] = await Promise.all([
       osv(list),
-      // the whole tree would be thousands of calls, and a transitive package is not chosen
+      // the whole tree is thousands of calls, and nobody chose a transitive one
       published([...new Set(list.filter((one) => one.direct).map((one) => one.name))]),
     ])
     missed = filed.missed

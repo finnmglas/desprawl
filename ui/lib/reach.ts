@@ -48,7 +48,7 @@ export const REACHES: Record<Reach, { label: string; tone: string; why: string }
   open: {
     label: "only exported",
     tone: "border-amber-500/60",
-    why: "nothing in this repo calls it, so it is here for something outside: a package entry, a route the framework loads, a test",
+    why: "nothing here calls it, so it is for something outside: an entry, a route, a test",
   },
   dead: {
     label: "unreachable",

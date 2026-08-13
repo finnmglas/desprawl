@@ -17,7 +17,7 @@ export interface Action {
   command: string
   /** leaves this machine, so it is asked about rather than just run */
   outward?: boolean
-  /** a server or a watcher: it is started and stopped rather than waited for */
+  /** started and stopped rather than waited for */
   long?: boolean
   /** why it cannot work here, which is only ever said when it is certain */
   blocked?: string
@@ -68,13 +68,10 @@ const GIT: Action[] = [
   },
 ]
 
-/** github.com/microsoft/vscode is microsoft, and so is git@github.com:microsoft/vscode.git */
+/** the owner, whichever way a remote is written */
 const ownerOf = (url: string) => url.trim().match(/[:/]([^/:]+)\/[^/]+?(?:\.git)?$/)?.[1] ?? ""
 
-/**
- * Whether this branch was ever pushed, read off the reflog of the one ref a push would move.
- * Only that one: a clone can track thousands of branches, and asking each costs a process.
- */
+/** the reflog of the one ref a push would move: asking each of thousands costs a process */
 function everPushed(root: string, upstream: string): boolean {
   try {
     return git(root, "reflog", "show", `refs/remotes/${upstream}`).includes("update by push")
@@ -84,7 +81,7 @@ function everPushed(root: string, upstream: string): boolean {
   }
 }
 
-/** the words a person is known by here, so a one letter owner cannot match one by accident */
+/** what a person is known by, so a one letter owner cannot match by accident */
 const namesOf = (who: string) =>
   new Set(
     who
@@ -93,11 +90,7 @@ const namesOf = (who: string) =>
       .filter(Boolean),
   )
 
-/**
- * Whether pushing is worth offering. A clone that has pushed before can push again, and a
- * remote owned by the name on the commits is probably yours. Neither is proof, and the one
- * thing that would be proof needs the network, so anything unclear is said rather than blocked.
- */
+/** pushed before, or owned by the name on the commits. Neither is proof, so unclear is said rather than blocked */
 function pushable(root: string): Pick<Action, "blocked" | "caution"> {
   const remote = (() => {
     try {
@@ -128,7 +121,7 @@ function pushable(root: string): Pick<Action, "blocked" | "caution"> {
   // the configured identity, or failing that whoever the last commit says wrote it
   const named = `${git(root, "config", "user.name")} ${git(root, "config", "user.email")}`.trim()
   const me = namesOf(named || git(root, "log", "-1", "--format=%an %ae"))
-  // a whole word of it, or a long enough piece of one: finnmglas is in finn@finnmglas.com
+  // a whole word, or a long enough piece: finnmglas is in finn@finnmglas.com
   if (owner && (me.has(owner) || (owner.length >= 4 && [...me].some((w) => w.includes(owner)))))
     return {}
   return {
@@ -204,27 +197,23 @@ export function act(repo: string, id: string): Promise<Run> {
   })
 }
 
-// what is up right now, so a tab that reloads still finds it
+// so a tab that reloads still finds it
 const held = new Map<string, { child: ReturnType<typeof spawn>; alive: Alive }>()
 const KEEP = 64_000
 
-// desprawl exits when the last tab closes, and it does not leave servers behind it
+// and it leaves no servers behind
 process.on("exit", () => {
   for (const one of held.values()) if (one.alive.running) signal(one.child, "SIGKILL")
 })
 
-/**
- * Started and left running, since a server has no end to wait for. An id names one of the
- * actions above and nothing else; `given` is for the agent, whose argv this file builds
- * itself rather than reading it off a request.
- */
+/** left running, since a server has no end to wait for. `given` is the agent's own argv */
 export function begin(
   repo: string,
   id: string,
   given?: string[],
-  /** handed to the child only, for the one thing that needs a credential */
+  /** the child's alone, for the one thing needing a credential */
   extra?: Record<string, string>,
-  /** read as it arrives, for a child that narrates itself rather than just printing */
+  /** read as it arrives, for a child that narrates itself */
   onSay?: (chunk: string, done: number | null) => void,
 ): Alive {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
@@ -234,13 +223,12 @@ export function begin(
 
   const [file, ...rest] = given ?? found.command.split(" ")
   // its own group: a manager spawns the real server as a child, and signalling only the
-  // manager leaves that child running and holding the port, which is not what stop means
+  // manager leaves the child holding the port, which is not what stop means
   const child = spawn(file, rest, {
     cwd: root,
     env: { ...process.env, FORCE_COLOR: "0", ...extra },
     detached: true,
-    // nothing here can type, and a cli given an open stdin waits a few seconds for input
-    // that is never coming, then says so in the output the panel is showing
+    // nothing here can type, and an open stdin makes a cli wait for input never coming
     stdio: given ? ["ignore", "pipe", "pipe"] : undefined,
   })
   const alive: Alive = {
@@ -266,7 +254,7 @@ export function begin(
   return alive
 }
 
-/** every process under one, since a manager puts its script in a group of its own */
+/** every process under one */
 function brood(pid: number): number[] {
   try {
     const seen = execFileSync("ps", ["-eo", "pid=,ppid="], { encoding: "utf8" })
@@ -292,7 +280,7 @@ const signal = (child: ReturnType<typeof spawn>, sign: NodeJS.Signals) => {
     }
     return
   }
-  // the group first, which is what a terminal interrupts, then anything that outlived it
+  // the group first, as a terminal does, then whatever outlived it
   try {
     process.kill(-child.pid, sign)
   } catch {
@@ -307,7 +295,7 @@ const signal = (child: ReturnType<typeof spawn>, sign: NodeJS.Signals) => {
   }
 }
 
-/** the same interrupt a terminal sends, and a harder one if it is ignored */
+/** what a terminal sends, and harder if ignored */
 export function stop(id: string): boolean {
   const one = held.get(id)
   if (!one || !one.alive.running) return false
@@ -318,7 +306,7 @@ export function stop(id: string): boolean {
 
 export const alive = (): Alive[] => [...held.values()].map((one) => one.alive)
 
-/** dropped from the list, once it has stopped: a running one is stopped rather than hidden */
+/** dropped once stopped: a running one is stopped rather than hidden */
 export function forget(id: string): boolean {
   const one = held.get(id)
   if (!one || one.alive.running) return false
