@@ -117,7 +117,7 @@ function fromDeps(deps: Deps | null): Task[] {
 }
 
 /** the deepest folder holding a whole ring */
-const shared = (paths: string[]): string => {
+export const shared = (paths: string[]): string => {
   const parts = paths[0].split("/").slice(0, -1)
   for (const path of paths) {
     const other = path.split("/").slice(0, -1)

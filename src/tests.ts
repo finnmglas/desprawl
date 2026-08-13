@@ -4,7 +4,7 @@
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { jsonc } from "./graph.ts"
+import { reading } from "./graph.ts"
 import { git } from "./model.ts"
 import { roleOf } from "./layers.ts"
 import { scrub } from "./specifiers.ts"
@@ -56,17 +56,9 @@ const RUNNERS: [string, RegExp][] = [
   ["bun:test", /^bun:test$/],
 ]
 
-const read = (path: string): Record<string, any> | null => {
-  try {
-    return jsonc(readFileSync(path, "utf8")) as Record<string, any>
-  } catch {
-    return null
-  }
-}
-
 /** a report someone already produced: istanbul writes both of these, and lcov is universal */
 function coverage(root: string): { made: Suite["coverage"]; from: string } {
-  const summary = read(join(root, "coverage", "coverage-summary.json"))
+  const summary = reading(join(root, "coverage", "coverage-summary.json"))
   if (summary?.total)
     return {
       made: {
@@ -100,7 +92,7 @@ function coverage(root: string): { made: Suite["coverage"]; from: string } {
 /** what a repo would run, what it holds, and any coverage already lying about */
 export function tests(repo: string): Suite {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
-  const manifest = read(join(root, "package.json"))
+  const manifest = reading(join(root, "package.json"))
   const scripts = (manifest?.scripts ?? {}) as Record<string, string>
   const script = ["test", "test:unit", "tests", "spec"].find((one) => scripts[one]) ?? ""
 

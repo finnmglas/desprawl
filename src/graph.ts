@@ -82,6 +82,15 @@ function bundled(file: string): boolean {
 }
 
 /** json with comments: a regex reads `"@/*"` as one */
+/** a manifest off disk, or nothing: an unreadable one is not a manifest */
+export const reading = (path: string): Record<string, any> | null => {
+  try {
+    return jsonc(readFileSync(path, "utf8")) as Record<string, any>
+  } catch {
+    return null
+  }
+}
+
 export function jsonc(text: string): unknown {
   let out = ""
   let i = 0

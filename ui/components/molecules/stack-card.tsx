@@ -4,7 +4,7 @@
 import { useState } from "react"
 import { Badge } from "../atoms/badge.tsx"
 import { Caret } from "../atoms/icons.tsx"
-import { Card, CardContent } from "../atoms/card.tsx"
+import { Card, CardContent, Note } from "../atoms/card.tsx"
 import { Chip } from "./chip.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
@@ -251,7 +251,7 @@ export function StackCard({
           Project metadata
           <Caret className={cn("transition-transform", !open && "-rotate-90")} />
         </span>
-        <span className="text-muted-foreground text-xs">{identity}</span>
+        <Note>{identity}</Note>
       </div>
       {badges}
       {buttons}

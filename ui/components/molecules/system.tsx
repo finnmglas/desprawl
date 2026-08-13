@@ -1,6 +1,7 @@
 // owner: finn
 // goal: the repo as one picture
 
+import { Note } from "../atoms/card.tsx"
 import { Chip } from "./chip.tsx"
 import { Face, Hands } from "./hands.tsx"
 import { Tip } from "../atoms/tip.tsx"
@@ -218,7 +219,7 @@ export function System({
           ))}
           {clients.length > 0 && (
             <span className="ml-auto flex items-center gap-1.5">
-              <span className="text-muted-foreground text-xs">speaks</span>
+              <Note>speaks</Note>
               {clients.slice(0, 3).map((one) => (
                 <Chip key={one.label} label={one.label} from={one.from} />
               ))}

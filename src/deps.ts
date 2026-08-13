@@ -1,10 +1,10 @@
 // owner: finn
 // goal: what each dependency is licensed as, and what is filed against it
 
-import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
+import { readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
-import { jsonc } from "./graph.ts"
+import { reading } from "./graph.ts"
 
 export interface Advisory {
   id: string
@@ -79,14 +79,6 @@ export interface Deps {
   checked: string
 }
 
-const read = (path: string): Record<string, any> | null => {
-  try {
-    return jsonc(readFileSync(path, "utf8")) as Record<string, any>
-  } catch {
-    return null
-  }
-}
-
 interface Held {
   name: string
   version: string
@@ -150,7 +142,7 @@ function tree(root: string): Map<string, Held> {
     for (const entry of listed) {
       if (entry.startsWith(".") && entry !== ".pnpm") continue
       const at = join(dir, entry)
-      const own = read(join(at, "package.json"))
+      const own = reading(join(at, "package.json"))
       if (own?.name && own?.version) {
         const key = `${own.name}@${own.version}`
         found.set(key, {
@@ -248,7 +240,7 @@ async function osv(list: Dep[]): Promise<Filed> {
 /** licences from disk, advisories from osv */
 export async function deps(repo: string): Promise<Deps> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
-  const manifest = read(join(root, "package.json"))
+  const manifest = reading(join(root, "package.json"))
   const wanted = new Map<string, boolean>()
   for (const [from, dev] of [
     [manifest?.dependencies, false],

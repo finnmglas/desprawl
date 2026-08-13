@@ -1,6 +1,7 @@
 // owner: finn
 // goal: opened commit, inline
 
+import { Note } from "../atoms/card.tsx"
 import { Moved } from "../atoms/moved.tsx"
 import { day, num } from "../../lib/format.ts"
 import type { Detail } from "../../../src/history.ts"
@@ -21,11 +22,11 @@ export function CommitDetail({
   return (
     <div style={{ height: DETAIL }} className="bg-muted/30 overflow-auto border-y px-3 py-2">
       {!commit ? (
-        <span className="text-muted-foreground text-xs">
+        <Note>
           {live
             ? "loading…"
             : "A saved page carries the log, not the diffs. Run desprawl on the repo to open a commit."}
-        </span>
+        </Note>
       ) : (
         <div className="flex flex-col gap-2">
           <div className="text-muted-foreground text-xs">

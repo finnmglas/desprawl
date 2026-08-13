@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
-import { Card, CardContent } from "../components/atoms/card.tsx"
+import { Card, CardContent, Note } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
@@ -382,7 +382,7 @@ const WHAT: Column<Symbol>[] = [
     key: "kind",
     label: "Kind",
     get: (s) => s.kind,
-    cell: (s) => <span className="text-muted-foreground text-xs">{s.kind}</span>,
+    cell: (s) => <Note>{s.kind}</Note>,
   },
 ]
 

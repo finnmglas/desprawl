@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { cycles, hotspots } from "../src/cycles.ts"
+import { cycles } from "../src/cycles.ts"
 import { build } from "../src/graph.ts"
 import { repo } from "./repo.ts"
 
@@ -32,19 +32,4 @@ test("a cycle made only of types is one the build never sees", () => {
   const g = build(dir)
   assert.equal(cycles(g).length, 1, "it is a cycle in the source")
   assert.deepEqual(cycles(g, { types: false }), [], "and not one at runtime")
-})
-
-test("fan in ranks by who is actually imported", () => {
-  const g = build(
-    repo({
-      "hub.ts": "export const hub = 1\n",
-      "a.ts": 'import "./hub"\n',
-      "b.ts": 'import "./hub"\n',
-      "c.ts": 'import "./hub"\nimport "./a"\n',
-    }),
-  )
-  const hot = hotspots(g, 2)
-  assert.deepEqual(hot.depended[0], { path: "hub.ts", count: 3 })
-  assert.deepEqual(hot.depending[0], { path: "c.ts", count: 2 })
-  assert.deepEqual(hot.unreached.sort(), ["b.ts", "c.ts"], "nothing imports these two")
 })

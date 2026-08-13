@@ -2,9 +2,9 @@
 // goal: the handful of commands a reader would otherwise switch to a terminal for
 
 import { execFile, execFileSync, spawn } from "node:child_process"
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { jsonc } from "./graph.ts"
+import { reading } from "./graph.ts"
 import { git } from "./model.ts"
 import type { Run } from "./tests.ts"
 
@@ -129,14 +129,6 @@ function pushable(root: string): Pick<Action, "blocked" | "caution"> {
   }
 }
 
-const read = (path: string): Record<string, any> | null => {
-  try {
-    return jsonc(readFileSync(path, "utf8")) as Record<string, any>
-  } catch {
-    return null
-  }
-}
-
 const manager = (root: string) =>
   existsSync(join(root, "pnpm-lock.yaml"))
     ? "pnpm"
@@ -147,7 +139,7 @@ const manager = (root: string) =>
 /** what this repo can be told to do: git, and the scripts it declares that end */
 export function actions(repo: string): Action[] {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
-  const scripts = (read(join(root, "package.json"))?.scripts ?? {}) as Record<string, string>
+  const scripts = (reading(join(root, "package.json"))?.scripts ?? {}) as Record<string, string>
   const run = manager(root)
 
   const project = Object.keys(scripts)

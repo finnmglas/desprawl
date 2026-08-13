@@ -66,16 +66,3 @@ export const cycles = (graph: Graph, options?: { types?: boolean }): string[][] 
   components(graph, options)
     .filter((group) => group.length > 1)
     .sort((a, b) => b.length - a.length)
-
-/** what everything leans on, and what leans on everything */
-export function hotspots(graph: Graph, take = 10) {
-  const all = Object.values(graph.modules)
-  const by = (pick: (m: (typeof all)[number]) => number) =>
-    [...all].sort((a, b) => pick(b) - pick(a)).slice(0, take)
-  return {
-    depended: by((m) => m.in.length).map((m) => ({ path: m.path, count: m.in.length })),
-    depending: by((m) => m.out.length).map((m) => ({ path: m.path, count: m.out.length })),
-    /** imported by nobody: dead weight, unless it is an entry point */
-    unreached: all.filter((m) => !m.in.length).map((m) => m.path),
-  }
-}

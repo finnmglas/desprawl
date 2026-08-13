@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { Button } from "../atoms/button.tsx"
-import { Card, CardContent } from "../atoms/card.tsx"
+import { Card, CardContent, Note } from "../atoms/card.tsx"
 import { CardHead } from "./card-head.tsx"
 import { Tip } from "../atoms/tip.tsx"
 import { toast } from "../atoms/toast.tsx"
@@ -142,11 +142,11 @@ export function Doing({ onDone }: { onDone?: () => void }) {
                       )}
                     />
                     <span className="font-mono text-xs">{one.command}</span>
-                    <span className="text-muted-foreground text-xs">
+                    <Note>
                       {one.running
                         ? `up for ${Math.round((Date.now() - one.since) / 1000)}s`
                         : `exited ${one.code}`}
-                    </span>
+                    </Note>
                     {one.running ? (
                       <Button
                         className="ml-auto"

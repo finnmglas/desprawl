@@ -25,6 +25,7 @@ import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
 import { namesOf } from "../lib/naming.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/verdict.ts"
+import { shared } from "../lib/tasks.ts"
 import { cn } from "../lib/ui.ts"
 import {
   balanced,
@@ -74,16 +75,6 @@ const sureness = (shape: Shape) =>
   shape.sure
     ? `Decided on ${plural(shape.edges, "import")}, and no single one of them would move it elsewhere`
     : `Decided on only ${plural(shape.edges, "import")}, and moving one of them would land it on another label`
-
-/** the deepest folder holding every file of a ring, which is where the fix lives */
-const shared = (paths: string[]): string => {
-  const parts = paths[0].split("/").slice(0, -1)
-  for (const path of paths) {
-    const other = path.split("/").slice(0, -1)
-    while (parts.length && parts.some((part, i) => other[i] !== part)) parts.pop()
-  }
-  return parts.join("/") || "the repo root"
-}
 
 /** most of what ties it together goes through a file that only forwards */
 const glued = (loop: Tangle) => {
@@ -137,6 +128,9 @@ function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number
     </div>
   )
 }
+
+/** the same folder the tasks tab names, said for a reader rather than for a path */
+const rooted = (paths: string[]) => shared(paths).replace(/^\.$/, "the repo root")
 
 export function Modules({
   stats,
@@ -607,7 +601,7 @@ export function Modules({
           hint="files that import each other in a ring, read off the files themselves"
           rows={cycles.map((ring) => ({
             ring,
-            where: shared(ring),
+            where: rooted(ring),
             spans: new Set(ring.map(groupOf)).size,
           }))}
           id={(row) => row.ring[0]}

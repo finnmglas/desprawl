@@ -22,10 +22,11 @@ export const CardTitle = ({ className, ...props }: Div) => (
   <div className={cn("text-sm font-medium leading-none", className)} {...props} />
 )
 
-export const CardDescription = ({ className, ...props }: Div) => (
-  <div className={cn("text-muted-foreground text-xs", className)} {...props} />
-)
-
 export const CardContent = ({ className, ...props }: Div) => (
   <div className={cn("p-4", className)} {...props} />
+)
+
+/** the muted caption beside a number, a label or a control */
+export const Note = ({ className, ...props }: Div) => (
+  <span className={cn("text-muted-foreground text-xs", className)} {...props} />
 )

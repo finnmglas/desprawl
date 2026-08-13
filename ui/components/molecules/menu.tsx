@@ -1,6 +1,7 @@
 // owner: finn
 // goal: ellipsis popover
 
+import { Note } from "../atoms/card.tsx"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms/button.tsx"
 import { cn } from "../../lib/ui.ts"
@@ -75,7 +76,7 @@ export function MenuSection({
     <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-1 px-2 py-1.5">
       <span className="text-xs font-medium">{label}</span>
       {children}
-      {hint && <span className="text-muted-foreground text-xs">{hint}</span>}
+      {hint && <Note>{hint}</Note>}
     </div>
   )
 }

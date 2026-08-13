@@ -1,6 +1,7 @@
 // owner: finn
 // goal: hand one task to an agent on this machine, and watch it
 
+import { Note } from "../atoms/card.tsx"
 import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "../atoms/button.tsx"
@@ -205,7 +206,7 @@ export function Fix({
             </div>
 
             <div className="flex flex-col gap-1">
-              <span className="text-muted-foreground text-xs">Model</span>
+              <Note>Model</Note>
               <Tabs grow tabs={chosen.models} value={picked} onChange={(model) => set({ model })} />
             </div>
 
@@ -223,7 +224,7 @@ export function Fix({
                 <div className="flex flex-col gap-2 pt-1">
                   {agent.installs.length > 1 && (
                     <div className="flex flex-col gap-1">
-                      <span className="text-muted-foreground text-xs">Which AI</span>
+                      <Note>Which AI</Note>
                       <Select
                         value={chosen.id}
                         onChange={(event) => set({ install: event.target.value })}
@@ -234,18 +235,16 @@ export function Fix({
                           </option>
                         ))}
                       </Select>
-                      <span className="text-muted-foreground text-xs">
+                      <Note>
                         {chosen.who
                           ? `billed to ${chosen.who}`
                           : "billed to whatever account it is signed in as, which nothing here could read"}
-                      </span>
+                      </Note>
                     </div>
                   )}
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs">
-                      What it does with the work
-                    </span>
+                    <Note>What it does with the work</Note>
                     {/* one line: four as tabs cut the last off, four as a list overflowed */}
                     <Select value={said.id} onChange={(event) => set({ mode: event.target.value })}>
                       {agent.modes.map((one) => (
@@ -255,11 +254,11 @@ export function Fix({
                         </option>
                       ))}
                     </Select>
-                    <span className="text-muted-foreground text-xs">{said.note}</span>
+                    <Note>{said.note}</Note>
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs">What it may do unasked</span>
+                    <Note>What it may do unasked</Note>
                     <Select value={leash} onChange={(event) => set({ trust: event.target.value })}>
                       <option value="auto">auto, whatever the work above needs</option>
                       {chosen.trusts.map((one) => (
@@ -271,7 +270,7 @@ export function Fix({
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <span className="text-muted-foreground text-xs">Anything else to tell it</span>
+                    <Note>Anything else to tell it</Note>
                     <textarea
                       value={extra}
                       onChange={(event) => setExtra(event.target.value)}
@@ -301,9 +300,9 @@ export function Fix({
               {said.id === "plan" ? "ask it for a plan" : said.label}
             </Button>
             {run && (
-              <span className="text-muted-foreground text-xs">
+              <Note>
                 {run.running ? "working, under Agents below" : "it finished, see Agents below"}
-              </span>
+              </Note>
             )}
           </div>,
           document.body,

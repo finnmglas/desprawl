@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms/button.tsx"
-import { Card, CardContent } from "../atoms/card.tsx"
+import { Card, CardContent, Note } from "../atoms/card.tsx"
 import { CardHead } from "../molecules/card-head.tsx"
 import { Badge } from "../atoms/badge.tsx"
 import { Sparkle } from "../atoms/icons.tsx"
@@ -171,9 +171,9 @@ function One({
               </Button>
             </div>
           ) : (
-            <span className="text-muted-foreground text-xs">
+            <Note>
               {talk.tool} was run once and cannot be picked back up here, so this is what it said
-            </span>
+            </Note>
           )}
         </>
       )}
