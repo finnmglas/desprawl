@@ -4,6 +4,7 @@
 import { readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
+export { familyOf, type Family } from "./licence.ts"
 import { reading } from "./graph.ts"
 
 export interface Advisory {

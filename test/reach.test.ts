@@ -4,7 +4,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { calls, TOP } from "../src/calls.ts"
-import { REACHES, reachOf, reached, rings, twins } from "../ui/lib/reach.ts"
+import { REACHES, reachOf, reached, rings, twins } from "../src/reach.ts"
 import { repo } from "./repo.ts"
 
 const graph = (files: Record<string, string>) => calls(repo(files))

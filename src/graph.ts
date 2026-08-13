@@ -49,7 +49,7 @@ export interface Graph {
 }
 
 const SOURCE = /\.(m|c)?(t|j)sx?$/
-const VENDORED =
+export const VENDORED =
   /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|\.yarn|dist|build|out|coverage|\.next|\.nuxt|\.output)\//
 
 // the order typescript probes in

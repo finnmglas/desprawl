@@ -4,6 +4,7 @@
 import { toast } from "./toast.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
+import type { Sprawl } from "../../src/work.ts"
 import type { Run, Suite } from "../../src/tests.ts"
 import type { Action, Alive } from "../../src/actions.ts"
 import type { Agent } from "../../src/agent.ts"
@@ -152,6 +153,10 @@ export async function printed(): Promise<Blob | null> {
   }
   return null
 }
+
+/** the text level sprawl: repeated literals and copied runs */
+export const sprawlHere = (): Promise<Sprawl> =>
+  ask("/api/sprawl", { repeated: [], copied: [], talky: [] })
 
 /** licences off disk, advisories from osv, asked for once */
 export const dependencies = (): Promise<Deps | null> =>

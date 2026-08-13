@@ -79,55 +79,57 @@ export function Doing({ onDone }: { onDone?: () => void }) {
     { kind: "git" as const, title: "Git" },
     { kind: "project" as const, title: "Project" },
   ]
-  // a handful fits on one line, and two labelled rows for six buttons is mostly whitespace
-  const tight = list.length <= FEW + groups.length
-
   return (
     <Card>
       <CardHead title="Actions" hint="run against this repo, from here" />
-      <CardContent
-        className={cn("flex flex-col gap-3", tight && "flex-row flex-wrap items-center")}
-      >
-        {groups.map((group) => {
-          const held = list.filter((one) => one.kind === group.kind)
-          if (!held.length) return null
-          const shown = group.kind === "project" && !all ? held.slice(0, FEW) : held
-          return (
-            <div key={group.kind} className="flex flex-wrap items-center gap-2">
-              <span className={cn("text-muted-foreground shrink-0 text-xs", !tight && "w-14")}>
-                {group.title}
-              </span>
-              {shown.map((one) => (
-                <Tip
-                  key={one.id}
-                  text={one.blocked ?? one.caution ?? `${one.command} · ${one.note}`}
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={!!busy || !!one.blocked}
-                    onClick={() => press(one)}
-                    className={cn(
-                      one.outward && "border-amber-500/60",
-                      one.blocked && "cursor-not-allowed opacity-40",
-                      one.caution && "border-dashed",
-                    )}
-                  >
-                    {busy === one.id ? "running…" : one.long ? `▶ ${one.label}` : one.label}
-                  </Button>
-                </Tip>
-              ))}
-              {group.kind === "project" && held.length > FEW && (
-                <button
-                  onClick={() => setAll(!all)}
-                  className="text-muted-foreground hover:text-foreground cursor-pointer px-1 text-xs"
-                >
-                  {all ? "show fewer" : `+${held.length - FEW} more`}
-                </button>
-              )}
-            </div>
-          )
-        })}
+      <CardContent className="flex flex-col gap-3">
+        {/* git on the left and the repo's own scripts on the right, so the two never
+            read as one row of eleven buttons */}
+        <div className="grid gap-3 sm:grid-cols-2">
+          {groups.map((group) => {
+            const held = list.filter((one) => one.kind === group.kind)
+            if (!held.length) return null
+            const shown = group.kind === "project" && !all ? held.slice(0, FEW) : held
+            return (
+              <div key={group.kind} className="flex min-w-0 flex-col gap-1.5">
+                <Note>{group.title}</Note>
+                <div className="flex flex-wrap items-center gap-2">
+                  {shown.map((one) => (
+                    <Tip
+                      key={one.id}
+                      text={one.blocked ?? one.caution ?? `${one.command} · ${one.note}`}
+                    >
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={!!busy || !!one.blocked}
+                        onClick={() => press(one)}
+                        // the same card colour the copy and save buttons sit on, or on dark
+                        // these read as holes cut in the panel
+                        className={cn(
+                          "bg-card",
+                          one.outward && "border-amber-500/60",
+                          one.blocked && "cursor-not-allowed opacity-40",
+                          one.caution && "border-dashed",
+                        )}
+                      >
+                        {busy === one.id ? "running…" : one.long ? `▶ ${one.label}` : one.label}
+                      </Button>
+                    </Tip>
+                  ))}
+                  {group.kind === "project" && held.length > FEW && (
+                    <button
+                      onClick={() => setAll(!all)}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer px-1 text-xs"
+                    >
+                      {all ? "show fewer" : `+${held.length - FEW} more`}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
         {/* whatever is running, and whatever last finished, always on their own rows */}
         <div className={cn("flex w-full flex-col gap-2", !up.length && !ran && "hidden")}>
           {up.length > 0 && (

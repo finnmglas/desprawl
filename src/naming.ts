@@ -1,7 +1,7 @@
 // owner: finn
 // goal: a folder path read as a name a person would use
 
-import { LOOSE_FILES } from "../../src/layers.ts"
+import { LOOSE_FILES } from "./layers.ts"
 
 // says nothing alone, so it borrows the folder above it
 const PLAIN = new Set([

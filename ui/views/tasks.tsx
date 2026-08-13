@@ -18,7 +18,7 @@ import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
-import { callGraph, dependencies, importGraph } from "../lib/live.ts"
+import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/live.ts"
 import { hands, handsOf, worked } from "../lib/people.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
@@ -29,6 +29,7 @@ import type { Calls } from "../../src/calls.ts"
 import type { Deps } from "../../src/deps.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
+import type { Sprawl } from "../../src/work.ts"
 
 const ALL = "everything"
 
@@ -38,6 +39,8 @@ const TONES: Record<string, string> = {
   licence: "border-amber-500/60",
   cycle: "border-amber-500/60",
   dead: "border-sky-500/60",
+  copy: "",
+  prose: "",
   shape: "",
   size: "",
 }
@@ -72,6 +75,8 @@ export function Tasks({
   // the row says as much as a row can, and the rest is a panel rather than a jump into
   // Files: opening a folder nobody asked to open is not what clicking a task means
   const [opened, setOpened] = useState<Task | null>(null)
+  // a page has no disk, so the text detectors are read on the other side and sent over
+  const [text, setText] = useState<Sprawl | null>(window.__DESPRAWL_SPRAWL__ ?? null)
   const where = useMemo(() => worked(stats.tree), [stats.tree])
   // a task names a file, and the tally is per folder: the folder holding it is the answer
   const crewOf = (task: Task) => {
@@ -88,6 +93,7 @@ export function Tasks({
     if (!graph) void importGraph().then(setGraph)
     if (!calls) void callGraph().then(setCalls)
     if (!deps) void dependencies().then(setDeps)
+    if (isLive()) void sprawlHere().then(setText)
   }, [])
 
   const layout = useMemo(() => (graph ? fold(graph, balanced(graph)) : null), [graph])
@@ -96,8 +102,8 @@ export function Tasks({
     [graph],
   )
   const found = useMemo(
-    () => tasks(layout, calls, deps, lines, graph),
-    [layout, calls, deps, lines, graph],
+    () => tasks(layout, calls, deps, lines, graph, text),
+    [layout, calls, deps, lines, graph, text],
   )
 
   if (!graph)

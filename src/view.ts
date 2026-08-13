@@ -10,6 +10,7 @@ import type { Calls } from "./calls.ts"
 import type { Deps } from "./deps.ts"
 import type { Suite } from "./tests.ts"
 import { build } from "./graph.ts"
+import { copied, repeated, talky } from "./sprawl.ts"
 import type { Graph } from "./graph.ts"
 import type { Stats } from "./model.ts"
 
@@ -55,11 +56,18 @@ export function page(
   const graph = held?.graph ?? build(stats.repo)
   const heavy = graph.stats.files > HEAVY
   const said = held?.called ?? (heavy ? null : calls(stats.repo, graph))
+  const paths = Object.keys(graph.modules)
+  const loose = {
+    repeated: repeated(stats.repo, paths),
+    copied: copied(stats.repo, paths),
+    talky: talky(stats.repo, paths),
+  }
 
   const data =
     `<script>window.__DESPRAWL__=${inline(stats)};window.__DESPRAWL_GRAPH__=${inline(graph)}` +
     `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}` +
     `${held?.deps ? `;window.__DESPRAWL_DEPS__=${inline(held.deps)}` : ""}` +
+    `;window.__DESPRAWL_SPRAWL__=${inline(loose)}` +
     `${held?.suite ? `;window.__DESPRAWL_TESTS__=${inline(held.suite)}` : ""}</script>`
   const shell_ = held?.viewer ?? shell()
   const at = shell_.indexOf(HEAD)

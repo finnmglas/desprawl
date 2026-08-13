@@ -6,7 +6,7 @@ import { test } from "node:test"
 import { build } from "../src/graph.ts"
 import { calls } from "../src/calls.ts"
 import { balanced, fold } from "../src/layers.ts"
-import { IMPACTS, tasks, weigh } from "../ui/lib/tasks.ts"
+import { IMPACTS, tasks, weigh } from "../src/work.ts"
 import type { Deps } from "../src/deps.ts"
 import { repo } from "./repo.ts"
 

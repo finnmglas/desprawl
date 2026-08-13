@@ -2,7 +2,7 @@
 // owner: finn
 // goal: render stats
 
-import { existsSync } from "node:fs"
+import { existsSync, statSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
 import { deps } from "./deps.ts"
@@ -13,6 +13,8 @@ import { explain, needs } from "./needs.ts"
 import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
 import { anonymous, open, view } from "./view.ts"
+import { GRAINS, IMPACTS, KINDS, VIEWS, views } from "./views.ts"
+import type { Grain, Hits, Sort, View } from "./views.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
 const fail = (err: unknown): never => {
@@ -36,6 +38,11 @@ const { values, positionals } = (() => {
         anon: { type: "boolean", default: false },
         out: { type: "string" },
         keep: { type: "boolean", default: false },
+        kind: { type: "string" },
+        impact: { type: "string" },
+        limit: { type: "string" },
+        offline: { type: "boolean", default: false },
+        grain: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -47,7 +54,13 @@ const { values, positionals } = (() => {
 
 if (values.help) {
   console.log(
-    "desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+    [
+      "desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep]",
+      "         [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
+      `desprawl ${VIEWS.join("|")} [path] [--json]`,
+      "         tasks also takes [--kind K] [--impact I] [--limit N] [--offline]",
+      "         knowledge also takes [--grain module|file|function]",
+    ].join("\n"),
   )
   process.exit(0)
 }
@@ -57,7 +70,8 @@ const missing = needs()
 if (missing) fail(missing)
 
 // a first positional is the command only when it names one, otherwise it is the path
-const command = ["cli", "view"].includes(positionals[0] ?? "") ? positionals[0] : ""
+const KNOWN = ["cli", "view", ...VIEWS]
+const command = KNOWN.includes(positionals[0] ?? "") ? positionals[0] : ""
 const asked = (command ? positionals[1] : positionals[0]) ?? process.cwd()
 
 // a url is fetched to disk first, everything below only ever sees a path
@@ -70,7 +84,7 @@ const target = (() => {
 })()
 
 // the explorer is the default surface, the terminal report is asked for by name or by --json
-const viewing = command !== "cli" && !values.json
+const viewing = !command && !values.json
 
 const num = (n: number): string => n.toLocaleString("en-US")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
@@ -184,11 +198,34 @@ function report(s: Stats): string {
 try {
   if (!existsSync(target)) fail(`no such path as ${target}`)
   // --git-dir passes on bare repo / no commits these not
+  if (!statSync(target).isDirectory()) fail(`${target} is a file, and desprawl reads a repo`)
   git(target, "rev-parse", "--show-toplevel")
   git(target, "rev-parse", "HEAD")
 
+  // one panel, straight to the terminal: the same numbers the tab shows
+  if (VIEWS.includes(command as View)) {
+    if ((values.kind || values.impact) && command !== "tasks")
+      fail(`--kind and --impact are for tasks, not ${command}`)
+    if (values.grain && command !== "knowledge") fail(`--grain is for knowledge, not ${command}`)
+    if (values.kind && !KINDS.includes(values.kind as Sort))
+      fail(`no such kind as ${values.kind}. There is ${KINDS.join(", ")}`)
+    if (values.impact && !IMPACTS.includes(values.impact as Hits))
+      fail(`no such impact as ${values.impact}. There is ${IMPACTS.join(", ")}`)
+    if (values.grain && !GRAINS.includes(values.grain as Grain))
+      fail(`no such grain as ${values.grain}. There is ${GRAINS.join(", ")}`)
+    const made = await views(command as View, target, {
+      kind: values.kind,
+      impact: values.impact,
+      limit: values.limit ? int(values.limit, 0) : undefined,
+      offline: values.offline,
+      grain: values.grain,
+    })
+    // never process.exit here: it drops whatever of a large payload has not been written
+    console.log(values.json ? JSON.stringify(made.data, null, 2) : made.text)
+  }
+
   // analyses live not static
-  if (viewing && !values.static) {
+  else if (viewing && !values.static) {
     const live = await serve(target, cap, values.keep)
     open(live)
     console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)

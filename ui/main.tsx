@@ -37,6 +37,7 @@ import type { Calls as Called } from "../src/calls.ts"
 import type { Deps as Depended } from "../src/deps.ts"
 import type { Suite as Suited } from "../src/tests.ts"
 import type { Graph as Imports } from "../src/graph.ts"
+import type { Sprawl as Sprawled } from "../src/work.ts"
 import type { Stats } from "../src/model.ts"
 
 // desprawl view swaps placeholder for data
@@ -48,6 +49,7 @@ declare global {
     __DESPRAWL_CALLS__?: Called
     __DESPRAWL_DEPS__?: Depended
     __DESPRAWL_TESTS__?: Suited
+    __DESPRAWL_SPRAWL__?: Sprawled
   }
 }
 

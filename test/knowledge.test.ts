@@ -6,7 +6,7 @@ import { test } from "node:test"
 import { build } from "../src/graph.ts"
 import { calls } from "../src/calls.ts"
 import { balanced, fold } from "../src/layers.ts"
-import { asRows, knowledge } from "../ui/lib/knowledge.ts"
+import { asRows, knowledge } from "../src/knowledge.ts"
 import { repo } from "./repo.ts"
 
 const source = {

@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { test } from "node:test"
 import { explain, older } from "../src/needs.ts"
 import { isUrl } from "../src/remote.ts"
+import { VIEWS } from "../src/views.ts"
 import { repo } from "./repo.ts"
 
 /** the real binary, since these are the paths a person actually walks into */
@@ -78,4 +79,42 @@ test("a newer node is never mistaken for an older one", () => {
     ["24.13.0", false], ["22.18.0", false], ["22.19.0", false], ["22.17.9", true], ["20.11.1", true],
   ]
   for (const [have, expected] of cases) assert.equal(older(have, "22.18"), expected, have)
+})
+
+test("every view prints something a person and a parser can both read", async () => {
+  for (const view of VIEWS) {
+    const said = run(view, ".").out
+    assert.ok(said.trim().length, `${view} printed nothing`)
+    const json = run(view, ".", "--json").out
+    assert.doesNotThrow(() => JSON.parse(json), `${view} --json is not json`)
+  }
+})
+
+test("a filter narrows the list and never invents a row", () => {
+  const all = JSON.parse(run("tasks", ".", "--json").out) as { kind: string; hits: string }[]
+  const size = JSON.parse(run("tasks", ".", "--json", "--kind", "size").out) as { kind: string }[]
+  assert.ok(size.length <= all.length)
+  assert.ok(
+    size.every((one) => one.kind === "size"),
+    "a kind filter lets nothing else through",
+  )
+  const three = JSON.parse(run("tasks", ".", "--json", "--limit", "3").out) as unknown[]
+  assert.ok(three.length <= 3)
+})
+
+test("the architecture reads as bands of named modules, not paths", () => {
+  const said = run("architecture", ".").out
+  assert.match(said, /Consumable Entrypoints/)
+  assert.match(said, /Core Fundaments/)
+  assert.match(said, /\(src\) L\d+ \w+, [\d.k]+ lines/, "each row names the folder it came from")
+  assert.doesNotMatch(said.split("\n")[0], /\//, "the first line is the repo, not a path")
+})
+
+test("the knowledge graph comes out at whichever grain is asked for", () => {
+  const rows = (grain: string) =>
+    run("knowledge", ".", "--grain", grain).out.trim().split("\n").length
+  assert.ok(rows("file") > rows("module"), "a file is finer than the module holding it")
+  assert.ok(rows("function") > rows("file"))
+  const head = run("knowledge", ".").out.split("\n")[0]
+  assert.match(head, /kind\tid\tlabel/, "tab separated, so a sheet or a script can take it")
 })

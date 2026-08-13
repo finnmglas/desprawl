@@ -12,6 +12,8 @@ import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
+import { copied, repeated, talky } from "./sprawl.ts"
+import type { Sprawl } from "./work.ts"
 import { run as runTests, tests } from "./tests.ts"
 import { act, actions, alive, begin, forget, stop as stopAction } from "./actions.ts"
 import { agent, ask } from "./agent.ts"
@@ -90,6 +92,7 @@ export function serve(
   let imports: Graph | null = null
   let called: Calls | null = null
   let known: Deps | null = null
+  let loose: Sprawl | null = null
   let suite: Suite | null = null
 
   const load = (fresh: boolean): Stats => {
@@ -422,6 +425,18 @@ export function serve(
 
         // read once a page asks. A read that got no answer is not kept: cached silence
         // reads as "nothing filed" all session
+        // seconds on a large repo, and the same answer until the files change
+        if (url.pathname === "/api/sprawl") {
+          const paths = Object.keys((imports ||= build(repo)).modules)
+          return json(
+            (loose ||= {
+              repeated: repeated(repo, paths),
+              copied: copied(repo, paths),
+              talky: talky(repo, paths),
+            }),
+          )
+        }
+
         if (url.pathname === "/api/deps") {
           ;(known
             ? Promise.resolve(known)

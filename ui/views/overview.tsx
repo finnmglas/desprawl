@@ -17,7 +17,8 @@ import { StackCard } from "../components/molecules/stack-card.tsx"
 import { Doing } from "../components/molecules/doing.tsx"
 import { Working } from "../components/atoms/working.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
-import { System, wall } from "../components/molecules/system.tsx"
+import { System } from "../components/molecules/system.tsx"
+import { wall } from "../../src/system.ts"
 import { Save } from "../components/molecules/save.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { ago, day, num, pct, plural, tokens, weight } from "../lib/format.ts"
@@ -698,11 +699,11 @@ export function Overview({
             {suite.script && isLive() && (
               <div className="ml-auto flex items-center gap-1">
                 {[
-                  { label: `▶ ${suite.script}`, note: suite.command, cover: false },
+                  { label: suite.script, note: suite.command, cover: false },
                   ...(suite.measured || suite.measure
                     ? [
                         {
-                          label: "▶ with coverage",
+                          label: "with coverage",
                           note: suite.measure ? `the ${suite.measure} script` : suite.measured,
                           cover: true,
                         },
@@ -713,6 +714,7 @@ export function Overview({
                     key={one.label}
                     variant="outline"
                     size="sm"
+                    className="bg-card"
                     title={one.note}
                     disabled={!!running}
                     onClick={() => {
@@ -781,7 +783,7 @@ export function Overview({
                 {suite.script && (
                   <>
                     {" "}
-                    here, then the <span className="font-mono">▶ {suite.script}</span> button.
+                    here, then the <span className="font-mono">{suite.script}</span> button.
                   </>
                 )}
               </p>

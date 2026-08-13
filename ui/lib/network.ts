@@ -5,7 +5,8 @@ import { unitOf, type Layout } from "../../src/layers.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Graph } from "../../src/graph.ts"
 
-export type Grain = "module" | "file" | "function"
+import type { Grain } from "../../src/knowledge.ts"
+export type { Grain }
 
 export interface Spot {
   id: string

@@ -1,6 +1,10 @@
 // owner: finn
 // goal: judge kpi numbers
 
+export { familyOf, type Family } from "../../src/licence.ts"
+import { shapeOf as shaped, spread } from "../../src/layers.ts"
+export type { Shape } from "../../src/layers.ts"
+
 export interface Verdict {
   /** one or two words, shown in the corner of the card */
   label: string
@@ -107,159 +111,16 @@ export const layeringOf = (levels: number, units: number): Verdict =>
         why: "the longest chain of units that depend on each other. Deep is not worse, it is further to trace",
       }
 
-/** what opening it shows: a pile, or too small to be a folder */
-export function spreadOf(
-  entries: number,
-  folders?: number,
-  /** a root earns more room: config and docs live loose in it */
-  roomy = false,
-): { label: string; tone: string; why: string } {
-  const held =
-    folders === undefined ? "" : folders ? `, ${folders} of them folders` : " and not one subfolder"
-  const allowed = roomy ? ", and a repo root was already allowed more than a folder inside it" : ""
-
-  if (entries >= (roomy ? 100 : 60))
-    return {
-      label: "bloated",
-      tone: OUTLINE.bad,
-      why: `${entries} entries side by side${held}. This is not a folder any more, it is a directory listing${allowed}`,
-    }
-  if (entries >= (roomy ? 40 : 26))
-    return {
-      label: "oversize",
-      tone: OUTLINE.warn,
-      why: `${entries} entries${held}. Past what anyone scans at once, though still a list you could sort out in an afternoon${allowed}`,
-    }
-  if (entries >= 4)
-    return {
-      label: "healthy",
-      tone: OUTLINE.good,
-      why: `${entries} entries, a folder you can open and take in at once`,
-    }
-  return {
-    label: "thin",
-    tone: OUTLINE.quiet,
-    why: `${entries} entries. Not a problem, but a folder this small may belong inside its neighbour`,
+/** the same band, with the colour a badge wants */
+export const spreadOf = (entries: number, folders?: number, roomy = false) => {
+  const band = spread(entries, folders, roomy)
+  const tone = {
+    bloated: OUTLINE.bad,
+    oversize: OUTLINE.warn,
+    healthy: OUTLINE.good,
+    thin: OUTLINE.quiet,
   }
-}
-
-export interface Shape {
-  label: string
-  band: "entry" | "middle" | "base"
-  tone: string
-  why: string
-  /** no single import could move it elsewhere, so the label is not a coin flip */
-  sure: boolean
-  /** what it was decided on, so four imports never read like four thousand */
-  edges: number
-}
-
-/** imports only itself: a module. Otherwise placed by which way its edges lean */
-function read(
-  inside: number,
-  out: number,
-  into: number,
-  reach: number,
-): Omit<Shape, "sure" | "edges"> & { firm?: boolean } {
-  // a hue per shape, a star its neighbour: near misses read near, never the same
-  const { good: MODULE, near: NEAR, cool: FLOOR, even: EVEN, warn: MIDDLE } = OUTLINE
-  const { entry: ENTRY, top: TOP } = OUTLINE
-  if (!inside && !out)
-    return {
-      label: "Module",
-      band: "base",
-      tone: MODULE,
-      firm: true,
-      why: into
-        ? "it imports nothing at all and the rest imports it, so it stands on its own"
-        : "it imports nothing and nothing imports it, so it stands apart from the repo",
-    }
-  const kept = (inside / (inside + out)) * 100
-
-  if (kept >= 100)
-    return {
-      label: "Module",
-      band: "base",
-      tone: MODULE,
-      firm: true,
-      why: "every import stays inside it, so it can be lifted out as it stands",
-    }
-  if (kept >= 80)
-    return {
-      label: "Module*",
-      band: "base",
-      tone: NEAR,
-      why: "four imports in five stay inside. A module once the last few are dealt with",
-    }
-
-  // everything left is placed by which way it leans, so nothing turns on one import
-  const arriving = into + out ? (into / (into + out)) * 100 : 0
-  if (arriving >= 55)
-    return {
-      label: "Shared",
-      band: "base",
-      tone: FLOOR,
-      why: `${Math.round(arriving)}% of its edges arrive, so it is what the rest stands on`,
-    }
-  // half of it is its own and it leans on one group: a leaf hanging off the tree, and
-  // nothing importing it means unused, never a top of the stack
-  if (kept >= 50 && reach <= 1)
-    return {
-      label: "Module*",
-      band: "base",
-      tone: NEAR,
-      why: `half its imports stay inside and it leans on ${reach ? "one other group" : "nothing"}, so it is a leaf. Almost nothing here uses it`,
-    }
-  if (arriving <= 0)
-    return {
-      label: "Entrypoint",
-      band: "entry",
-      tone: ENTRY,
-      firm: true,
-      why: "nothing here imports it, and it imports the rest. A top of the stack",
-    }
-  if (arriving < 10)
-    return {
-      label: "Entrypoint*",
-      band: "entry",
-      tone: TOP,
-      why: `${Math.round(arriving)}% of its edges arrive, the rest leave, so it mostly composes`,
-    }
-  if (arriving < 45)
-    return {
-      label: "Collection",
-      band: "middle",
-      tone: MIDDLE,
-      why: `${Math.round(arriving)}% of its edges arrive, so it leans on more than leans on it. Hard to move or to name`,
-    }
-  return {
-    label: "Shared*",
-    band: "middle",
-    tone: EVEN,
-    why: `${Math.round(arriving)}% of its edges arrive, which is even. Nearly a foundation, and it would take little to make it one`,
-  }
-}
-
-/**
- * The shape, and whether it is worth trusting. A label decided on four imports sits a
- * single import away from another one, which is checked rather than guessed at from a
- * sample size: move one import each way and see whether the answer holds.
- */
-export function shapeOf(inside: number, out: number, into = 0, reach = 2): Shape {
-  const { firm, ...shape } = read(inside, out, into, reach)
-  const less = (n: number) => Math.max(0, n - 1)
-  const nearby = [
-    read(inside + 1, less(out), into, reach),
-    read(less(inside), out + 1, into, reach),
-    read(inside, out + 1, less(into), reach),
-    read(inside, less(out), into + 1, reach),
-  ]
-  return {
-    ...shape,
-    // an exact answer is not a near miss: nothing imports it, or nothing leaves it
-    sure: !!firm || nearby.every((one) => one.label === shape.label),
-    edges: inside + out + into,
-  }
+  return { ...band, tone: tone[band.label] }
 }
 
 /** an outlined badge, one colour per meaning, spelled once for every panel */
@@ -287,56 +148,20 @@ export const RANK = ["CRITICAL", "HIGH", "MODERATE", "LOW"]
 export const worst = (found: { severity: string }[]): string =>
   RANK.find((one) => found.some((a) => a.severity === one)) ?? (found.length ? "UNKNOWN" : "")
 
-// by what they ask of the code around them. Prefix matches, since one package writes
-// "MIT", another "MIT License", another "MIT-0"
-// prettier-ignore
-const PERMISSIVE =
-  /^(MIT|ISC|0BSD|BSD|Apache|Unlicense|CC0|CC-BY(?!-(NC|ND|SA))|WTFPL|OFL|SIL|Zlib|Libpng|libtiff|Python-2|PSF|BlueOak|X11|NCSA|AFL|UPL|BSL-1|Boost|PostgreSQL|Zope|HPND|FTL|IJG|bzip2|curl|W3C|Ruby|TCL|JSON|Unicode|ICU|Beerware|OpenSSL|ODC-By|PDDL|CeCILL-B|Intel|MirOS|Xnet|AAL)/i
-// prettier-ignore
-const WEAK =
-  /^(LGPL|MPL|EPL|CDDL|CeCILL-C|Artistic|MS-PL|MS-RL|CPL|IPL|APSL|QPL|SPL|NPL|Nokia|SISSL|CC-BY-SA|ODbL)/i
-// prettier-ignore
-const STRONG =
-  /^(GPL|AGPL|SSPL|OSL|RPL|RPSL|EUPL|CeCILL|Sleepycat|Watcom|GFDL|CC-BY-N|Elastic|BUSL|Commons-Clause|PolyForm|Prosperity|Parity|CAL-1|Hippocratic|Fair-Source|FSL|RSAL|Confluent)/i
-/** npm's word for "nobody licensed this to you" */
-const CLOSED = /^(UNLICENSED|Proprietary|Commercial|Closed|All[- ]Rights[- ]Reserved|Private)/i
+/** the same shape, with the colour a badge wants */
+const HUE: Record<string, string> = {
+  Module: OUTLINE.good,
+  "Module*": OUTLINE.near,
+  Shared: OUTLINE.cool,
+  Even: OUTLINE.even,
+  Middle: OUTLINE.warn,
+  Entry: OUTLINE.entry,
+  Top: OUTLINE.top,
+}
 
-export type Family = "permissive" | "weak" | "strong" | "closed" | "unknown"
-
-// gentlest first: an OR takes the lowest of these and an AND the highest
-const ORDER: Family[] = ["permissive", "weak", "strong", "closed", "unknown"]
-
-// closed comes first: UNLICENSED starts with a licence that means the opposite
-const one = (said: string): Family =>
-  CLOSED.test(said)
-    ? "closed"
-    : PERMISSIVE.test(said)
-      ? "permissive"
-      : WEAK.test(said)
-        ? "weak"
-        : STRONG.test(said)
-          ? "strong"
-          : "unknown"
-
-const worstOf = (parts: string[]) =>
-  parts.map(one).reduce((a, b) => (ORDER.indexOf(a) > ORDER.indexOf(b) ? a : b))
-
-/** what it asks of the code using it: a fact, not a verdict */
-export const familyOf = (license: string): Family => {
-  const said = license.trim().replace(/^the\s+/i, "")
-  if (!said) return "unknown"
-  // an either takes the gentler side, a both takes the stricter
-  return said
-    .split(/\s+OR\s+/i)
-    .map((part) =>
-      worstOf(
-        part
-          .split(/\s+AND\s+/i)
-          .map((bit) => bit.replace(/[()]/g, "").trim())
-          .filter(Boolean),
-      ),
-    )
-    .reduce((a, b) => (ORDER.indexOf(a) < ORDER.indexOf(b) ? a : b))
+export const shapeOf = (inside: number, out: number, into = 0, reach = 2) => {
+  const shape = shaped(inside, out, into, reach)
+  return { ...shape, tone: HUE[shape.label] ?? HUE[shape.label.replace("*", "")] ?? OUTLINE.quiet }
 }
 
 /** how covered is covered enough, in the bands every team argues about anyway */

@@ -1,11 +1,14 @@
 // owner: finn
 // goal: the graphs as typed things and typed relations, for whatever reads them next
 
-import { unitOf } from "../../src/layers.ts"
-import type { Calls } from "../../src/calls.ts"
-import type { Graph } from "../../src/graph.ts"
-import type { Layout } from "../../src/layers.ts"
-import type { Grain } from "./network.ts"
+import { unitOf } from "./layers.ts"
+import type { Calls } from "./calls.ts"
+import type { Graph } from "./graph.ts"
+import type { Layout } from "./layers.ts"
+
+/** module, file or declaration: how fine the things are */
+export const GRAINS = ["module", "file", "function"] as const
+export type Grain = (typeof GRAINS)[number]
 
 export interface Thing {
   id: string

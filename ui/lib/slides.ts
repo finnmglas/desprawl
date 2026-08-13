@@ -2,7 +2,7 @@
 // goal: what every panel says, as slides
 
 import { balanced, fold } from "../../src/layers.ts"
-import { nameOf, namesOf } from "./naming.ts"
+import { nameOf, namesOf } from "../../src/naming.ts"
 import { num, pct, plural, tokens } from "./format.ts"
 import { shapeOf } from "./verdict.ts"
 import type { Graph } from "../../src/graph.ts"

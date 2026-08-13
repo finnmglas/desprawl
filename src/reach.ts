@@ -1,9 +1,8 @@
 // owner: finn
 // goal: what a call graph knows past who calls who
 
-import { scc } from "../../src/cycles.ts"
-// a value from calls.ts would drag node's fs into the bundle, its shapes cost nothing
-import type { Calls, Symbol } from "../../src/calls.ts"
+import { scc } from "./cycles.ts"
+import type { Calls, Symbol } from "./calls.ts"
 
 /** what a declaration is to the code that runs */
 export type Reach = "runs" | "called" | "open" | "dead"
