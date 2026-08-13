@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { git } from "./model.ts"
 import { CODE } from "./scan.ts"
+import { manifests as readManifests } from "./manifests.ts"
 import type { Ai, Manifest, Node, Pinning, Stack } from "./model.ts"
 
 /** A dependency name, or a prefix ending in /, mapped to the label it implies. */
@@ -601,6 +602,8 @@ function shipped(
   manifests: Manifest[],
   boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
   apps: string[],
+  /** what a manifest of another language says it builds, so cli is not an npm only word */
+  outside: string[] = [],
 ): string[] {
   const parts: string[] = []
   if (frameworks.some((f) => CLIENT.includes(f))) add(parts, "frontend")
@@ -608,7 +611,7 @@ function shipped(
   if (manifests.some((m) => Object.keys(m.deps).length === 0 && m.workspaces))
     add(parts, "monorepo root")
   if (manifests.some((m) => m.workspaces) || workspaces) add(parts, "monorepo")
-  if (manifests.some((m) => m.bin)) add(parts, "cli")
+  if (manifests.some((m) => m.bin) || outside.length) add(parts, "cli")
   // the platform, not "mobile": only one of those is checkable
   for (const made of apps) add(parts, made.toLowerCase())
   if (boxes.dockerfiles || boxes.compose || boxes.kubernetes || boxes.terraform) add(parts, "infra")
@@ -649,7 +652,8 @@ export function stack(repo: string, languages: Node[] = []): Stack {
   const scripts: string[] = []
   const bundlers: string[] = []
   const typescript: string[] = []
-  const managers: string[] = [...(found.lock ?? [])]
+  const managers: string[] = []
+  for (const one of found.lock ?? []) add(managers, one)
   const pinning: Pinning = { exact: 0, caret: 0, tilde: 0, range: 0, linked: 0 }
   const names = new Set<string>()
 
@@ -709,6 +713,27 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     exts.has("ts") || exts.has("tsx") || exts.has("mts") || (found.typescript?.length ?? 0) > 0
   const hasJs = exts.has("js") || exts.has("jsx") || exts.has("mjs") || exts.has("cjs")
 
+  // what every other language keeps in a manifest of its own
+  const where: Record<string, string> = {}
+  const foreign = readManifests(repo, paths)
+  for (const one of foreign) {
+    add(managers, MANAGERS[one.kind])
+    for (const asked of one.asked) {
+      names.add(asked.name)
+      // the last segment: a maven coordinate is group:artifact, a crate is just its name
+      const tail = asked.name.split(":").pop() ?? asked.name
+      for (const [table, into] of FOREIGN) {
+        const found = label(table, tail)
+        if (!found) continue
+        add(dep[into], found)
+        // the package that implied it, and where that package lives
+        from[found] ??= asked.name
+        where[found] ??= one.kind
+      }
+    }
+  }
+  const cli = dep.frameworks.some((one) => Object.values(OUT_CLIS).includes(one))
+  const builds = [...foreign.flatMap((one) => one.bins), ...(cli ? ["argument parser"] : [])]
   const parts = shipped(
     dep.frameworks,
     dep.connects.length > 0,
@@ -716,6 +741,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     manifests,
     counts,
     apps,
+    builds,
   )
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
@@ -742,7 +768,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     manifests,
     typescript,
     managers,
-    lockfiles: found.lock ?? [],
+    lockfiles: [...new Set(found.lock ?? [])],
     pinning,
     dependencies: names.size,
     build: dep.build,
@@ -775,6 +801,96 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     licenses,
     parts,
     from,
+    registries: where,
     ai: { ...signatures, tools, files: agentFiles },
   }
 }
+
+const MANAGERS: Record<string, string> = {
+  cargo: "cargo",
+  python: "pip",
+  gradle: "gradle",
+  cmake: "cmake",
+  go: "go",
+}
+
+/**
+ * What a package outside npm implies, sorted into the same buckets the node ones use: a
+ * database client is a connection whichever language asks for it, and an async runtime is
+ * a runtime. Only what shapes the whole program is a framework.
+ */
+// prettier-ignore
+const OUT_FRAMEWORKS: Table = {
+  actix: "Actix", "actix-web": "Actix", axum: "Axum", rocket: "Rocket", warp: "warp",
+  poem: "Poem", salvo: "Salvo", bevy: "Bevy", tauri: "Tauri", dioxus: "Dioxus", leptos: "Leptos",
+  django: "Django", flask: "Flask", fastapi: "FastAPI", starlette: "Starlette", sanic: "Sanic",
+  tornado: "Tornado", celery: "Celery", scrapy: "Scrapy", streamlit: "Streamlit", gradio: "Gradio",
+  "spring-boot-starter": "Spring Boot", "spring-core": "Spring", ktor: "Ktor", micronaut: "Micronaut",
+  quarkus: "Quarkus", vertx: "Vert.x", gin: "Gin", echo: "Echo", fiber: "Fiber", chi: "chi",
+  laravel: "Laravel", symfony: "Symfony", vapor: "Vapor", rails: "Rails", sinatra: "Sinatra",
+  "aspnetcore": "ASP.NET Core",
+}
+
+// an argument parser shapes a program the way a router does, and says it is a cli
+// prettier-ignore
+const OUT_CLIS: Table = {
+  clap: "clap", structopt: "structopt", argh: "argh", gumdrop: "gumdrop", pico: "pico-args",
+  argparse: "argparse", click: "Click", typer: "Typer", fire: "Fire", docopt: "docopt",
+  picocli: "picocli", "commons-cli": "commons-cli", args4j: "args4j", clikt: "Clikt",
+  cobra: "Cobra", urfave: "urfave/cli", kingpin: "kingpin", "swift-argument-parser": "ArgumentParser",
+}
+
+// what it runs on rather than what it is: an async runtime, a thread pool, a jit
+// prettier-ignore
+const OUT_RUNTIMES: Table = {
+  tokio: "Tokio", "async-std": "async-std", smol: "smol", rayon: "Rayon", crossbeam: "crossbeam",
+  "kotlinx-coroutines-core": "Coroutines", asyncio: "asyncio", uvloop: "uvloop", gevent: "gevent",
+  uvicorn: "Uvicorn", gunicorn: "Gunicorn", hypercorn: "Hypercorn", wasm: "WebAssembly",
+}
+
+// something it talks to: a database, an http client, a queue, a model
+// prettier-ignore
+const OUT_CONNECTS: Table = {
+  diesel: "Diesel", sqlx: "SQLx", "sea-orm": "SeaORM", rusqlite: "SQLite", tonic: "Tonic",
+  hyper: "hyper", reqwest: "reqwest", ureq: "ureq", redis: "Redis", mongodb: "MongoDB",
+  sqlalchemy: "SQLAlchemy", psycopg2: "Postgres", pymongo: "MongoDB", requests: "requests",
+  httpx: "httpx", aiohttp: "aiohttp", boto3: "AWS", openai: "OpenAI", anthropic: "Anthropic",
+  langchain: "LangChain", transformers: "Transformers", torch: "PyTorch", tensorflow: "TensorFlow",
+  scikit: "scikit-learn", retrofit: "Retrofit", okhttp: "OkHttp", exposed: "Exposed",
+  hibernate: "Hibernate", jdbc: "JDBC", gorm: "GORM", sqlx_go: "sqlx", "grpc-go": "gRPC",
+  "aws-sdk-go": "AWS", stripe: "Stripe", sentry: "Sentry",
+}
+
+// how it reads and writes its own data, which is neither a framework nor a connection
+// prettier-ignore
+const OUT_CONTENT: Table = {
+  serde: "Serde", "serde_json": "Serde", prost: "Protobuf", bincode: "bincode", toml: "TOML",
+  pydantic: "Pydantic", numpy: "NumPy", pandas: "pandas", polars: "Polars", "pyarrow": "Arrow",
+  jackson: "Jackson", gson: "Gson", kotlinx: "kotlinx.serialization", protobuf: "Protobuf",
+}
+
+// prettier-ignore
+const OUT_UI: Table = {
+  egui: "egui", iced: "iced", ratatui: "Ratatui", crossterm: "crossterm", indicatif: "indicatif",
+  appcompat: "AppCompat", "core-ktx": "AndroidX", material: "Material", compose: "Compose",
+  swiftui: "SwiftUI", tkinter: "Tkinter", "PyQt5": "Qt", kivy: "Kivy",
+}
+
+// prettier-ignore
+const OUT_TESTS: Table = {
+  pytest: "pytest", unittest: "unittest", nose: "nose", hypothesis: "Hypothesis", tox: "tox",
+  junit: "JUnit", mockito: "Mockito", assertj: "AssertJ", kotest: "Kotest", espresso: "Espresso",
+  criterion: "Criterion", divan: "divan", proptest: "proptest", quickcheck: "QuickCheck",
+  testify: "testify", gtest: "GoogleTest", catch2: "Catch2", doctest: "doctest", rspec: "RSpec",
+  phpunit: "PHPUnit", xunit: "xUnit", nunit: "NUnit",
+}
+
+const FOREIGN: [Table, "frameworks" | "runtimes" | "connects" | "content" | "ui" | "testing"][] = [
+  [OUT_FRAMEWORKS, "frameworks"],
+  [OUT_CLIS, "frameworks"],
+  [OUT_RUNTIMES, "runtimes"],
+  [OUT_CONNECTS, "connects"],
+  [OUT_CONTENT, "content"],
+  [OUT_UI, "ui"],
+  [OUT_TESTS, "testing"],
+]

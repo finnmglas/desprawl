@@ -284,6 +284,14 @@ export function net(
   const unitAt = (path: string) =>
     typeof split === "number" ? unitOf(path, split) : (split[path] ?? unitOf(path, 1))
   const known = new Map(layout.units.map((u) => [u.path, u]))
+  const langAt = new Map<string, string>()
+  for (const one of layout.units) {
+    const by = new Map<string, number>()
+    for (const [path, module] of Object.entries(graph.modules))
+      if (unitAt(path) === one.path && module.lang)
+        by.set(module.lang, (by.get(module.lang) ?? 0) + 1)
+    langAt.set(one.path, [...by].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "")
+  }
   const held = members(graph, calls, grain).filter((one) => known.has(unitAt(one.file)))
 
   // module grain draws the unit itself, so the level band is the only box it needs
@@ -386,11 +394,26 @@ export function net(
       const held = (inner.get(band) ?? []).length
       y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
     } else {
+      // two languages cannot import each other, so a shelf that mixes them draws lines
+      // across the picture that say nothing: each language keeps its own side
       const here = layout.units
         .filter((u) => u.level === level)
-        .sort((a, b) => a.path.localeCompare(b.path))
-      for (let from = 0; from < here.length; from += per) {
-        const shelf = here.slice(from, from + per)
+        .sort(
+          (a, b) =>
+            (langAt.get(a.path) ?? "").localeCompare(langAt.get(b.path) ?? "") ||
+            a.path.localeCompare(b.path),
+        )
+      // a shelf never mixes two languages, so the columns stay one language wide
+      const shelves: (typeof here)[] = []
+      for (let from = 0; from < here.length;) {
+        const lang = langAt.get(here[from].path) ?? ""
+        let to = from
+        while (to < here.length && to - from < per && (langAt.get(here[to].path) ?? "") === lang)
+          to++
+        shelves.push(here.slice(from, to))
+        from = to
+      }
+      for (const shelf of shelves) {
         const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
         const total = weights.reduce((sum, one) => sum + one, 0) || 1
         const room = wide - 2 * PAD - GAP * (shelf.length - 1)

@@ -188,6 +188,8 @@ export interface Stack {
   parts: string[]
   /** label to the dependency that implied it, so a claim can be followed */
   from: Record<string, string>
+  /** which registry a label's package lives in, when it is not npm */
+  registries: Record<string, string>
   ai: Ai
 }
 

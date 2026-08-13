@@ -4,7 +4,8 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
 import { git } from "./model.ts"
-import { scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
+import { declared, foreign, scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
+import { READS, candidates, dialectOf, type Dialect } from "./dialects.ts"
 
 export interface Edge {
   to: string
@@ -15,6 +16,8 @@ export interface Edge {
 }
 
 export interface Module {
+  /** which dialect it was read with, so a mixed repo can be split by language */
+  lang: string
   path: string
   out: Edge[] // resolved inside the repo
   in: string[]
@@ -205,8 +208,20 @@ export function build(repo: string): Graph {
   )
   // a bundle is output, never a module of its own
   const sources = [...tracked].filter(
-    (p) => SOURCE.test(p) && !p.endsWith(".d.ts") && !BUNDLED.test(p) && !bundled(join(root, p)),
+    (p) =>
+      READS.test(p) &&
+      !p.endsWith(".d.ts") &&
+      !BUNDLED.test(p) &&
+      (!SOURCE.test(p) || !bundled(join(root, p))),
   )
+
+  // a crate names its siblings rather than pathing to them
+  const crates = new Map<string, string>()
+  for (const path of tracked) {
+    if (!/(^|\/)Cargo\.toml$/.test(path)) continue
+    const name = /^\s*name\s*=\s*"([^"]+)"/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
+    if (name) crates.set(name, dirname(path) === "." ? "" : dirname(path))
+  }
 
   // resolves to its own folder, not node_modules
   const workspaces = new Map<string, string>()
@@ -225,6 +240,7 @@ export function build(repo: string): Graph {
         in: [],
         packages: [],
         imports: {},
+        lang: "",
         symbols: { exports: 0, declares: 0, functions: 0, classes: 0 },
         lines: 0,
         barrel: false,
@@ -248,8 +264,56 @@ export function build(repo: string): Graph {
       continue
     }
 
-    modules[from].symbols = symbols(source)
+    const dialect = dialectOf(from)
     modules[from].lines = source.split("\n").length
+    modules[from].lang = dialect?.id ?? ""
+
+    // a language of its own: its specifiers name paths through its own idea of a project
+    if (dialect && dialect.id !== "ts") {
+      const done = scrub(source, dialect.flavour)
+      modules[from].symbols = counted(done.code, dialect)
+      for (const spec of foreign(source, dialect, done)) {
+        if (!spec.guess) seen++
+        // an angled include is usually the toolchain's and sometimes the project's own, and
+        // the repo itself is what says which
+        const tried = candidates(dialect, spec.text, from, crates)
+        const held = tried.find((one) => modules[one])
+        const folder = held ? null : tried.find((one) => one.endsWith("/"))
+        const inside = folder
+          ? Object.keys(modules).filter(
+              (one) => one.startsWith(folder) && !one.slice(folder.length).includes("/"),
+            )
+          : []
+        if (!held && inside.length) {
+          for (const one of inside) {
+            if (one === from) continue
+            modules[from].imports[spec.text] = one
+            modules[from].out.push({ to: one, type: false, lazy: false, via: false })
+            modules[one].in.push(from)
+          }
+          continue
+        }
+        if (held && held !== from) {
+          modules[from].imports[spec.text] = held
+          modules[from].out.push({ to: held, type: false, lazy: false, via: false })
+          modules[held].in.push(from)
+          continue
+        }
+        const name = outsideOf(dialect, spec.text) || (spec.type ? spec.text : "")
+        // a specifier that named this project and landed nowhere is broken, and one that
+        // named somebody else's crate or package was never ours to find
+        if (!name) {
+          if (!spec.guess) missing.push({ from, specifier: spec.text, reason: "no such file" })
+          continue
+        }
+        external++
+        add(modules[from].packages, name)
+        ;(packages[name] ??= []).push(from)
+      }
+      continue
+    }
+
+    modules[from].symbols = symbols(source)
     for (const spec of specifiers(source)) {
       seen++
       const target = locate(spec.text, full)
@@ -355,7 +419,10 @@ export function build(repo: string): Graph {
     return tracked.has(rel) ? { kind: "asset" } : { kind: "generated" }
   }
 
+  // counted after, or the edges a sibling implies are drawn and never counted
+  siblings(modules, root)
   const edges = Object.values(modules).reduce((sum, m) => sum + m.out.length, 0)
+
   return {
     modules,
     packages,
@@ -373,4 +440,67 @@ export function build(repo: string): Graph {
 
 const add = (list: string[], value: string) => {
   if (!list.includes(value)) list.push(value)
+}
+
+/** what a foreign file declares, off the same patterns the call graph reads */
+function counted(code: string, dialect: Dialect): Symbols {
+  const found = declared(code, dialect)
+  return {
+    exports: found.length,
+    declares: found.length,
+    functions: found.filter((one) => one.kind === "function").length,
+    classes: found.filter((one) => one.kind === "class").length,
+  }
+}
+
+/** the crate, package or library a specifier names when it is not a file here */
+function outsideOf(dialect: Dialect, text: string): string {
+  if (dialect.id === "rust") {
+    const head = text.split("::")[0]
+    return /^(crate|super|self)$/.test(head) ? "" : head
+  }
+  if (dialect.id === "python") return text.startsWith(".") ? "" : text.split(".")[0]
+  if (dialect.id === "jvm") return text.split(".").slice(0, 2).join(".")
+  return text.split("/").pop() ?? text
+}
+
+/**
+ * The jvm needs no import for a class beside it, so those edges are invisible in the text.
+ * A sibling whose name is used here is one this file leans on, which is the same rule the
+ * call graph uses and the only way a package of ten files does not read as ten islands.
+ */
+function siblings(modules: Record<string, Module>, root: string): void {
+  const byFolder = new Map<string, string[]>()
+  for (const [path, one] of Object.entries(modules))
+    if (one.lang === "jvm") {
+      const dir = path.split("/").slice(0, -1).join("/")
+      byFolder.set(dir, [...(byFolder.get(dir) ?? []), path])
+    }
+  for (const held of byFolder.values()) {
+    if (held.length < 2) continue
+    const names = new Map(
+      held.map((path) => [
+        path
+          .split("/")
+          .pop()!
+          .replace(/\.\w+$/, ""),
+        path,
+      ]),
+    )
+    for (const path of held) {
+      let code = ""
+      try {
+        code = scrub(readFileSync(join(root, path), "utf8"), "c").code
+      } catch {
+        continue
+      }
+      const words = new Set(code.match(/[A-Za-z_]\w*/g) ?? [])
+      for (const [name, other] of names) {
+        if (other === path || !words.has(name)) continue
+        if (modules[path].out.some((edge) => edge.to === other)) continue
+        modules[path].out.push({ to: other, type: false, lazy: false, via: false })
+        modules[other].in.push(path)
+      }
+    }
+  }
 }

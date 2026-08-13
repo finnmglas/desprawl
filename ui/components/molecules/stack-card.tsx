@@ -7,6 +7,7 @@ import { Caret } from "../atoms/icons.tsx"
 import { Card, CardContent, Note } from "../atoms/card.tsx"
 import { Chip } from "./chip.tsx"
 import { CardHead } from "./card-head.tsx"
+import { REGISTRY_OF } from "../../../src/registries.ts"
 import { CopyButton } from "./copy-button.tsx"
 import { Save } from "./save.tsx"
 import { Tip } from "../atoms/tip.tsx"
@@ -111,10 +112,12 @@ function Row({
   label,
   items,
   from,
+  registries,
 }: {
   label: string
   items: string[]
   from: Record<string, string>
+  registries: Record<string, string>
 }) {
   const [all, setAll] = useState(false)
   const sorted = byWeight(items)
@@ -134,6 +137,7 @@ function Row({
             key={item}
             label={item}
             from={from[item]}
+            registry={REGISTRY_OF[registries[item] ?? ""] ?? "npm"}
             // a port is somewhere you can actually go, as long as the thing is running
             href={label === "Ports" ? `http://localhost:${item}` : undefined}
             note={
@@ -156,7 +160,12 @@ function Row({
   )
 }
 
-function Group({ title, rows, from }: Section & { from: Record<string, string> }) {
+function Group({
+  title,
+  rows,
+  from,
+  registries,
+}: Section & { from: Record<string, string>; registries: Record<string, string> }) {
   const shown = kept(rows)
   if (!shown.length) return null
   return (
@@ -165,7 +174,13 @@ function Group({ title, rows, from }: Section & { from: Record<string, string> }
         {title}
       </span>
       {shown.map(([label, items]) => (
-        <Row key={label} label={label} items={items.map(String)} from={from} />
+        <Row
+          key={label}
+          label={label}
+          items={items.map(String)}
+          from={from}
+          registries={registries}
+        />
       ))}
     </div>
   )
@@ -293,7 +308,7 @@ export function StackCard({
 
       <div className="grid gap-x-8 gap-y-5 md:grid-cols-2 xl:grid-cols-3">
         {sections.map((section) => (
-          <Group key={section.title} {...section} from={stack.from} />
+          <Group key={section.title} {...section} from={stack.from} registries={stack.registries} />
         ))}
       </div>
     </>

@@ -11,6 +11,7 @@ import { MEANS, isClient, isHost } from "../../lib/outside.ts"
 import { hands, handsOf } from "../../lib/people.ts"
 import { isId, namesOf } from "../../../src/naming.ts"
 import { BANDS } from "../../../src/system.ts"
+import { REGISTRY_OF } from "../../../src/registries.ts"
 import { shapeOf } from "../../lib/verdict.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Unit } from "../../../src/layers.ts"
@@ -95,6 +96,7 @@ export function System({
   const named = [...new Set([...stack.hosts, ...stack.apis, ...stack.connects])].map((label) => ({
     label,
     from: stack.from[label],
+    registry: REGISTRY_OF[stack.registries[label] ?? ""] ?? "npm",
     talks: units.filter((u) => stack.from[label] && u.installs.includes(stack.from[label])),
   }))
   // runs on one side, calls on the other
@@ -132,7 +134,7 @@ export function System({
               </span>
               {/* the chip has its own hint */}
               <div className="bg-card flex min-w-0 flex-1 flex-col gap-1 rounded-lg border p-2">
-                <Chip label={one.label} from={one.from} />
+                <Chip label={one.label} from={one.from} registry={one.registry} />
                 <Tip
                   className="min-w-0"
                   text={
@@ -171,13 +173,18 @@ export function System({
           {/* the wall is the repo, so its name outranks the chips beside it */}
           <span className="text-base font-semibold">{name}</span>
           {stack.frameworks.slice(0, 4).map((name) => (
-            <Chip key={name} label={name} from={stack.from[name]} />
+            <Chip
+              key={name}
+              label={name}
+              from={stack.from[name]}
+              registry={REGISTRY_OF[stack.registries[name] ?? ""] ?? "npm"}
+            />
           ))}
           {clients.length > 0 && (
             <span className="ml-auto flex items-center gap-1.5">
               <Note>speaks</Note>
               {clients.slice(0, 3).map((one) => (
-                <Chip key={one.label} label={one.label} from={one.from} />
+                <Chip key={one.label} label={one.label} from={one.from} registry={one.registry} />
               ))}
             </span>
           )}

@@ -7,6 +7,7 @@ import { Avatar } from "../components/atoms/avatar.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
+import { REGISTRIES, linkTo } from "../../src/registries.ts"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/atoms/moved.tsx"
@@ -116,6 +117,23 @@ const FAMILY: Record<string, string> = {
   unknown: OUTLINE.quiet,
 }
 
+const WHERE: Column<Row> = {
+  key: "ecosystem",
+  label: "Registry",
+  get: (one) => one.ecosystem,
+  cell: (one) =>
+    one.every ? (
+      <span className="text-muted-foreground">
+        {new Set(one.every.map((d) => d.ecosystem)).size} of them
+      </span>
+    ) : (
+      <span className="text-muted-foreground text-xs">
+        {REGISTRIES[one.ecosystem]?.label ?? one.ecosystem}
+      </span>
+    ),
+  hint: "which package registry it is installed from, since a repo of several languages draws from several",
+}
+
 const DEPS: Column<Row>[] = [
   {
     key: "name",
@@ -126,10 +144,10 @@ const DEPS: Column<Row>[] = [
         <span className="font-medium">{plural(one.every.length, "package")}</span>
       ) : (
         <a
-          href={`https://www.npmjs.com/package/${one.name}`}
+          href={linkTo(one.name, one.ecosystem)}
           target="_blank"
           rel="noreferrer"
-          title={`${one.name} on npm`}
+          title={`${one.name} on ${REGISTRIES[one.ecosystem]?.label ?? one.ecosystem}`}
           className="hover:text-foreground underline decoration-dotted"
         >
           {one.name}
@@ -506,6 +524,11 @@ export function Overview({
     () => (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct),
     [kit, scope],
   )
+  // one registry needs no column saying so on every row, several do
+  const columns = useMemo(() => {
+    const many = new Set((kit?.list ?? []).map((one) => one.ecosystem)).size > 1
+    return many ? [DEPS[0], DEPS[1], WHERE, ...DEPS.slice(2)] : DEPS
+  }, [kit])
   const picked = useMemo(() => {
     const said = hunt.trim().toLowerCase()
     return said
@@ -827,7 +850,7 @@ export function Overview({
           )}
           // dupes
           id={(one) => `${one.name}@${one.version}`}
-          columns={DEPS}
+          columns={columns}
           total={{ ...kit.list[0], name: "", every: picked }}
           fold={8}
         >

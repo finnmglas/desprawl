@@ -13,7 +13,7 @@ import { explain, needs } from "./needs.ts"
 import { isUrl, local } from "./remote.ts"
 import { serve } from "./serve.ts"
 import { anonymous, open, view } from "./view.ts"
-import { GRAINS, IMPACTS, KINDS, VIEWS, views } from "./views.ts"
+import { GRAINS, IMPACTS, KINDS, LANGUAGES, VIEWS, views } from "./views.ts"
 import type { Grain, Hits, Sort, View } from "./views.ts"
 import type { Node, Split, Stats } from "./model.ts"
 
@@ -43,6 +43,7 @@ const { values, positionals } = (() => {
         limit: { type: "string" },
         offline: { type: "boolean", default: false },
         grain: { type: "string" },
+        lang: { type: "string" },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -60,6 +61,7 @@ if (values.help) {
       `desprawl ${VIEWS.join("|")} [path] [--json]`,
       "         tasks also takes [--kind K] [--impact I] [--limit N] [--offline]",
       "         knowledge also takes [--grain module|file|function]",
+      `         any of them takes [--lang ${LANGUAGES.join("|")}]`,
     ].join("\n"),
   )
   process.exit(0)
@@ -213,12 +215,15 @@ try {
       fail(`no such impact as ${values.impact}. There is ${IMPACTS.join(", ")}`)
     if (values.grain && !GRAINS.includes(values.grain as Grain))
       fail(`no such grain as ${values.grain}. There is ${GRAINS.join(", ")}`)
+    if (values.lang && !LANGUAGES.includes(values.lang))
+      fail(`no such language as ${values.lang}. There is ${LANGUAGES.join(", ")}`)
     const made = await views(command as View, target, {
       kind: values.kind,
       impact: values.impact,
       limit: values.limit ? int(values.limit, 0) : undefined,
       offline: values.offline,
       grain: values.grain,
+      lang: values.lang,
     })
     // never process.exit here: it drops whatever of a large payload has not been written
     console.log(values.json ? JSON.stringify(made.data, null, 2) : made.text)

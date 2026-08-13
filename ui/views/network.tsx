@@ -14,6 +14,7 @@ import { Waiting } from "../components/atoms/waiting.tsx"
 import { Menu, MenuSection } from "../components/molecules/menu.tsx"
 import { BRANDS } from "../lib/brands.ts"
 import { LANGS } from "../../src/langs.ts"
+import { onlyIn } from "../../src/dialects.ts"
 import { PAINT, fit } from "../lib/canvas.ts"
 import { callGraph, importGraph } from "../lib/live.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
@@ -46,6 +47,10 @@ const WIRED = ["kind", "module", "leaving"]
 const ramp = (share: number) => `hsl(${Math.round(140 - 140 * share)}, 65%, 55%)`
 
 /** a hue off the name, so a palette never runs out */
+/** a band, spread across the wheel: an ordered thing wants ordered colours */
+const banded = (at: number, of: number) =>
+  `hsl(${Math.round((at / Math.max(1, of)) * 300)}, 62%, 55%)`
+
 const hued = (name: string) => {
   let hash = 0
   for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) % 360
@@ -63,7 +68,8 @@ export function Network({
   onTab: (tab: string) => void
   onPath: (path: string[]) => void
 }) {
-  const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
+  const [read, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
+  const [lang, setLang] = useState("")
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
   const [grain, setGrain] = useState<Grain>("file")
   const [imports, setImports] = useState(false)
@@ -73,7 +79,7 @@ export function Network({
   const [find, setFind] = useState("")
   const [numbers, setNumbers] = useState(false)
   const [bundle, setBundle] = useState(false)
-  const [paint, setPaint] = useState(PAINTS[0])
+  const [paint, setPaint] = useState("")
   const [edges, setEdges] = useState(WIRED[0])
   const [only, setOnly] = useState("")
   const [near, setNear] = useState<Spot | null>(null)
@@ -93,6 +99,20 @@ export function Network({
     if (!calls) void callGraph().then(setCalls)
   }, [])
 
+  // js and ts are one language written two ways, so a repo of both is not multi language
+  const multi = (held: string[]) => held.filter((one) => one !== "ts").length > 0 && held.length > 1
+  const langs = useMemo(
+    () =>
+      [
+        ...new Set(
+          Object.values(read?.modules ?? {})
+            .map((m) => m.lang)
+            .filter(Boolean),
+        ),
+      ].sort(),
+    [read],
+  )
+  const graph = useMemo(() => (read && lang ? onlyIn(read, lang) : read), [read, lang])
   useEffect(() => {
     const measure = () => {
       setWide(frame.current?.clientWidth ?? 900)
@@ -207,10 +227,16 @@ export function Network({
   const where = useMemo(() => worked(stats.tree), [stats.tree])
   const owner = (path: string) => hands(path, where, stats.contributors)[0]?.who.name ?? ""
   // what everything here is measured against, so a big file is big for this repo
+  // the deepest level any unit sits at, so the band is spread over the range in hand
+  const deepest = useMemo(
+    () => Math.max(1, ...(layout?.units ?? []).map((one) => one.level)),
+    [layout],
+  )
   const biggest = useMemo(
     () => Math.max(1, ...(drawn?.spots ?? []).map((s) => Math.log1p(s.weight))),
     [drawn],
   )
+  const boxAt = useMemo(() => new Map((drawn?.boxes ?? []).map((b) => [b.id, b])), [drawn])
   const unitOf = (spot: Spot) =>
     grain === "function" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
   const fileOf = (spot: Spot) => (grain === "function" ? spot.box : spot.id)
@@ -221,29 +247,71 @@ export function Network({
       : /(^|\/)(tests?|__tests__)\/|\.(test|spec)\./.test(file)
         ? "test"
         : "source"
+  // said once the graph is read: several languages want telling apart, one wants its shape
+  const painted = paint || (multi(langs) ? "language" : "shape")
+
   const colourOf = (spot: Spot) => {
-    if (paint === "one colour") return null
-    if (paint === "language") {
+    if (painted === "one colour") return null
+    if (painted === "language") {
       const brand = BRANDS[langOf(fileOf(spot))]
       return brand ? `#${brand[0]}` : null
     }
-    if (paint === "kind") return hued(grain === "file" ? sortOf(spot.id) : spot.kind)
-    if (paint === "size") return ramp(Math.log1p(spot.weight) / biggest)
-    if (paint === "shape") {
+    if (painted === "kind") return hued(grain === "file" ? sortOf(spot.id) : spot.kind)
+    if (painted === "size") return ramp(Math.log1p(spot.weight) / biggest)
+    if (painted === "shape") {
       const unit = units.get(grain === "module" ? spot.id : unitOf(spot))
       if (!unit) return null
       const out = Object.values(unit.out).reduce((sum, n) => sum + n, 0)
       const into = Object.values(unit.in).reduce((sum, n) => sum + n, 0)
       return hued(shapeOf(unit.internal, out, into, Object.keys(unit.out).length).label)
     }
-    if (paint === "level")
-      return hued(`level ${units.get(grain === "module" ? spot.id : unitOf(spot))?.level ?? 0}`)
+    if (painted === "level") {
+      const at = units.get(grain === "module" ? spot.id : unitOf(spot))?.level ?? 0
+      return banded(at, deepest)
+    }
     return hued(grain === "module" ? spot.id : unitOf(spot))
   }
 
+  // every colour on screen, once, in the order the eye meets them
+  const legend = useMemo(() => {
+    if (!drawn || painted === "one colour") return []
+    const seen = new Map<string, string | null>()
+    for (const spot of drawn.spots) {
+      const label =
+        painted === "language"
+          ? (langOf(fileOf(spot)) ?? "")
+          : painted === "kind"
+            ? grain === "file"
+              ? sortOf(spot.id)
+              : spot.kind
+            : painted === "level"
+              ? `L${units.get(grain === "module" ? spot.id : unitOf(spot))?.level ?? 0}`
+              : painted === "module"
+                ? (called.get(grain === "module" ? spot.id : unitOf(spot)) ?? "")
+                : ""
+      if (!label || seen.has(label)) continue
+      seen.set(label, colourOf(spot))
+    }
+    // size is a ramp, not a set of names, so it says its two ends instead
+    if (painted === "size")
+      return [
+        { label: "smaller", colour: ramp(0) },
+        { label: "bigger", colour: ramp(1) },
+      ]
+    if (painted === "shape")
+      for (const spot of drawn.spots) {
+        const unit = units.get(grain === "module" ? spot.id : unitOf(spot))
+        if (!unit) continue
+        const out = Object.values(unit.out).reduce((sum, v) => sum + v, 0)
+        const into = Object.values(unit.in).reduce((sum, v) => sum + v, 0)
+        const label = shapeOf(unit.internal, out, into, Object.keys(unit.out).length).label
+        if (!seen.has(label)) seen.set(label, colourOf(spot))
+      }
+    return [...seen].slice(0, 14).map(([label, colour]) => ({ label, colour }))
+  }, [drawn, paint, grain, units, called])
+
   const hunted = find.trim().toLowerCase()
   const at = useMemo(() => new Map((drawn?.spots ?? []).map((s) => [s.id, s])), [drawn])
-  const boxAt = useMemo(() => new Map((drawn?.boxes ?? []).map((b) => [b.id, b])), [drawn])
 
   // react listens passively, so preventDefault there is ignored
   // under the cursor. The zoom has to own the wheel, which means binding it by hand
@@ -657,6 +725,13 @@ export function Network({
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />
+        {langs.length > 1 && (
+          <Tabs
+            tabs={["every language", ...langs]}
+            value={lang || "every language"}
+            onChange={(next) => setLang(next === "every language" ? "" : next)}
+          />
+        )}
         <div className="ml-auto flex flex-wrap items-center gap-1">
           {toggle(imports, setImports, "imports", IMPORT)}
           {toggle(wired, setWired, "calls", CALL)}
@@ -754,6 +829,20 @@ export function Network({
           </div>
         </CardHead>
         <CardContent>
+          {/* what the colours mean, said where the drawing is rather than in a menu */}
+          {!!drawn && (
+            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {legend.map((one) => (
+                <span key={one.label} className="flex items-center gap-1.5 text-xs">
+                  <span
+                    className="size-2.5 shrink-0 rounded-[2px]"
+                    style={{ background: one.colour ?? "var(--muted-foreground)" }}
+                  />
+                  <span className="text-muted-foreground">{one.label}</span>
+                </span>
+              ))}
+            </div>
+          )}
           <div ref={frame} className="w-full">
             {heavy ? (
               <div className="text-muted-foreground flex h-40 flex-col items-center justify-center gap-3 text-sm">

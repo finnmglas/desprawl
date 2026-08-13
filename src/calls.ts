@@ -5,9 +5,13 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { build, type Graph } from "./graph.ts"
 import { packageOf } from "./graph.ts"
-import { MARK, scrub, specifiers } from "./specifiers.ts"
+import { MARK, declared, scrub, specifiers } from "./specifiers.ts"
+import { dialectOf, keywordsOf, runtimeOf } from "./dialects.ts"
+import { foreign } from "./specifiers.ts"
 
 export interface Symbol {
+  /** the dialect its file was read with, so a mixed repo can be split */
+  lang: string
   /** file#name, unique: a file declares a name once */
   id: string
   file: string
@@ -53,6 +57,8 @@ export interface Calls {
 const KEY = /[{,;]\s*[A-Za-z_$][\w$]*\s*:\s*$/
 // onClick={save} calls save. a dot owns the name, a spread does not
 const USED = /(?<![\w$])(?<!(?<!\.)\.)([A-Za-z_$][\w$]*)/g
+// a method on a value: the receiver is unknown, but the name it calls is not
+const METHOD = /(?<=[\w$)\]])(?:\.|::|->)([A-Za-z_]\w*)\s*\(/g
 const CALLED = /^[^\S\n]*(?:<[^<>()]*>)?[^\S\n]*\(/
 const KEYWORD = new Set([
   "if",
@@ -255,13 +261,27 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     } catch {
       continue
     }
-    const read = scrub(text)
+    const dialect = dialectOf(module.path)
+    const read = scrub(text, dialect?.flavour)
     const { code } = read
     sources.set(module.path, code)
     const starts = breaks(code)
 
     const local = new Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>()
-    for (const spec of specifiers(text, read)) {
+    // a language of its own says the name last: `import android.content.Intent` binds Intent
+    if (dialect && dialect.id !== "ts")
+      for (const spec of foreign(text, dialect, read)) {
+        const file = module.imports[spec.text]
+        const tail =
+          spec.text
+            .split(/[.:/]+/)
+            .filter(Boolean)
+            .pop() ?? ""
+        if (!tail || tail === "*") continue
+        if (file) local.set(tail, { file, name: tail })
+        else if (!spec.guess) local.set(tail, { name: tail, pkg: outside(dialect.id, spec.text) })
+      }
+    for (const spec of dialect && dialect.id !== "ts" ? [] : specifiers(text, read)) {
       const file = module.imports[spec.text]
       const pkg = file ? undefined : packageOf(spec.text)
       for (const bound of spec.names)
@@ -291,6 +311,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       ;(mine.get(module.path) ?? mine.set(module.path, []).get(module.path)!).push(id)
       symbols[id] = {
         id,
+        lang: module.lang,
         file: module.path,
         name,
         kind,
@@ -303,15 +324,53 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       }
     }
 
-    for (const m of code.matchAll(DECLARED))
-      add(
-        m[5],
-        m.index,
-        !!m[1],
-        m[4] === "class" ? "class" : /^[A-Z]/.test(m[5]) ? "component" : "function",
-      )
-    for (const m of code.matchAll(ASSIGNED))
-      add(m[2], m.index, !!m[1], /^[A-Z]/.test(m[2]) ? "component" : "function")
+    if (dialect && dialect.id !== "ts") {
+      // its own words for a declaration, and everything at the top of a file is reachable
+      for (const one of declared(code, dialect))
+        add(one.name, one.at, true, one.kind === "class" ? "class" : "function")
+    } else {
+      for (const m of code.matchAll(DECLARED))
+        add(
+          m[5],
+          m.index,
+          !!m[1],
+          m[4] === "class" ? "class" : /^[A-Z]/.test(m[5]) ? "component" : "function",
+        )
+      for (const m of code.matchAll(ASSIGNED))
+        add(m[2], m.index, !!m[1], /^[A-Z]/.test(m[2]) ? "component" : "function")
+    }
+  }
+
+  // a top level function on the jvm lives in a file named after nothing in particular, so
+  // an import that named no file is looked up by the declaration it named instead
+  const declares = new Map<string, string[]>()
+  for (const [id] of Object.entries(symbols)) {
+    const name = id.split("#")[1]
+    declares.set(name, [...(declares.get(name) ?? []), id.split("#")[0]])
+  }
+  for (const module of Object.values(graph.modules)) {
+    if (!module.lang || module.lang === "ts") continue
+    const local = bindings.get(module.path)
+    if (!local) continue
+    for (const [name, came] of local) {
+      if (came.file || !came.pkg) continue
+      const held = declares.get(name)
+      // one file declaring it is an answer, several is a guess nobody asked for
+      if (held?.length === 1 && held[0] !== module.path) local.set(name, { file: held[0], name })
+    }
+  }
+
+  // what an imported file declares is what its name means here, which is how a language
+  // that imports a module rather than its names is read at all
+  for (const module of Object.values(graph.modules)) {
+    if (!module.lang || module.lang === "ts") continue
+    const local = bindings.get(module.path)
+    if (!local) continue
+    for (const edge of module.out)
+      for (const id of mine.get(edge.to) ?? []) {
+        const name = id.split("#")[1]
+        if (!local.has(name)) local.set(name, { file: edge.to, name })
+      }
   }
 
   // or every entry point reads as dead
@@ -330,6 +389,10 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
 
   for (const [file, code] of sources) {
     const local = bindings.get(file)!
+    // its own language owns its own words: a `when` is not a call to something missing
+    const lang = graph.modules[file]?.lang ?? ""
+    const owns = lang && lang !== "ts" ? keywordsOf(lang) : KEYWORD
+    const runtime = lang && lang !== "ts" ? runtimeOf(lang) : GLOBAL
     const walking = [...(mine.get(file) ?? []), `${file}#${TOP}`]
     for (const id of walking) {
       const top = id.endsWith(`#${TOP}`)
@@ -338,6 +401,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         symbols[id] ??
         (symbols[id] = {
           id,
+          lang: graph.modules[file]?.lang ?? "",
           file,
           name: TOP,
           kind: "module",
@@ -357,12 +421,30 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       )
 
       const seen = new Set<string>()
+      // a method call names no file, so it lands only when one file declares that name
+      if (lang && lang !== "ts")
+        for (const m of body.matchAll(METHOD)) {
+          const name = m[1]
+          if (owns.has(name) || name === symbol.name) continue
+          // the runtime only wins where nothing here declares that name
+          if (runtime.has(name) && !declares.has(name)) continue
+          const here = symbols[`${file}#${name}`]
+          if (here) {
+            link(symbol.id, here.id)
+            continue
+          }
+          const held = declares.get(name)
+          if (held?.length === 1) {
+            const there = symbols[`${held[0]}#${name}`]
+            if (there && there.id !== symbol.id) link(symbol.id, there.id)
+          }
+        }
       for (const m of body.matchAll(USED)) {
         const name = m[1]
         // coverage counts call shaped mentions only
         const shaped = CALLED.test(body.slice(m.index + name.length, m.index + name.length + 40))
         if (KEY.test(body.slice(Math.max(0, m.index - 24), m.index + name.length + 2))) continue
-        if (KEYWORD.has(name) || seen.has(name)) continue
+        if (owns.has(name) || seen.has(name)) continue
         seen.add(name)
         if (name === symbol.name) continue
 
@@ -375,7 +457,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
           continue
         }
         if (locals.get(file)?.has(name)) continue
-        if (GLOBAL.has(name)) {
+        if (runtime.has(name) && !symbols[`${file}#${name}`]) {
           if (shaped) builtin++
           continue
         }
@@ -436,3 +518,11 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     },
   }
 }
+
+/** the package a foreign specifier belongs to, for a name it brought in from outside */
+const outside = (lang: string, text: string): string =>
+  lang === "rust"
+    ? text.split("::")[0]
+    : lang === "jvm" || lang === "python"
+      ? text.split(".").slice(0, 2).join(".")
+      : (text.split("/").pop() ?? text)

@@ -4,6 +4,7 @@
 import { analyze } from "./analyze.ts"
 import { timeline } from "./history.ts"
 import { GRAINS, asRows, knowledge, type Grain } from "./knowledge.ts"
+import { LANGUAGES, onlyIn } from "./dialects.ts"
 import { calls as callGraph } from "./calls.ts"
 import { deps as depsOf } from "./deps.ts"
 import { build } from "./graph.ts"
@@ -39,6 +40,8 @@ export interface Asked {
   offline?: boolean
   /** module, file or declaration, for the knowledge graph */
   grain?: string
+  /** one dialect of a mixed repo, since a graph of all of them is several pictures */
+  lang?: string
 }
 
 const n = (v: number) => human(v, 3)
@@ -63,8 +66,9 @@ interface Read {
   lines: Map<string, number>
 }
 
-const readIn = (repo: string): Read => {
-  const graph = build(repo)
+const readIn = (repo: string, only = ""): Read => {
+  const whole = build(repo)
+  const graph = only ? onlyIn(whole, only) : whole
   const split = balanced(graph)
   return {
     repo,
@@ -85,7 +89,7 @@ const asked = (found: Task[], ask: Asked) => {
 }
 
 async function work(repo: string, ask: Asked): Promise<{ text: string; data: unknown }> {
-  const read = readIn(repo)
+  const read = readIn(repo, ask.lang ?? "")
   const kit = ask.offline ? null : await depsOf(repo).catch(() => null)
   const paths = [...read.lines.keys()]
   const said = {
@@ -251,7 +255,7 @@ function kit(repo: string) {
     ["connects", stack.connects], ["testing", stack.testing], ["bundlers", stack.bundlers],
     ["linters", [...stack.linters, ...stack.formatters]], ["ci", stack.ci],
     ["hosting", stack.hosts], ["apis", stack.apis],
-    ["packages", [`${stack.dependencies} deps`, ...stack.managers, ...stack.lockfiles]],
+    ["packages", [`${stack.dependencies} deps`, ...new Set([...stack.managers, ...stack.lockfiles])]],
     ["licence", [stack.license, stack.private ? "private" : ""]],
   ]
   return {
@@ -315,11 +319,11 @@ export async function views(
   if (view === "deps") return packages(repo)
   if (view === "stack") return kit(repo)
   if (view === "history") return past(repo)
-  const read = readIn(repo)
+  const read = readIn(repo, ask.lang ?? "")
   if (view === "knowledge") return known(repo, read, ask)
   if (view === "architecture") return shape(read)
   return view === "modules" ? units(read) : view === "execution" ? runs(read) : loose(read, ask)
 }
 
-export { GRAINS, KINDS, IMPACTS, weigh }
+export { GRAINS, KINDS, IMPACTS, LANGUAGES, weigh }
 export type { Grain, Hits, Sort, Task }

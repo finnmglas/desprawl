@@ -40,6 +40,7 @@ export function Execution({
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
   const [roots, setRoots] = useState(ROOTS[0])
   const [kind, setKind] = useState(KINDS[0])
+  const [lang, setLang] = useState(KINDS[0])
   const [find, setFind] = useState("")
 
   useEffect(() => {
@@ -99,10 +100,13 @@ export function Execution({
       .values(),
   ].sort((a, b) => b.sites - a.sites)
 
+  // a repo of two languages is two pictures, and reading them apart is the only way to see either
+  const langs = [...new Set(declared.map((s) => s.lang).filter(Boolean))].sort()
   const hunted = find.trim().toLowerCase()
   const shown = declared.filter(
     (s) =>
       (kind === KINDS[0] || s.kind === kind) &&
+      (lang === KINDS[0] || s.lang === lang) &&
       (!hunted || s.name.toLowerCase().includes(hunted) || s.file.toLowerCase().includes(hunted)),
   )
   const walk = (file: string) => onPath(file.split("/").slice(0, -1))
@@ -196,6 +200,7 @@ export function Execution({
 
       <div className="flex flex-wrap items-center gap-1">
         <Tabs tabs={KINDS} value={kind} onChange={setKind} />
+        {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
         <Tabs className="ml-auto" tabs={ROOTS} value={roots} onChange={setRoots} />
       </div>
 

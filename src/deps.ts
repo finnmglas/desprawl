@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { git } from "./model.ts"
 export { familyOf, type Family } from "./licence.ts"
 import { reading } from "./graph.ts"
+import { manifests } from "./manifests.ts"
 
 export interface Advisory {
   id: string
@@ -33,6 +34,8 @@ export interface Dep {
   latest: string
   /** its own files on disk: what it installed is its own row */
   bytes: number
+  /** where it lives, so an advisory is asked for in the right place */
+  ecosystem: string
   advisories: Advisory[]
 }
 
@@ -81,6 +84,7 @@ export interface Deps {
 }
 
 interface Held {
+  ecosystem: string
   name: string
   version: string
   license: string
@@ -147,6 +151,7 @@ function tree(root: string): Map<string, Held> {
       if (own?.name && own?.version) {
         const key = `${own.name}@${own.version}`
         found.set(key, {
+          ecosystem: "npm",
           name: own.name,
           version: own.version,
           license: licensed(own),
@@ -165,6 +170,10 @@ function tree(root: string): Map<string, Held> {
   return found
 }
 
+/** the one version a range names, when it names exactly one */
+const pinned = (range: string): string =>
+  /^[=~^]?v?(\d+\.\d+(\.\d+)?)$/.exec(range.trim())?.[1] ?? ""
+
 const CHUNK = 500
 const TRIES = 3
 
@@ -176,7 +185,9 @@ interface Filed {
 
 async function osv(list: Dep[]): Promise<Filed> {
   const found = new Map<string, Advisory[]>()
-  const asked = list.filter((one) => one.version)
+  const asked = list
+    .map((one) => ({ ...one, version: one.version || pinned(one.range) }))
+    .filter((one) => one.version && one.ecosystem)
   if (!asked.length) return { found, missed: 0 }
 
   // a whole tree is thousands of packages, and one batch has a limit
@@ -187,7 +198,7 @@ async function osv(list: Dep[]): Promise<Filed> {
       method: "POST",
       body: JSON.stringify({
         queries: part.map((one) => ({
-          package: { name: one.name, ecosystem: "npm" },
+          package: { name: one.name, ecosystem: one.ecosystem },
           version: one.version,
         })),
       }),
@@ -238,6 +249,22 @@ async function osv(list: Dep[]): Promise<Filed> {
   return { found, missed }
 }
 
+/** named but never installed here: the manifest is all we know about it */
+const blank = (name: string, range: string, dev: boolean, ecosystem: string): Dep => ({
+  name,
+  version: "",
+  license: "",
+  bytes: 0,
+  ecosystem,
+  range,
+  dev,
+  direct: true,
+  released: "",
+  used: "",
+  latest: "",
+  advisories: [],
+})
+
 /** licences from disk, advisories from osv */
 export async function deps(repo: string): Promise<Deps> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
@@ -275,21 +302,19 @@ export async function deps(repo: string): Promise<Deps> {
 
   // nothing installed, so the manifest is all there is to report
   if (!list.length)
-    list.push(
-      ...[...wanted].map(([name, dev]) => ({
-        name,
-        version: "",
-        license: "",
-        bytes: 0,
-        range: range(name),
-        dev,
-        direct: true,
-        released: "",
-        used: "",
-        latest: "",
-        advisories: [] as Advisory[],
-      })),
-    )
+    list.push(...[...wanted].map(([name, dev]) => blank(name, range(name), dev, "npm")))
+
+  // every other language keeps what it asks for in a manifest of its own, and nothing of
+  // it is on disk here: the range is all there is, which is enough for an advisory
+  const tracked = git(root, "ls-files", "-z").split("\0").filter(Boolean)
+  const found = manifests(root, tracked).filter((one) => one.path !== "package.json")
+  // a crate or module this repo itself builds is not something it depends on
+  const own = new Set(found.map((one) => one.name).filter(Boolean) as string[])
+  for (const one of found)
+    for (const asked of one.asked) {
+      if (own.has(asked.name) || list.some((held) => held.name === asked.name)) continue
+      list.push(blank(asked.name, asked.range, asked.dev, asked.ecosystem))
+    }
 
   let offline = false
   let missed = 0

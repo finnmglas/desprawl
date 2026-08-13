@@ -205,3 +205,48 @@ export const NOTES: Record<string, string> = {
   Plotly: "scientific charts", Konva: "canvas scene graph", PixiJS: "webgl renderer",
   "deck.gl": "large geospatial layers",
 }
+
+/** the ones outside npm, so a rust or python chip explains itself like every other */
+// prettier-ignore
+const OUTSIDE: Record<string, string> = {
+  Tokio: "rust's async runtime", "async-std": "async runtime, std shaped",
+  Actix: "rust web framework, actor based", Axum: "rust web framework, on tokio and tower",
+  Rocket: "rust web framework, macro heavy", warp: "rust web framework, filter composed",
+  Tonic: "grpc for rust", hyper: "the http library most rust servers sit on",
+  Serde: "rust serialisation, derive driven", Rayon: "data parallelism for rust",
+  Diesel: "rust orm, compile time checked", SQLx: "rust sql, checked against a real database",
+  SeaORM: "async rust orm", Bevy: "rust game engine, entity component",
+  Tauri: "desktop apps with a web frontend and a rust core", egui: "immediate mode rust gui",
+  wgpu: "rust graphics on the webgpu api", Polars: "dataframes in rust, arrow backed",
+  clap: "rust argument parser, the common one", structopt: "clap by derive, now folded into it",
+  argh: "small rust argument parser", "pico-args": "minimal rust argument parser",
+  gumdrop: "derive based rust argument parser",
+  Django: "python web framework, batteries included", Flask: "small python web framework",
+  FastAPI: "python api framework, typed and async", Starlette: "the asgi toolkit under fastapi",
+  Pydantic: "python validation off type hints", SQLAlchemy: "python orm and sql toolkit",
+  NumPy: "python arrays and linear algebra", pandas: "python dataframes",
+  PyTorch: "deep learning, dynamic graphs", TensorFlow: "deep learning, google's",
+  "scikit-learn": "classical machine learning for python", Transformers: "pretrained models, hugging face",
+  argparse: "python's own argument parser", Click: "python cli framework, decorator based",
+  Typer: "click with type hints", Fire: "python cli from any object", docopt: "cli from the usage text",
+  "Spring Boot": "jvm application framework, opinionated", Spring: "the jvm framework it is built on",
+  Ktor: "kotlin web framework, coroutine based", Coroutines: "kotlin's async runtime",
+  Retrofit: "typed http client for the jvm", OkHttp: "the http client under retrofit",
+  AppCompat: "android backwards compatible ui", AndroidX: "the android support libraries",
+  Material: "google's material components", picocli: "jvm cli framework, annotation driven",
+  Clikt: "kotlin cli framework", "commons-cli": "apache's jvm argument parser",
+  args4j: "jvm argument parser, annotation driven",
+  Gin: "go web framework, fast router", Echo: "go web framework", Fiber: "go web framework, express shaped",
+  GORM: "go orm", Cobra: "go cli framework, the common one", "urfave/cli": "go cli framework",
+  kingpin: "go argument parser",
+  pytest: "python test runner, the common one", unittest: "python's own test framework",
+  Hypothesis: "property based testing for python", tox: "python test matrix runner",
+  JUnit: "jvm test framework", Mockito: "jvm mocking", AssertJ: "fluent jvm assertions",
+  Kotest: "kotlin test framework", Espresso: "android ui testing",
+  Criterion: "rust benchmarking, statistical", divan: "rust benchmarking, fast to write",
+  proptest: "property based testing for rust", QuickCheck: "property based testing",
+  testify: "go assertions and mocks", GoogleTest: "c++ test framework", Catch2: "c++ test framework",
+  doctest: "c++ test framework, single header",
+}
+
+for (const [name, said] of Object.entries(OUTSIDE)) NOTES[name] ??= said
