@@ -5,10 +5,11 @@ import { useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "../atoms/card.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
-import { Save } from "./save.tsx"
+import { Save, type Sheet } from "./save.tsx"
 import { TBody, TD, TH, THead, TR, Table } from "../atoms/table.tsx"
 import { Tip } from "../atoms/tip.tsx"
 import { type Column } from "../../lib/columns.ts"
+import { Find } from "./find.tsx"
 import { delimit } from "../../lib/export.ts"
 import { HINTS } from "../../lib/hints.ts"
 import { backdrop, cycle, pct } from "../../lib/format.ts"
@@ -39,6 +40,10 @@ export interface DataTableProps<T> {
   onSort?: (sort: Sort | null) => void
   /** what an export is called, when the title is not plain words */
   file?: string
+  /** more tables that come off this panel, offered inside its save button */
+  saves?: Sheet[]
+  /** what the reader typed into the search, for a total row that has to agree with it */
+  onFind?: (said: string) => void
 }
 
 export function DataTable<T>({
@@ -54,26 +59,40 @@ export function DataTable<T>({
   total,
   fold,
   file,
+  saves,
   onSort,
+  onFind,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
   const sheet = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<Sort | null>(null)
   const [open, setOpen] = useState(false)
+  const [hunt, setHunt] = useState("")
+
+  // a table nobody has to scroll is a table nobody searches, so the search appears with
+  // the fold that hid something in the first place
+  const searchable = fold !== undefined && rows.length > fold
+  const rows_ = useMemo(() => {
+    const said = hunt.trim().toLowerCase()
+    if (!said || !searchable) return rows
+    return rows.filter((row) =>
+      columns.some((col) => String(col.get(row)).toLowerCase().includes(said)),
+    )
+  }, [rows, columns, hunt, searchable])
 
   const sums = useMemo(() => {
     const found: Record<string, number> = {}
     for (const col of columns) {
       if (!col.num) continue
       let sum = 0
-      for (const row of rows) {
+      for (const row of rows_) {
         const value = col.get(row)
         if (typeof value === "number") sum += value
       }
       found[col.key] = sum
     }
     return found
-  }, [columns, rows])
+  }, [columns, rows_])
 
   // num means the column is right aligned, not that it holds numbers: a date is a string
   // sitting in one, and a string column adds up to nothing without anything being wrong
@@ -82,27 +101,27 @@ export function DataTable<T>({
       new Set(
         columns
           .filter(
-            (col) => col.num && !col.good && rows.some((row) => typeof col.get(row) === "number"),
+            (col) => col.num && !col.good && rows_.some((row) => typeof col.get(row) === "number"),
           )
           .map((col) => col.key),
       ),
-    [columns, rows],
+    [columns, rows_],
   )
 
   const share = (col: Column<T>) => shares(col, scale)
   const scaled = (col: Column<T>, row: T) => effective(col, row, scale, sums)
 
   const sorted = useMemo(() => {
-    if (!sort) return rows
+    if (!sort) return rows_
     const col = columns.find((c) => c.key === sort.key)
-    if (!col) return rows
-    return [...rows].sort((a, b) => {
+    if (!col) return rows_
+    return [...rows_].sort((a, b) => {
       const [x, y] = [scaled(col, a), scaled(col, b)]
       const cmp =
         typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y))
       return sort.asc ? cmp : -cmp
     })
-  }, [rows, sort, columns, scale])
+  }, [rows_, sort, columns, scale])
 
   // peaks follow the same values, shares bar against the biggest share
   const peaks = useMemo(() => {
@@ -110,14 +129,14 @@ export function DataTable<T>({
     for (const col of columns) {
       if (!col.num || col.flat) continue
       let peak = 0
-      for (const row of rows) {
+      for (const row of rows_) {
         const at = scaled(col, row)
         if (typeof at === "number" && at > peak) peak = at
       }
       found[col.key] = peak
     }
     return found
-  }, [columns, rows, scale])
+  }, [columns, rows_, scale])
 
   // the fold hides rows, peaks and export still see them all
   const foldable = fold !== undefined && sorted.length > fold
@@ -138,6 +157,15 @@ export function DataTable<T>({
       <CardHead title={title} hint={hint}>
         <div className="ml-auto flex items-center gap-1">
           {children}
+          {searchable && (
+            <Find
+              value={hunt}
+              onChange={(said) => {
+                setHunt(said)
+                onFind?.(said)
+              }}
+            />
+          )}
           <CopyButton
             text={() => delimit(matrix(), "\t")}
             message={`Copied ${sorted.length} rows`}
@@ -148,6 +176,7 @@ export function DataTable<T>({
             rows={matrix}
             picture={() => sheet.current}
             note={`${sorted.length} rows, as`}
+            extra={saves}
           />
         </div>
       </CardHead>

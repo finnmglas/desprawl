@@ -64,11 +64,20 @@ async function vectors(node: HTMLElement, paint: string): Promise<string> {
   return decodeURIComponent(url.slice("data:image/svg+xml;charset=utf-8,".length))
 }
 
+/** one more table that comes off the same panel, so two panels do not need two buttons */
+export interface Sheet {
+  name: string
+  label: string
+  note?: string
+  rows: () => Matrix
+}
+
 export function Save({
   name,
   rows,
   picture,
   note,
+  extra,
   children,
   className,
 }: {
@@ -79,6 +88,7 @@ export function Save({
   /** the drawing this panel holds, when it holds one */
   picture?: () => HTMLElement | null
   note?: string
+  extra?: Sheet[]
   /** anything the panel wants to offer beside the formats, like a grain */
   children?: React.ReactNode
   className?: string
@@ -155,6 +165,25 @@ export function Save({
           <Line label="SVG" ext="svg" onClick={() => void vector()} />
         </>
       )}
+      {extra?.map((sheet) => (
+        <div key={sheet.name}>
+          <div className="bg-border my-1 h-px" />
+          <p className="text-muted-foreground px-2 py-1.5 text-xs">{sheet.note ?? sheet.label}</p>
+          {FORMATS.map((format) => (
+            <Line
+              key={format.key}
+              label={`${sheet.label}, ${format.label}`}
+              ext={format.ext}
+              onClick={() => {
+                const made = sheet.rows()
+                const file = named(`${sheet.name}.${format.ext}`)
+                download(file, format.of(made, sheet.name), format.mime)
+                toast(file, `${made.length - 1} rows · ${format.hint}`)
+              }}
+            />
+          ))}
+        </div>
+      ))}
       {children && <div className="bg-border my-1 h-px" />}
       {children}
     </Menu>

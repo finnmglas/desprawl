@@ -12,10 +12,10 @@ import { Input } from "../components/atoms/input.tsx"
 import { Kind } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
-import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { toast } from "../components/atoms/toast.tsx"
 import { nest, num, pct } from "../lib/format.ts"
 import { filesIn } from "../lib/live.ts"
+import type { Matrix } from "../lib/formats.ts"
 import { mainly } from "../lib/tint.ts"
 import { spreadOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
@@ -48,6 +48,16 @@ export interface ExplorerProps {
   /** a line kind shades the rows the same way a language does, and only one at a time */
   kind: string
   setKind: (kind: string) => void
+}
+
+const flatten = (node: Node): Matrix => {
+  const rows: Matrix = [["path", "code", "comment", "blank", "files", "commits", "last"]]
+  const walk = (one: Node) => {
+    rows.push([one.path, one.code, one.comment, one.blank, one.files, one.commits, one.last])
+    one.children?.forEach(walk)
+  }
+  walk(node)
+  return rows
 }
 
 export function Explorer({
@@ -181,6 +191,14 @@ export function Explorer({
           rows={rows}
           id={(n) => n.path}
           fold={100}
+          saves={[
+            {
+              name: `${path.join("-") || "root"}-tree`,
+              label: "Folder tree",
+              note: `${num(here.files)} files, every child of ${path.join("/") || "/"}, as`,
+              rows: () => flatten(here),
+            },
+          ]}
           onRowClick={enter}
           rowStyle={(n) =>
             lang || kind
@@ -198,12 +216,6 @@ export function Explorer({
               {standing.label}
             </Badge>
           </Tip>
-          <CopyButton
-            label="Copies this folder as json"
-            text={() => JSON.stringify(here, null, 2)}
-            message={`Copied ${path.join("/") || "/"} as json`}
-            note={`${num(here.files)} files, with every child`}
-          />
         </DataTable>
 
         <div className="flex min-w-0 flex-col gap-3">

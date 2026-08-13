@@ -20,7 +20,6 @@ import { Waiting } from "../components/atoms/waiting.tsx"
 import { System, wall } from "../components/molecules/system.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
-import { Find } from "../components/molecules/find.tsx"
 import { ago, day, num, pct, plural, tokens, weight } from "../lib/format.ts"
 import {
   commentsOf,
@@ -499,15 +498,20 @@ export function Overview({
   const [kit, setKit] = useState<Deps | null>(null)
   const [scope, setScope] = useState(SCOPE[0])
   const [hunt, setHunt] = useState("")
-  // the scope decides which rows there are, the search which of them are worth showing,
-  // and the totals row counts whatever survived both
+  // the scope decides which rows there are and the table searches within them: the totals
+  // row is a prop rather than a row, so it has to be told what the search left
+  const scoped = useMemo(
+    () => (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct),
+    [kit, scope],
+  )
   const picked = useMemo(() => {
-    const rows = (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct)
     const said = hunt.trim().toLowerCase()
     return said
-      ? rows.filter((one) => `${one.name} ${one.license}`.toLowerCase().includes(said))
-      : rows
-  }, [kit, scope, hunt])
+      ? scoped.filter((one) =>
+          `${one.name} ${one.version} ${one.license}`.toLowerCase().includes(said),
+        )
+      : scoped
+  }, [scoped, hunt])
   const [suite, setSuite] = useState<Suite | null>(null)
   const [running, setRunning] = useState("")
   useEffect(() => {
@@ -809,7 +813,8 @@ export function Overview({
               : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
           }
           // worst first
-          rows={[...picked].sort(
+          onFind={setHunt}
+          rows={[...scoped].sort(
             (a, b) =>
               b.advisories.length - a.advisories.length ||
               RANK.indexOf(worst(a.advisories)) - RANK.indexOf(worst(b.advisories)) ||
@@ -822,7 +827,6 @@ export function Overview({
           fold={8}
         >
           <div className="ml-auto flex items-center gap-2">
-            <Find value={hunt} onChange={setHunt} placeholder="Find a package or a licence" />
             <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
           </div>
         </DataTable>

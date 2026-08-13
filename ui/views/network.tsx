@@ -640,14 +640,19 @@ export function Network({
             ...(drawn?.wires ?? []).map((w) => [w.from, w.to, w.imports, w.calls, String(w.types)]),
           ]}
           note={`${plural(drawn?.wires.length ?? 0, "link")} between ${plural(drawn?.spots.length ?? 0, "node")}, as`}
+          extra={
+            graph && layout && split
+              ? [
+                  {
+                    name: "knowledge-graph",
+                    label: "Knowledge graph",
+                    note: "every module, file, declaration and install as one set of things and the relations between them, at this grain, as",
+                    rows: () => asRows(knowledge(stats.repo, graph, calls, layout, grain, split)),
+                  },
+                ]
+              : undefined
+          }
         />
-        {graph && layout && split && (
-          <Save
-            name="knowledge-graph"
-            rows={() => asRows(knowledge(stats.repo, graph, calls, layout, grain, split))}
-            note="every module, file, declaration and install as one set of things and the relations between them, at this grain, as"
-          />
-        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
