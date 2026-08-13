@@ -271,9 +271,11 @@ export function installs(): Install[] {
     })
     return [
       of(plain, tool.name),
-      // a wrapper sets its own config dir, named after it
+      // a wrapper sets its own config dir, named after it. The same plain binary on a
+      // second PATH entry is not a wrapper
       ...bins
         .slice(1)
+        .filter((bin) => last(bin) !== tool.name)
         .map((bin) => of(bin, last(bin), undefined, tool.who(join(homedir(), `.${last(bin)}`)))),
       // the plain one's own dir is not a second entry
       ...(tool.home

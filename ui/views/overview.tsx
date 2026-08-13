@@ -289,7 +289,7 @@ const DEPS: Column<Row>[] = [
       const stale = !!one.latest && one.version !== one.latest
       return (
         <Tip
-          text={`${one.version} was published on ${day(one.used)}${stale ? `, and ${one.latest} is out since` : ", which is the newest there is"}`}
+          text={`${one.version} was published on ${day(one.used)}${stale ? `, and ${one.latest} is out` : ", which is the newest there is"}`}
         >
           <span>{ago(one.used)}</span>
         </Tip>
@@ -531,12 +531,13 @@ export function Overview({
   }, [kit])
   const picked = useMemo(() => {
     const said = hunt.trim().toLowerCase()
+    // the same match the table itself searches with, so the totals row agrees
     return said
       ? scoped.filter((one) =>
-          `${one.name} ${one.version} ${one.license}`.toLowerCase().includes(said),
+          columns.some((col) => String(col.get(one)).toLowerCase().includes(said)),
         )
       : scoped
-  }, [scoped, hunt])
+  }, [scoped, hunt, columns])
   const [suite, setSuite] = useState<Suite | null>(null)
   const [running, setRunning] = useState("")
   useEffect(() => {

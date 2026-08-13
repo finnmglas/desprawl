@@ -33,6 +33,33 @@ export interface Run {
   output: string
 }
 
+/** whichever manager the lockfile says this repo is run with */
+export const manager = (root: string) =>
+  existsSync(join(root, "pnpm-lock.yaml"))
+    ? "pnpm"
+    : existsSync(join(root, "yarn.lock"))
+      ? "yarn"
+      : "npm"
+
+/** what a finished child says, however it ended */
+export function settle(
+  err: (Error & { code?: number | string | null }) | null,
+  out: string,
+  bad: string,
+  started: number,
+  empty = "",
+): Run {
+  const output = `${out}${bad}`.trim()
+  return {
+    ok: !err,
+    // a kill or a missing binary carries no numeric code, and 0 would read as fine
+    code: typeof err?.code === "number" ? err.code : err ? 1 : 0,
+    seconds: Math.round((Date.now() - started) / 100) / 10,
+    // the end is where a runner puts its totals, and the head is where it puts noise
+    output: output.length > 8000 ? `…\n${output.slice(-8000)}` : output || empty,
+  }
+}
+
 // what each runner is asked to write a report with, when the repo has no script for it
 const MEASURE: Record<string, string> = {
   vitest: "npx vitest run --coverage --coverage.reporter=lcov",
@@ -155,28 +182,16 @@ const LIMIT = 10 * 60_000
  */
 export function run(repo: string, script: string, command = ""): Promise<Run> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
-  const manager = existsSync(join(root, "pnpm-lock.yaml"))
-    ? "pnpm"
-    : existsSync(join(root, "yarn.lock"))
-      ? "yarn"
-      : "npm"
+  const run = manager(root)
   if (command) mkdirSync(join(root, "coverage"), { recursive: true })
   const started = Date.now()
   return new Promise((resolve) => {
+    const sh = process.platform === "win32" ? ["cmd", "/c"] : ["/bin/sh", "-c"]
     execFile(
-      command ? "/bin/sh" : manager,
-      command ? ["-c", command] : manager === "npm" ? ["run", script] : [script],
+      command ? sh[0] : run,
+      command ? [sh[1], command] : run === "npm" ? ["run", script] : [script],
       { cwd: root, timeout: LIMIT, maxBuffer: 1 << 26 },
-      (err, stdout, stderr) => {
-        const output = `${stdout}${stderr}`.trim()
-        resolve({
-          ok: !err,
-          code: (err as { code?: number } | null)?.code ?? 0,
-          seconds: Math.round((Date.now() - started) / 100) / 10,
-          // the end is where a runner puts its totals, and the head is where it puts noise
-          output: output.length > 8000 ? `…\n${output.slice(-8000)}` : output,
-        })
-      },
+      (err, stdout, stderr) => resolve(settle(err, stdout, stderr, started)),
     )
   })
 }

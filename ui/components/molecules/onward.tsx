@@ -2,8 +2,39 @@
 // goal: guide user navigation
 
 import { Card, CardContent, CardHeader, CardTitle } from "../atoms/card.tsx"
+import { Back } from "../atoms/back.tsx"
+import { Waiting } from "../atoms/waiting.tsx"
 import { num, plural } from "../../lib/format.ts"
 import type { Stats } from "../../../src/model.ts"
+
+/** what a graph view shows until its graph arrives */
+export function Loading({
+  stats,
+  current,
+  onTab,
+  what,
+  slow = "Large repo takes a few seconds.",
+  rows = 4,
+}: {
+  stats: Stats
+  current: string
+  onTab: (tab: string) => void
+  what: string
+  slow?: string
+  rows?: number
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <Back onTab={onTab} />
+      <Card>
+        <CardContent className="p-4">
+          <Waiting what={what} slow={slow} rows={rows} />
+        </CardContent>
+      </Card>
+      <Onward stats={stats} current={current} onTab={onTab} />
+    </div>
+  )
+}
 
 export function Onward({
   stats,

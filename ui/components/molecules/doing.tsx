@@ -58,7 +58,8 @@ export function Doing({ onDone }: { onDone?: () => void }) {
     // a server has no end to wait for, so it is started and then watched
     if (one.long) {
       void startAction(one.id).then((made) => {
-        if (made) setUp((was) => [...was.filter((o) => o.id !== made.id), made])
+        if (!made) return
+        setUp((was) => [...was.filter((o) => o.id !== made.id), made])
         toast(`Started ${one.command}`, "it keeps running until you stop it")
       })
       return

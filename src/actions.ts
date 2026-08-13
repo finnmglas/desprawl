@@ -2,11 +2,10 @@
 // goal: the handful of commands a reader would otherwise switch to a terminal for
 
 import { execFile, execFileSync, spawn } from "node:child_process"
-import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { reading } from "./graph.ts"
 import { git } from "./model.ts"
-import type { Run } from "./tests.ts"
+import { manager, settle, type Run } from "./tests.ts"
 
 export interface Action {
   id: string
@@ -129,13 +128,6 @@ function pushable(root: string): Pick<Action, "blocked" | "caution"> {
   }
 }
 
-const manager = (root: string) =>
-  existsSync(join(root, "pnpm-lock.yaml"))
-    ? "pnpm"
-    : existsSync(join(root, "yarn.lock"))
-      ? "yarn"
-      : "npm"
-
 /** what this repo can be told to do: git, and the scripts it declares that end */
 export function actions(repo: string): Action[] {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
@@ -177,15 +169,9 @@ export function act(repo: string, id: string): Promise<Run> {
   const [file, ...rest] = found.command.split(" ")
   const started = Date.now()
   return new Promise((resolve) => {
-    execFile(file, rest, { cwd: root, timeout: LIMIT, maxBuffer: 1 << 26 }, (err, out, bad) => {
-      const output = `${out}${bad}`.trim()
-      resolve({
-        ok: !err,
-        code: (err as { code?: number } | null)?.code ?? 0,
-        seconds: Math.round((Date.now() - started) / 100) / 10,
-        output: output.length > 8000 ? `…\n${output.slice(-8000)}` : output || "(no output)",
-      })
-    })
+    execFile(file, rest, { cwd: root, timeout: LIMIT, maxBuffer: 1 << 26 }, (err, out, bad) =>
+      resolve(settle(err, out, bad, started, "(no output)")),
+    )
   })
 }
 
@@ -237,6 +223,13 @@ export function begin(
   }
   child.stdout?.on("data", take)
   child.stderr?.on("data", take)
+  // a missing binary emits error, never exit, and unhandled it kills the server
+  child.on("error", (err) => {
+    alive.running = false
+    alive.code = -1
+    alive.output = (alive.output + err.message).slice(-KEEP)
+    onSay?.("", -1)
+  })
   child.on("exit", (code) => {
     alive.running = false
     alive.code = code ?? 0

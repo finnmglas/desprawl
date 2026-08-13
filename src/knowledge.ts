@@ -64,6 +64,8 @@ export function knowledge(
   if (files)
     for (const module of Object.values(graph.modules)) {
       const unit = unitAt(module.path)
+      // a shallow file is already its own unit, and nothing contains itself
+      if (unit === module.path) continue
       keep({
         id: module.path,
         sort: "file",

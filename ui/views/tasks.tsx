@@ -7,17 +7,15 @@ import { Face, Hands } from "../components/molecules/hands.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { Dialog } from "../components/atoms/dialog.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
-import { Card, CardContent } from "../components/atoms/card.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Fix } from "../components/molecules/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Agents } from "../components/molecules/agents.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
-import { Onward } from "../components/molecules/onward.tsx"
+import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
-import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/live.ts"
 import { hands, handsOf, worked } from "../lib/people.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
@@ -108,19 +106,13 @@ export function Tasks({
 
   if (!graph)
     return (
-      <div className="flex flex-col gap-4">
-        <Back onTab={onTab} />
-        <Card>
-          <CardContent className="p-4">
-            <Waiting
-              what="Reading what there is to do,"
-              slow="It reads every graph first."
-              rows={4}
-            />
-          </CardContent>
-        </Card>
-        <Onward stats={stats} current="Tasks" onTab={onTab} />
-      </div>
+      <Loading
+        stats={stats}
+        current="Tasks"
+        onTab={onTab}
+        what="Reading what there is to do,"
+        slow="It reads every graph first."
+      />
     )
 
   const hunted = find.trim().toLowerCase()

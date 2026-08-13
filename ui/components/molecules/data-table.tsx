@@ -207,7 +207,7 @@ export function DataTable<T>({
                       read, not a column of real zeros, and either way it says nothing */}
                     {counted.has(col.key) && sums[col.key] === 0 && (
                       <Tip
-                        text="every row reads 0 here, so either there is nothing to count or the number could not be read at all"
+                        text="every row reads 0: nothing to count, or the number could not be read"
                         side="bottom"
                       >
                         <span className="ml-1 cursor-help">⚠️</span>

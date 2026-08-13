@@ -23,6 +23,37 @@ import { slides } from "../../lib/slides.ts"
 import type { Prefs } from "../../lib/prefs.ts"
 import type { Stats } from "../../../src/model.ts"
 
+/** a graph offered as json, live or carried by a static page */
+function Pull<T>({
+  held,
+  ask,
+  file,
+  label,
+  said,
+}: {
+  held: T | null | undefined
+  ask: () => Promise<T | null>
+  file: string
+  label: string
+  said: (got: T) => string
+}) {
+  if (!isLive() && !held) return null
+  return (
+    <MenuItem
+      onClick={async () => {
+        const got = await ask()
+        if (!got) return
+        const name = named(file)
+        download(name, JSON.stringify(got, null, 2), "application/json")
+        toast(name, said(got))
+      }}
+    >
+      <Download />
+      {label}
+    </MenuItem>
+  )
+}
+
 /** a labelled row of choices, the shape every setting here takes */
 function Choice({
   label,
@@ -89,37 +120,22 @@ export function Settings({
         <Download />
         git-stats (json)
       </MenuItem>
-      {(isLive() || window.__DESPRAWL_GRAPH__) && (
-        <MenuItem
-          onClick={async () => {
-            const graph = await importGraph()
-            if (!graph) return
-            const file = named("imports.json")
-            download(file, JSON.stringify(graph, null, 2), "application/json")
-            toast(file, `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files`)
-          }}
-        >
-          <Download />
-          import-graph (json)
-        </MenuItem>
-      )}
-      {(isLive() || window.__DESPRAWL_CALLS__) && (
-        <MenuItem
-          onClick={async () => {
-            const graph = await callGraph()
-            if (!graph) return
-            const file = named("calls.json")
-            download(file, JSON.stringify(graph, null, 2), "application/json")
-            toast(
-              file,
-              `${num(graph.stats.symbols)} declarations, ${num(graph.stats.edges)} calls between them`,
-            )
-          }}
-        >
-          <Download />
-          call-graph (json)
-        </MenuItem>
-      )}
+      <Pull
+        held={window.__DESPRAWL_GRAPH__}
+        ask={importGraph}
+        file="imports.json"
+        label="import-graph (json)"
+        said={(got) => `${num(got.stats.edges)} imports between ${num(got.stats.files)} files`}
+      />
+      <Pull
+        held={window.__DESPRAWL_CALLS__}
+        ask={callGraph}
+        file="calls.json"
+        label="call-graph (json)"
+        said={(got) =>
+          `${num(got.stats.symbols)} declarations, ${num(got.stats.edges)} calls between them`
+        }
+      />
       {isLive() && (
         <MenuItem
           onClick={async () => {

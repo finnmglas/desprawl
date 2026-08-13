@@ -94,9 +94,9 @@ Graph view draws it. Every file is a dot inside the module holding it, and a mod
 
 Execution view analyzes the call graph rather than the import graph. Reach is followed from what actually runs: every file's top level, and every export unless you switch that off. What nothing arrives at is named, with the lines deleting it would take out.
 
-Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks modules order and depth smartly for you. Cycles are detected and its organized visually.
+Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks module order and depth for you. Cycles are detected and organized visually.
 
-`desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone - or served as a website.
+`desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone, or served as a website.
 
 A saved file carries both graphs, the dependency table and what the test suite holds, and says plainly what it cannot do: it never runs a suite, never reaches a registry, and its numbers are as old as the file.
 

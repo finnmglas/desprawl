@@ -199,35 +199,30 @@ function loose(read: Read, ask: Asked) {
   const same = copied(read.repo, paths)
   const chatty = talky(read.repo, paths)
   const take = ask.limit ?? 20
-  const rest = (all: unknown[]) => (all.length > take ? `… and ${all.length - take} more` : "")
+  const rest = (all: unknown[]) => (all.length > take ? `\n… and ${all.length - take} more` : "")
   return {
     text: [
       grid([
         ["REPEATED LITERAL", "FILES"],
         ...said.slice(0, take).map((one) => [cut(one.text, 56), one.times]),
-      ]),
-      rest(said),
-      "",
+      ]) + rest(said),
       grid([
         ["COPIED", "LINES", "AND"],
         ...same
           .slice(0, take)
           .map((one) => [cut(one.at[0], 44), one.lines.length, cut(one.at[1], 44)]),
-      ]),
-      rest(same),
-      chatty.length ? "" : "",
-      chatty.length
-        ? grid([
-            ["MOSTLY COMMENT", "SHARE", "PROSE"],
-            ...chatty
-              .slice(0, take)
-              .map((one) => [cut(one.path, 56), `${Math.round(one.share * 100)}%`, n(one.said)]),
-          ])
-        : "",
-      rest(chatty),
-    ]
-      .filter(Boolean)
-      .join("\n"),
+      ]) + rest(same),
+      ...(chatty.length
+        ? [
+            grid([
+              ["MOSTLY COMMENT", "SHARE", "PROSE"],
+              ...chatty
+                .slice(0, take)
+                .map((one) => [cut(one.path, 56), `${Math.round(one.share * 100)}%`, n(one.said)]),
+            ]) + rest(chatty),
+          ]
+        : []),
+    ].join("\n\n"),
     data: { repeated: said, copied: same, talky: chatty },
   }
 }

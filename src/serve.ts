@@ -171,7 +171,7 @@ export function serve(
               // said once, not six hundred times over a long run
               if (!waited)
                 console.log(
-                  `\nTab closed, but ${working.length} agent run${working.length === 1 ? " is" : "s are"} still going, so desprawl stayed up.\n`,
+                  `\nTab closed, but ${working.length} run${working.length === 1 ? " is" : "s are"} still going, so desprawl stayed up.\n`,
                 )
               waited = true
               farewell = setTimeout(leave, GRACE)
@@ -201,10 +201,14 @@ export function serve(
           req.on("end", () => {
             try {
               JSON.parse(body) // never poison the next read
+            } catch {
+              return send(400, "bad json", "text/plain")
+            }
+            try {
               writePrefs(body)
               send(200, body, "application/json")
-            } catch {
-              send(400, "bad json", "text/plain")
+            } catch (err) {
+              send(500, err instanceof Error ? err.message : "could not write", "text/plain")
             }
           })
           return
@@ -415,7 +419,7 @@ export function serve(
             measuring && !found.measure ? found.measured : "",
           ).then(
             (ran) => {
-              suite = { ...(suite ||= tests(repo)), ...tests(repo), ran }
+              suite = { ...tests(repo), ran }
               json(suite)
             },
             (err: Error) => json({ error: err.message }, 500),

@@ -159,7 +159,9 @@ export function rows(
       const known = days.filter((i) => at(i) !== undefined)
       if (!known.length) return undefined
       if (SERIES[key].how === "last") return Math.max(0, at(known[known.length - 1]) ?? 0)
-      if (SERIES[key].how === "distinct" && !full) {
+      if (SERIES[key].how === "distinct") {
+        // daily counts cannot be unioned, so a bucket says its busiest day
+        if (full) return Math.max(...known.map((i) => at(i) ?? 0))
         const seen = new Set<number>()
         for (const i of known) for (const who of stats.active[i - shift] ?? []) seen.add(who)
         return seen.size

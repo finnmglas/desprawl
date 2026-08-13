@@ -73,6 +73,17 @@ function cargo(root: string, path: string): Read {
   const pkg = held.get("package") ?? []
   const asked: Asked[] = []
   for (const [name, lines] of held) {
+    // [dependencies.serde] is one package spelled over several lines
+    const inner = /(^|\.)(dependencies|dev-dependencies|build-dependencies)\.([\w-]+)$/.exec(name)
+    if (inner) {
+      asked.push({
+        name: inner[3],
+        range: range(lines.join(" ")),
+        dev: inner[2] === "dev-dependencies",
+        ecosystem: "crates.io",
+      })
+      continue
+    }
     // a target's own dependencies live under a longer name: [target.'cfg(unix)'.dependencies]
     const dev = /dev-dependencies$/.test(name)
     if (!/(^|\.)(dependencies|dev-dependencies|build-dependencies)$/.test(name)) continue
@@ -80,15 +91,6 @@ function cargo(root: string, path: string): Read {
       const one = named(line)
       if (one) asked.push({ name: one, range: range(line), dev, ecosystem: "crates.io" })
     }
-    // [dependencies.serde] is one package spelled over several lines
-    const inner = /\.(dependencies|dev-dependencies)\.([\w-]+)$/.exec(name)
-    if (inner)
-      asked.push({
-        name: inner[2],
-        range: range(lines.join(" ")),
-        dev: inner[1] === "dev-dependencies",
-        ecosystem: "crates.io",
-      })
   }
   const bins = [...held.keys()].filter((one) => one === "bin" || one.startsWith("bin.")).length
     ? ["cargo bin"]
@@ -132,7 +134,9 @@ function python(root: string, path: string): Read {
   const project = held.get("project") ?? []
   const asked: Asked[] = []
   // dependencies = ["a >= 1", "b"] spans lines, and the section reader joined them
-  const listed = /(?:^|\n)dependencies\s*=\s*\[([\s\S]*?)\]/.exec(project.join("\n"))?.[1] ?? ""
+  // a requirement can carry its own brackets: "requests[socks]>=2"
+  const listed =
+    /(?:^|\n)dependencies\s*=\s*\[((?:[^\][]|\[[^\][]*\])*)\]/.exec(project.join("\n"))?.[1] ?? ""
   for (const one of listed.match(/["']([^"']+)["']/g) ?? []) {
     const held_ = requirement(one.replace(/["']/g, ""))
     if (held_) asked.push(held_)

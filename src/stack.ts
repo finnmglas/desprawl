@@ -45,7 +45,7 @@ const UI: Table = {
   bootstrap: "Bootstrap", "react-bootstrap": "Bootstrap", "@radix-ui/": "Radix",
   "@base-ui/react": "Base UI", "@headlessui/react": "Headless UI", daisyui: "daisyUI",
   "@mantine/core": "Mantine", "styled-components": "styled-components", "@emotion/react": "Emotion",
-  bulma: "Bulma", "primereact: ": "PrimeReact", "@diceui/": "DiceUI", "class-variance-authority": "cva",
+  bulma: "Bulma", primereact: "PrimeReact", "@diceui/": "DiceUI", "class-variance-authority": "cva",
   "@nextui-org/react": "NextUI", vuetify: "Vuetify", "@ionic/react": "Ionic",
   "@heroui/react": "HeroUI", "@ariakit/react": "Ariakit", "@base-ui-components/react": "Base UI",
   "@fluentui/react-components": "Fluent", "@carbon/react": "Carbon", "@blueprintjs/core": "Blueprint",
@@ -411,7 +411,7 @@ function pin(range: string): keyof Pinning {
   if (/^(link|file|workspace|portal):/.test(range)) return "linked"
   if (range.startsWith("^")) return "caret"
   if (range.startsWith("~")) return "tilde"
-  if (/^\d/.test(range)) return "exact"
+  if (/^\d+\.\d+\.\d+\S*$/.test(range)) return "exact"
   return "range"
 }
 
@@ -467,7 +467,8 @@ function assisted(repo: string): Pick<Ai, "signed" | "scanned" | "capped" | "by"
   const commits = log.split("\0").filter((c) => c.trim())
   let signed = 0
   for (const commit of commits) {
-    const [author = "", ...body] = commit.split("\n")
+    // each record after the first begins with the newline that closed the one before
+    const [author = "", ...body] = commit.replace(/^\n/, "").split("\n")
     const claims = [
       // a human called Claude is not a tool, a bot address is
       /\[bot\]|noreply|users\.noreply/i.test(author) ? author : "",

@@ -42,6 +42,14 @@ test("each language names what it imports in its own words", () => {
   assert.deepEqual(said("a.py", "from .thing import One\nimport a.b"), [".thing", "a.b"])
   assert.deepEqual(said("A.kt", "import com.app.Helper"), ["com.app.Helper"])
   assert.deepEqual(said("a.c", '#include <stdio.h>\n#include "own.h"'), ["own.h", "stdio.h"])
+  // a go string is an import only on an import line or inside the block
+  assert.deepEqual(
+    said(
+      "a.go",
+      'import "fmt"\nimport (\n\t"os"\n\tx "net/http"\n)\nfunc f() string {\n\treturn "hello"\n}\nvar s = []string{\n\t"one",\n\t"two",\n}',
+    ),
+    ["fmt", "net/http", "os"],
+  )
 })
 
 test("a specifier lands where that language would look for it", () => {

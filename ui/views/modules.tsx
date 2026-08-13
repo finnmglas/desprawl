@@ -16,10 +16,9 @@ import { Input } from "../components/atoms/input.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Matrix } from "../components/molecules/matrix.tsx"
 import { Save } from "../components/molecules/save.tsx"
-import { Onward } from "../components/molecules/onward.tsx"
+import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
-import { Waiting } from "../components/atoms/waiting.tsx"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
 import { hands, worked } from "../lib/people.ts"
@@ -175,17 +174,7 @@ export function Modules({
   )
 
   if (!graph)
-    return (
-      <div className="flex flex-col gap-4">
-        <Back onTab={onTab} />
-        <Card>
-          <CardContent className="p-4">
-            <Waiting what="Reading all imports," slow="Large repo takes a few seconds." rows={4} />
-          </CardContent>
-        </Card>
-        <Onward stats={stats} current="Modules" onTab={onTab} />
-      </div>
-    )
+    return <Loading stats={stats} current="Modules" onTab={onTab} what="Reading all imports," />
 
   if (!layout || !units.length)
     return (
@@ -685,7 +674,7 @@ export function Modules({
                         </span>
                       </Tip>
                     ) : null}{" "}
-                    Removing {plural(loop.cut.length, "import")} of them fixes it, see below..
+                    Removing {plural(loop.cut.length, "import")} of them fixes it, see below.
                   </p>
                 </div>
               )

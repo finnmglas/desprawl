@@ -10,11 +10,10 @@ import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
-import { Onward } from "../components/molecules/onward.tsx"
+import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
-import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph } from "../lib/live.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { REACHES, reachOf, reached, rings, twins } from "../../src/reach.ts"
@@ -55,17 +54,7 @@ export function Execution({
   const loops = useMemo(() => (calls ? rings(calls) : []), [calls])
 
   if (!calls)
-    return (
-      <div className="flex flex-col gap-4">
-        <Back onTab={onTab} />
-        <Card>
-          <CardContent className="p-4">
-            <Waiting what="Reading every call," slow="Large repo takes a few seconds." rows={4} />
-          </CardContent>
-        </Card>
-        <Onward stats={stats} current="Execution" onTab={onTab} />
-      </div>
-    )
+    return <Loading stats={stats} current="Execution" onTab={onTab} what="Reading every call," />
 
   const all = Object.values(calls.symbols)
   const declared = all.filter((s) => s.kind !== "module")

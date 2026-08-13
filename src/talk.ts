@@ -93,8 +93,12 @@ function swallow(talk: Talk, line: string) {
   else if (said.type === "user") {
     // noise until it fails, and then the whole story
     for (const part of (said.message?.content ?? []) as Record<string, any>[])
-      if (part.type === "tool_result" && part.is_error)
-        add(talk, { who: "note", text: `that failed: ${String(part.content).slice(0, 200)}` })
+      if (part.type === "tool_result" && part.is_error) {
+        // content arrives as a string or as a list of blocks
+        const said =
+          typeof part.content === "string" ? part.content : JSON.stringify(part.content ?? "")
+        add(talk, { who: "note", text: `that failed: ${said.slice(0, 200)}` })
+      }
   } else if (said.type === "result") {
     talk.cost += Number(said.total_cost_usd ?? 0)
     if (said.is_error && said.result) add(talk, { who: "note", text: String(said.result) })
@@ -110,6 +114,7 @@ const feed = (talk: Talk, chunk: string, rest: { left: string }) => {
 
 const run = (repo: string, talk: Talk, prompt: string, install: string, trust: string): Alive => {
   const sent = plan(repo, prompt, talk.model, talk.mode, install, trust, talk.session)
+  talk.tool = sent.tool
   talk.answerable = sent.streams
   talk.running = true
   talk.code = null
@@ -165,10 +170,9 @@ export function startTalk(
   trust = "auto",
 ): Talk {
   const talk = blank(free(`fix:${id}`), task, model, mode)
-  const sent = plan(repo, prompt, model, mode, install, trust)
-  talk.tool = sent.tool
-  going.set(talk.id, talk)
+  // registered only once plan() had nothing to throw
   run(repo, talk, prompt, install, trust)
+  going.set(talk.id, talk)
   return talk
 }
 

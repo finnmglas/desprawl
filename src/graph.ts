@@ -308,7 +308,7 @@ export function build(repo: string): Graph {
         }
         external++
         add(modules[from].packages, name)
-        ;(packages[name] ??= []).push(from)
+        add((packages[name] ??= []), from)
       }
       continue
     }
@@ -370,7 +370,8 @@ export function build(repo: string): Graph {
       const star = pattern.indexOf("*")
       const head = star === -1 ? pattern : pattern.slice(0, star)
       const tail = star === -1 ? "" : pattern.slice(star + 1)
-      if (!text.startsWith(head) || !text.endsWith(tail)) continue
+      // no star means the exact name, not a prefix
+      if (star === -1 ? text !== pattern : !text.startsWith(head) || !text.endsWith(tail)) continue
       const middle = star === -1 ? "" : text.slice(head.length, text.length - tail.length)
       aliased = true
       for (const target of targets) {

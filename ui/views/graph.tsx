@@ -48,7 +48,6 @@ const SORTS: Record<string, (a: Numbered, b: Numbered) => number> = {
   subject: (a, b) => a.subject.localeCompare(b.subject),
   added: (a, b) => a.insertions - b.insertions,
   removed: (a, b) => a.deletions - b.deletions,
-  author: (a, b) => a.who - b.who,
   date: (a, b) => a.date.localeCompare(b.date),
   hash: (a, b) => a.hash.localeCompare(b.hash),
 }
@@ -115,6 +114,7 @@ export function Graph({
   const log = useMemo(() => [...stats.log, ...extra], [stats.log, extra])
 
   const more = async () => {
+    if (loading) return
     if (limit < log.length) return setLimit(limit + PAGE * 2)
     if (!isLive()) return
     setLoading(true)
@@ -145,7 +145,12 @@ export function Graph({
         )
       : windowed
     if (!sort) return kept
-    const cmp = SORTS[sort.key]
+    // who is an index into contributors, so the name has to come from stats
+    const named = (c: Numbered) => stats.contributors[c.who]?.name ?? ""
+    const cmp =
+      sort.key === "author"
+        ? (a: Numbered, b: Numbered) => named(a).localeCompare(named(b))
+        : SORTS[sort.key]
     return [...kept].sort((a, b) => (sort.asc ? cmp(a, b) : -cmp(a, b)))
   }, [numbered, filter, sort, from, to])
 
@@ -407,7 +412,9 @@ export function Graph({
               onClick={() => void more()}
               className="hover:bg-muted/50 text-muted-foreground w-full cursor-pointer py-2 text-center text-xs"
             >
-              {loading ? "loading…" : `show more, ${num(Math.max(0, total - limit))} left`}
+              {loading
+                ? "loading…"
+                : `show more, ${num(Math.max(0, (filter || from || to ? shown.length : total) - limit))} left`}
             </button>
           )}
         </CardContent>

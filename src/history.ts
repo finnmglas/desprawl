@@ -4,24 +4,20 @@
 import { COMMIT_MAX, LOG_MAX, git } from "./model.ts"
 import type { Churn, Commit, Contributor, Series } from "./model.ts"
 
-// -M writes renames as a{b => c}d or b => c
+// -M writes renames as a{b => c}d or b => c. Braces without an arrow are just a path
 const source = (path: string): string => {
+  if (!path.includes(" => ")) return path
   const open = path.indexOf("{")
-  if (open === -1) {
-    const arrow = path.indexOf(" => ")
-    return arrow === -1 ? path : path.slice(0, arrow)
-  }
+  if (open === -1) return path.slice(0, path.indexOf(" => "))
   const close = path.indexOf("}", open)
   const inner = path.slice(open + 1, close)
   return path.slice(0, open) + inner.slice(0, inner.indexOf(" => ")) + path.slice(close + 1)
 }
 
 function target(path: string): string {
+  if (!path.includes(" => ")) return path
   const open = path.indexOf("{")
-  if (open === -1) {
-    const arrow = path.indexOf(" => ")
-    return arrow === -1 ? path : path.slice(arrow + 4)
-  }
+  if (open === -1) return path.slice(path.indexOf(" => ") + 4)
   const close = path.indexOf("}", open)
   const inner = path.slice(open + 1, close)
   return path.slice(0, open) + inner.slice(inner.indexOf(" => ") + 4) + path.slice(close + 1)

@@ -156,9 +156,9 @@ function tree(root: string): Map<string, Held> {
           version: own.version,
           license: licensed(own),
           needs: Object.keys({ ...own.dependencies, ...own.optionalDependencies }),
-          // weighed once per name and version
+          // weighed once per name and version, and top once anywhere is top
           bytes: found.get(key)?.bytes ?? weigh(at),
-          top,
+          top: (found.get(key)?.top ?? false) || top,
         })
       }
       // a scope holds packages at the same level, a store holds its own
@@ -326,7 +326,8 @@ export async function deps(repo: string): Promise<Deps> {
     ])
     missed = filed.missed
     for (const one of list) {
-      one.advisories = filed.found.get(`${one.name}@${one.version}`) ?? []
+      // osv was asked with the pinned range when nothing is installed, so read it back the same way
+      one.advisories = filed.found.get(`${one.name}@${one.version || pinned(one.range)}`) ?? []
       const told = when.get(one.name)
       one.released = told?.times.modified ?? ""
       one.used = told?.times[one.version] ?? ""

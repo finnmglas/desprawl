@@ -151,7 +151,7 @@ export function Explorer({
             {stats.repo.split("/").pop()}
           </Button>
           {path.map((part, i) => (
-            <span key={part} className="flex items-center gap-1">
+            <span key={i} className="flex items-center gap-1">
               <span className="text-muted-foreground">/</span>
               <Button variant="ghost" size="sm" onClick={() => setPath(path.slice(0, i + 1))}>
                 {part}

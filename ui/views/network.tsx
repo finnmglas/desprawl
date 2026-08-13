@@ -7,10 +7,9 @@ import { Button } from "../components/atoms/button.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { Input } from "../components/atoms/input.tsx"
-import { Onward } from "../components/molecules/onward.tsx"
+import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Waiting } from "../components/atoms/waiting.tsx"
 import { Menu, MenuSection } from "../components/molecules/menu.tsx"
 import { BRANDS } from "../lib/brands.ts"
 import { LANGS } from "../../src/langs.ts"
@@ -457,11 +456,14 @@ export function Network({
     const lines = new Map<string, Path2D>()
     const heads = new Map<string, Path2D>()
     const ink = (colour: string, alpha: number) => `rgba(${colour}, ${alpha})`
-    const draw = (colour: string, alpha: number, key: string) => {
+    // strokes batch by key, so alpha has to live in the colour itself
+    const fade = (colour: string, alpha: number) =>
+      colour.replace(/^(hsl|rgb)\((.+)\)$/, `$1a($2, ${alpha})`)
+    const draw = (key: string) => {
       const found = lines.get(key) ?? new Path2D()
       lines.set(key, found)
       if (!heads.has(key)) heads.set(key, new Path2D())
-      return { line: found, head: heads.get(key)!, style: ink(colour, alpha) }
+      return { line: found, head: heads.get(key)! }
     }
     const styles = new Map<string, string>()
 
@@ -519,10 +521,8 @@ export function Network({
         const heft = Math.min(1, weight / 6)
         const alpha = quiet ? 0.03 : lit ? 0.85 : wire.types ? 0.13 : 0.22 + 0.3 * heft
         const key = `${tint ?? colour} ${alpha.toFixed(2)}`
-        const { line, head } = draw(colour, alpha, key)
-        // a named colour takes no alpha, so it carries its own
-        styles.set(key, tint ? tint : ink(colour, alpha))
-        if (tint) pen.globalAlpha = alpha
+        const { line, head } = draw(key)
+        styles.set(key, tint ? fade(tint, alpha) : ink(colour, alpha))
         const mx = (from.x + to.x) / 2
         const my = (from.y + to.y) / 2
         const dx = to.x - from.x
@@ -658,15 +658,7 @@ export function Network({
 
   if (!graph)
     return (
-      <div className="flex flex-col gap-4">
-        <Back onTab={onTab} />
-        <Card>
-          <CardContent className="p-4">
-            <Waiting what="Reading every import," slow="Large repo takes a few seconds." rows={5} />
-          </CardContent>
-        </Card>
-        <Onward stats={stats} current="Graph" onTab={onTab} />
-      </div>
+      <Loading stats={stats} current="Graph" onTab={onTab} what="Reading every import," rows={5} />
     )
 
   const walk = (spot: Spot) => {

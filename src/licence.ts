@@ -32,8 +32,10 @@ const one = (said: string): Family =>
           ? "strong"
           : "unknown"
 
-const worstOf = (parts: string[]) =>
-  parts.map(one).reduce((a, b) => (ORDER.indexOf(a) > ORDER.indexOf(b) ? a : b))
+const worstOf = (parts: string[]): Family =>
+  parts.length
+    ? parts.map(one).reduce((a, b) => (ORDER.indexOf(a) > ORDER.indexOf(b) ? a : b))
+    : "unknown"
 
 /** what it asks of the code using it: a fact, not a verdict */
 export const familyOf = (license: string): Family => {

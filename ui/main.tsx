@@ -149,6 +149,11 @@ function App({
     if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
 
+  const openFiles = (path: string[]) => {
+    go({ tab: "Files", path })
+    toast("Opened in Files", path.join("/") || "the repo root")
+  }
+
   const view = (one: string) =>
     one === "History" ? (
       <Graph
@@ -157,10 +162,7 @@ function App({
         to={to}
         onRange={(a, b) => go({ from: a, to: b })}
         onTab={(next) => go({ tab: next })}
-        onPath={(path) => {
-          go({ tab: "Files", path })
-          toast("Opened in Files", path.join("/") || "the repo root")
-        }}
+        onPath={openFiles}
         faces={faces}
       />
     ) : one === "Overview" ? (
@@ -177,43 +179,13 @@ function App({
         faces={faces}
       />
     ) : one === "Modules" ? (
-      <Modules
-        stats={stats}
-        faces={faces}
-        onTab={(next) => go({ tab: next })}
-        onPath={(path) => {
-          go({ tab: "Files", path })
-          toast("Opened in Files", path.join("/") || "the repo root")
-        }}
-      />
+      <Modules stats={stats} faces={faces} onTab={(next) => go({ tab: next })} onPath={openFiles} />
     ) : one === "Tasks" ? (
-      <Tasks
-        stats={stats}
-        faces={faces}
-        onTab={(next) => go({ tab: next })}
-        onPath={(path) => {
-          go({ tab: "Files", path })
-          toast("Opened in Files", path.join("/") || "the repo root")
-        }}
-      />
+      <Tasks stats={stats} faces={faces} onTab={(next) => go({ tab: next })} onPath={openFiles} />
     ) : one === "Graph" ? (
-      <Network
-        stats={stats}
-        onTab={(next) => go({ tab: next })}
-        onPath={(path) => {
-          go({ tab: "Files", path })
-          toast("Opened in Files", path.join("/") || "the repo root")
-        }}
-      />
+      <Network stats={stats} onTab={(next) => go({ tab: next })} onPath={openFiles} />
     ) : one === "Execution" ? (
-      <Execution
-        stats={stats}
-        onTab={(next) => go({ tab: next })}
-        onPath={(path) => {
-          go({ tab: "Files", path })
-          toast("Opened in Files", path.join("/") || "the repo root")
-        }}
-      />
+      <Execution stats={stats} onTab={(next) => go({ tab: next })} onPath={openFiles} />
     ) : (
       <Explorer
         stats={stats}

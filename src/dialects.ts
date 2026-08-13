@@ -86,8 +86,12 @@ const DIALECTS: Dialect[] = [
   },
   {
     id: "go", label: "Go", exts: ["go"], flavour: "c",
-    // one import per line, or a block of them in parens
-    imports: [/^[^\S\n]*(?:import\s+)?(?:[\w.]+\s+)?"([^"\n]+)"/gm],
+    // one import per line, or a block of them in parens. A member line holds nothing but
+    // an optional alias and the path: composite literals carry commas, statements carry more
+    imports: [
+      /^import\s+(?:[\w.]+\s+)?"([^"\n]+)"/gm,
+      /^[^\S\n]+(?!return\b)(?:[\w.]+[^\S\n]+)?"([^"\n]+)"[^\S\n]*(?:\/\/.*)?$/gm,
+    ],
     quoted: true,
     decls: [
       { kind: "function", re: /^func\s+(?:\([^)]*\)\s*)?([A-Za-z_]\w*)/gm },

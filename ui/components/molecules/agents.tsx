@@ -188,8 +188,11 @@ export function Agents() {
   useEffect(() => {
     if (!isLive()) return
     let timer: ReturnType<typeof setTimeout>
+    // an answer landing after unmount must not restart the loop
+    let gone = false
     const beat = () => {
       void talksNow().then((list) => {
+        if (gone) return
         setTalks(list)
         timer = setTimeout(beat, list.some((one) => one.running) ? BEAT : SLOW)
       })
@@ -203,6 +206,7 @@ export function Agents() {
       timer = setTimeout(beat, BEAT)
     })
     return () => {
+      gone = true
       clearTimeout(timer)
       stop()
     }

@@ -40,6 +40,13 @@ async function vectors(node: HTMLElement, paint: string): Promise<string> {
   if (chart) {
     const copy = chart.cloneNode(true) as SVGElement
     copy.setAttribute("xmlns", "http://www.w3.org/2000/svg")
+    // a css variable means nothing outside the page, so its value is written out
+    const live = chart.querySelectorAll<SVGElement>("*")
+    copy.querySelectorAll<SVGElement>("*").forEach((el, i) => {
+      for (const key of ["stroke", "fill"] as const)
+        if (el.getAttribute(key)?.startsWith("var("))
+          el.setAttribute(key, getComputedStyle(live[i]).getPropertyValue(key))
+    })
     return new XMLSerializer().serializeToString(copy)
   }
   // laid out alone, flex-1 and max-w mean nothing and it spreads, so it is pinned to the
@@ -102,11 +109,14 @@ export function Save({
       const ext = { jpeg: "jpg", png: "png", webp: "webp" }[kind]
       const file = named(`${name}.${ext}`)
       canvas.toBlob(
-        (blob) => blob && download(file, blob),
+        (blob) => {
+          if (!blob) return toast("Could not draw it", "the canvas was too large to encode")
+          download(file, blob)
+          toast(file, `${canvas.width} by ${canvas.height}`)
+        },
         `image/${kind}`,
         kind === "png" ? undefined : 0.92,
       )
-      toast(file, `${canvas.width} by ${canvas.height}`)
     } catch (err) {
       toast("Could not draw it", String(err))
     }
@@ -132,23 +142,25 @@ export function Save({
     </MenuItem>
   )
 
+  const Tables = ({ file, label, held }: { file: string; label?: string; held: () => Matrix }) =>
+    FORMATS.map((format) => (
+      <Line
+        key={format.key}
+        label={label ? `${label}, ${format.label}` : format.label}
+        ext={format.ext}
+        onClick={() => {
+          const made = held()
+          const said = named(`${file}.${format.ext}`)
+          download(said, format.of(made, file), format.mime)
+          toast(said, `${made.length - 1} rows · ${format.hint}`)
+        }}
+      />
+    ))
+
   return (
     <Menu className={className} title="Save this panel" trigger={<Download />}>
       <p className="text-muted-foreground px-2 py-1.5 text-xs">{note ?? `Save ${name}`}</p>
-      {rows &&
-        FORMATS.map((format) => (
-          <Line
-            key={format.key}
-            label={format.label}
-            ext={format.ext}
-            onClick={() => {
-              const made = rows()
-              const file = named(`${name}.${format.ext}`)
-              download(file, format.of(made, name), format.mime)
-              toast(file, `${made.length - 1} rows · ${format.hint}`)
-            }}
-          />
-        ))}
+      {rows && <Tables file={name} held={rows} />}
       {rows && picture && <div className="bg-border my-1 h-px" />}
       {picture && (
         <>
@@ -162,19 +174,7 @@ export function Save({
         <div key={sheet.name}>
           <div className="bg-border my-1 h-px" />
           <p className="text-muted-foreground px-2 py-1.5 text-xs">{sheet.note ?? sheet.label}</p>
-          {FORMATS.map((format) => (
-            <Line
-              key={format.key}
-              label={`${sheet.label}, ${format.label}`}
-              ext={format.ext}
-              onClick={() => {
-                const made = sheet.rows()
-                const file = named(`${sheet.name}.${format.ext}`)
-                download(file, format.of(made, sheet.name), format.mime)
-                toast(file, `${made.length - 1} rows · ${format.hint}`)
-              }}
-            />
-          ))}
+          <Tables file={sheet.name} label={sheet.label} held={sheet.rows} />
         </div>
       ))}
       {children && <div className="bg-border my-1 h-px" />}

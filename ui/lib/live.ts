@@ -84,9 +84,11 @@ export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/ap
 // time, and every one of those was fetching a megabyte of graph it already had
 const held = new Map<string, Promise<unknown>>()
 const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
-  const found = held.get(path) ?? made()
+  const found = (held.get(path) ?? made()) as Promise<T>
   held.set(path, found)
-  return found as Promise<T>
+  // a failed ask resolves null, and holding that would make the failure permanent
+  void found.then((v) => v ?? held.delete(path))
+  return found
 }
 
 export const importGraph = (): Promise<Graph | null> =>

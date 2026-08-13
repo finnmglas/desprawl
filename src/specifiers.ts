@@ -152,11 +152,11 @@ export function scrub(
       strings.push(source.slice(at, to))
       code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(source.slice(i, to), /\n/g))}`
       i = to + fence.length
-    } else if (!js && ch === "'" && /^'(\\.|[^'\\])'/.test(source.slice(i))) {
+    } else if (!js && !py && ch === "'" && /^'(\\.|[^'\\])'/.test(source.slice(i))) {
       // a char literal, and its neighbour 'a in &'a str, which opens nothing
       code += " "
       i += /^'\\/.test(source.slice(i)) ? 4 : 3
-    } else if (!js && ch === "'") {
+    } else if (!js && !py && ch === "'") {
       code += " "
       i++
     } else if (ch === '"' || ch === "'") {

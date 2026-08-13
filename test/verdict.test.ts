@@ -30,6 +30,7 @@ test("the families every licence sorts into", () => {
     ["Proprietary", "closed"],
     ["SEE LICENSE IN LICENSE.md", "unknown"],
     ["", "unknown"],
+    ["()", "unknown"],
     // an either takes the gentler, a both takes the stricter
     ["(MIT OR Apache-2.0)", "permissive"],
     ["MIT OR GPL-3.0", "permissive"],

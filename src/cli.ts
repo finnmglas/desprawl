@@ -86,7 +86,7 @@ const target = (() => {
 })()
 
 // the explorer is the default surface, the terminal report is asked for by name or by --json
-const viewing = !command && !values.json
+const viewing = (!command || command === "view") && !values.json
 
 const num = (n: number): string => n.toLocaleString("en-US")
 const day = (iso: string): string => (iso ? iso.slice(0, 10) : "-")
