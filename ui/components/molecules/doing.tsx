@@ -9,6 +9,7 @@ import { Tip } from "../atoms/tip.tsx"
 import { toast } from "../atoms/toast.tsx"
 import {
   aliveActions,
+  forgetAction,
   isLive,
   repoActions,
   runAction,
@@ -146,7 +147,7 @@ export function Doing({ onDone }: { onDone?: () => void }) {
                         ? `up for ${Math.round((Date.now() - one.since) / 1000)}s`
                         : `exited ${one.code}`}
                     </span>
-                    {one.running && (
+                    {one.running ? (
                       <Button
                         className="ml-auto"
                         variant="outline"
@@ -157,6 +158,19 @@ export function Doing({ onDone }: { onDone?: () => void }) {
                       >
                         ■ stop
                       </Button>
+                    ) : (
+                      // it has already exited, so this drops a line off a page rather than
+                      // interrupting anything
+                      <button
+                        title="Clear it away"
+                        onClick={() => {
+                          setUp((was) => was.filter((o) => o.id !== one.id))
+                          void forgetAction(one.id)
+                        }}
+                        className="text-muted-foreground hover:text-foreground ml-auto cursor-pointer px-1 text-lg leading-none"
+                      >
+                        ×
+                      </button>
                     )}
                   </div>
                   {one.output && (

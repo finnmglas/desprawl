@@ -187,6 +187,7 @@ function App({
     ) : one === "Tasks" ? (
       <Tasks
         stats={stats}
+        faces={faces}
         onTab={(next) => go({ tab: next })}
         onPath={(path) => {
           go({ tab: "Files", path })

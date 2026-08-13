@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms/button.tsx"
 import { Card, CardContent } from "../atoms/card.tsx"
 import { CardHead } from "../molecules/card-head.tsx"
+import { Badge } from "../atoms/badge.tsx"
 import { Sparkle } from "../atoms/icons.tsx"
+import { plural } from "../../lib/format.ts"
 import { Transcript } from "./transcript.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { closeTalk, isLive, sayToAgent, stopAction, talksNow } from "../../lib/live.ts"
+import { closeTalk, isLive, onAgent, sayToAgent, stopAction, talksNow } from "../../lib/live.ts"
 import { readPrefs } from "../../lib/prefs.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Talk } from "../../../src/talk.ts"
@@ -16,9 +18,9 @@ import type { Talk } from "../../../src/talk.ts"
 const BEAT = 1200
 const SLOW = 5000
 
-/** how long it has been going, said the way a person would */
-const spent = (since: number) => {
-  const seconds = Math.round((Date.now() - since) / 1000)
+/** how long it took, or how long it has been going, said the way a person would */
+const spent = (since: number, until: number) => {
+  const seconds = Math.round(((until || Date.now()) - since) / 1000)
   if (seconds < 60) return `${seconds}s`
   const minutes = Math.floor(seconds / 60)
   return minutes < 60
@@ -65,21 +67,34 @@ function One({
     )
   }
 
-  const state = talk.running ? "working" : talk.code ? `stopped, exit ${talk.code}` : "done"
+  const state = talk.running ? "working" : talk.code ? "stopped" : "done"
+  const tone = talk.running
+    ? "border-sky-500/50 text-sky-700 dark:text-sky-300"
+    : talk.code
+      ? "border-amber-500/60 text-amber-700 dark:text-amber-300"
+      : "border-emerald-500/50 text-emerald-700 dark:text-emerald-300"
+  // what it was told to do with the work, since that is the difference between a diff to
+  // read and a pull request somebody has to close
+  const did = talk.mode === "unstaged" ? "left in the working tree" : talk.mode
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3">
+    <div className={cn("flex flex-col gap-2 rounded-lg border p-3", talk.running && "border-ring")}>
       <div className="flex flex-wrap items-center gap-2">
-        <Sparkle className={cn(talk.running && "animate-pulse")} />
+        <Sparkle className={cn("shrink-0", talk.running && "animate-pulse")} />
         <button
           onClick={() => setOpen(!open)}
-          className="hover:text-foreground cursor-pointer text-sm font-medium"
+          title={open ? "fold it away" : "read the whole thing"}
+          className="hover:text-foreground min-w-0 flex-1 cursor-pointer truncate text-left text-sm font-medium"
         >
           {talk.task || talk.id}
         </button>
-        <span className="text-muted-foreground text-xs">
-          {talk.tool} {talk.model} · {talk.mode} · {state} · {spent(talk.since)}
-          {talk.cost > 0 && ` · $${talk.cost.toFixed(2)}`}
+        <Badge variant="outline" className={tone}>
+          {state}
+          {talk.code ? ` ${talk.code}` : ""}
+        </Badge>
+        <span className="text-muted-foreground shrink-0 text-xs tabular-nums">
+          {spent(talk.since, talk.until)}
+          {talk.cost > 0 && ` · ${talk.cost.toFixed(2)}`}
         </span>
         <div className="ml-auto flex items-center gap-2">
           {talk.running ? (
@@ -87,7 +102,9 @@ function One({
               variant="outline"
               size="sm"
               onClick={() => {
-                void stopAction(talk.id).then(() => onChange({ ...talk, running: false }))
+                void stopAction(talk.id).then(() =>
+                  onChange({ ...talk, running: false, until: Date.now() }),
+                )
               }}
             >
               stop it
@@ -114,6 +131,16 @@ function One({
             {open ? "hide" : "show"}
           </Button>
         </div>
+      </div>
+
+      <div className="text-muted-foreground -mt-1 flex flex-wrap items-center gap-1.5 pl-6 text-xs">
+        <span>{talk.tool}</span>
+        <span className="opacity-40">·</span>
+        <span>{talk.model}</span>
+        <span className="opacity-40">·</span>
+        <span>{did}</span>
+        <span className="opacity-40">·</span>
+        <span>{plural(talk.turns.filter((one) => one.tool).length, "tool call")}</span>
       </div>
 
       {open && (
@@ -171,7 +198,17 @@ export function Agents() {
       })
     }
     beat()
-    return () => clearTimeout(timer)
+    // a press that starts one puts it here on the press: waiting a beat for it to appear
+    // reads as the button having done nothing
+    const stop = onAgent((made) => {
+      setTalks((all) => [made, ...all.filter((one) => one.id !== made.id)])
+      clearTimeout(timer)
+      timer = setTimeout(beat, BEAT)
+    })
+    return () => {
+      clearTimeout(timer)
+      stop()
+    }
   }, [])
 
   if (!talks.length) return null

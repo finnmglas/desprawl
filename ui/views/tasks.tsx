@@ -3,6 +3,9 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
+import { Face, Hands } from "../components/molecules/hands.tsx"
+import { CopyButton } from "../components/molecules/copy-button.tsx"
+import { Dialog } from "../components/atoms/dialog.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
@@ -16,6 +19,7 @@ import { Tabs } from "../components/atoms/tabs.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph, dependencies, importGraph } from "../lib/live.ts"
+import { hands, handsOf, worked } from "../lib/people.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
 import { balanced, fold } from "../../src/layers.ts"
@@ -50,10 +54,12 @@ const TOLL: Record<Hits, string> = {
 
 export function Tasks({
   stats,
+  faces,
   onTab,
   onPath,
 }: {
   stats: Stats
+  faces: Record<string, string>
   onTab: (tab: string) => void
   onPath: (path: string[]) => void
 }) {
@@ -62,6 +68,20 @@ export function Tasks({
   const [deps, setDeps] = useState<Deps | null>(window.__DESPRAWL_DEPS__ ?? null)
   const [kind, setKind] = useState(ALL)
   const [find, setFind] = useState("")
+  // the row says as much as a row can, and the rest is a panel rather than a jump into
+  // Files: opening a folder nobody asked to open is not what clicking a task means
+  const [opened, setOpened] = useState<Task | null>(null)
+  const where = useMemo(() => worked(stats.tree), [stats.tree])
+  // a task names a file, and the tally is per folder: the folder holding it is the answer
+  const crewOf = (task: Task) => {
+    const at = task.where.replace(/\/?\*$/, "")
+    for (let path = at; path; path = path.split("/").slice(0, -1).join("/")) {
+      const found = hands(path, where, stats.contributors)
+      if (found.length) return found
+    }
+    // a task on package.json is the whole repo's, and the tree holds that tally
+    return handsOf(stats.tree.by, stats.contributors)
+  }
 
   useEffect(() => {
     if (!graph) void importGraph().then(setGraph)
@@ -113,6 +133,24 @@ export function Tasks({
         .split("/")
         .filter(Boolean),
     )
+
+  const written = (one: Task) => {
+    const crew = crewOf(one)
+    return [
+      `## ${one.title}`,
+      "",
+      one.why,
+      "",
+      `- Found by: ${one.kind}`,
+      `- Impact: ${one.hits}, ${FELT[one.hits]}`,
+      `- Where: \`${one.where}\``,
+      ...(crew.length ? [`- Knows it: ${crew[0].who.name}`] : []),
+      `- Clears ${num(one.reach)}, touches ${num(one.lines)} lines, about ${one.minutes}m of an agent`,
+      `- Cure: ${one.mechanical ? "mechanical, an agent can finish it" : "a decision somebody has to make"}`,
+      "",
+      `Found by desprawl in ${stats.repo}`,
+    ].join("\n")
+  }
 
   const columns: Column<Task>[] = [
     {
@@ -175,6 +213,25 @@ export function Tasks({
       hint: "an agent's time, scaled off the two runs anybody has timed here rather than off a feeling. Sort by it against Clears to pick",
     },
     {
+      key: "who",
+      label: "Dev",
+      get: (one) => crewOf(one)[0]?.who.name ?? "",
+      cell: (one) => {
+        const crew = crewOf(one)
+        if (!crew.length) return null
+        return (
+          <Tip
+            className="flex justify-center"
+            side="bottom"
+            text={<Hands of={crew} faces={faces} />}
+          >
+            <Face of={crew} faces={faces} />
+          </Tip>
+        )
+      },
+      hint: "who has committed most where this task is, so it lands with whoever knows it",
+    },
+    {
       key: "hits",
       label: "Impact",
       get: (one) => one.hits,
@@ -227,6 +284,7 @@ export function Tasks({
               "lines",
               "estimate minutes",
               "impact",
+              "dev",
               "cure",
               "why",
             ],
@@ -238,6 +296,7 @@ export function Tasks({
               one.lines,
               one.minutes,
               one.hits,
+              crewOf(one)[0]?.who.name ?? "",
               one.mechanical ? "known" : "judgement",
               one.why,
             ]),
@@ -311,10 +370,93 @@ export function Tasks({
         rows={shown}
         id={(one) => one.id}
         columns={columns}
-        onRowClick={(one) => walk(one.where)}
+        onRowClick={setOpened}
         fold={14}
         file="tasks"
       />
+
+      <Dialog
+        open={!!opened}
+        onClose={() => setOpened(null)}
+        className="max-w-lg gap-4"
+        title={
+          opened && (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-muted-foreground text-[11px] tracking-wide uppercase">
+                {opened.kind} · found by reading the repo
+              </span>
+              <span className="text-base leading-snug font-medium">{opened.title}</span>
+            </div>
+          )
+        }
+      >
+        {opened && (
+          <>
+            <p className="text-muted-foreground text-sm leading-relaxed">{opened.why}</p>
+
+            {/* the four numbers a person weighs it by, in one strip so they read across */}
+            <div className="bg-muted/40 grid grid-cols-2 gap-px overflow-hidden rounded-md sm:grid-cols-4">
+              {[
+                [num(opened.reach), "clears"],
+                [num(opened.lines), "lines"],
+                [`${opened.minutes}m`, "an agent"],
+                [opened.mechanical ? "known" : "a call", "the cure"],
+              ].map(([value, label]) => (
+                <div key={label} className="bg-card flex flex-col gap-0.5 px-3 py-2">
+                  <span className="text-lg leading-none font-semibold tabular-nums">{value}</span>
+                  <span className="text-muted-foreground text-[11px]">{label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <div className="flex items-baseline gap-2">
+                <span className="text-muted-foreground w-14 shrink-0 text-xs">Impact</span>
+                <Badge variant="outline" className={TOLL[opened.hits]}>
+                  {opened.hits}
+                </Badge>
+                <span className="text-muted-foreground min-w-0 text-xs">{FELT[opened.hits]}</span>
+              </div>
+              {crewOf(opened).length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground w-14 shrink-0 text-xs">Dev</span>
+                  <Face of={crewOf(opened)} faces={faces} className="size-5" />
+                  <span className="text-xs">
+                    {crewOf(opened)[0].who.name}
+                    <span className="text-muted-foreground"> has committed most where this is</span>
+                  </span>
+                </div>
+              )}
+              <div className="flex items-baseline gap-2">
+                <span className="text-muted-foreground w-14 shrink-0 text-xs">Where</span>
+                <button
+                  onClick={() => {
+                    walk(opened.where)
+                    setOpened(null)
+                  }}
+                  title="Open it in Files"
+                  className="hover:text-foreground hover:border-ring min-w-0 cursor-pointer truncate rounded border px-1.5 py-0.5 font-mono text-xs transition-colors"
+                >
+                  {opened.where}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 border-t pt-3">
+              <Fix task={opened} label="Hand it to an agent" />
+              <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+                it works here, and shows up under Agents
+              </span>
+              <CopyButton
+                label="Copy this task, as markdown"
+                text={() => written(opened)}
+                message="Copied the task"
+                note="Markdown, ready to paste into a ticket"
+              />
+            </div>
+          </>
+        )}
+      </Dialog>
 
       <Onward stats={stats} current="Tasks" onTab={onTab} />
     </div>

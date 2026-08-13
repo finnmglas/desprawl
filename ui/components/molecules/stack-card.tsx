@@ -93,6 +93,7 @@ function describe(stack: Stack): Section[] {
           ],
         ],
         ["Hosting", stack.hosts],
+        ["Built into", stack.apps],
         ["APIs", stack.apis],
         ["Config", stack.env],
       ],

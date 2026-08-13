@@ -240,3 +240,11 @@ test("a table is written the way whatever opens it next expects", () => {
   assert.ok(by("xls").includes("&quot;") === false, "and the cells are html escaped")
   assert.ok(by("xls").includes("<td x:num>24</td>"), "with numbers marked as numbers")
 })
+
+test("a folder does not say the same word twice because it borrowed it", () => {
+  // app_ui/ui borrows the folder above it, which already says ui
+  assert.equal(nameOf("app_ui/ui"), "App UI")
+  assert.equal(nameOf("app_ui/lib"), "App UI library", "a different word still gets borrowed")
+  assert.equal(nameOf("api/api"), "API")
+  assert.equal(nameOf("packages/core/lib"), "Core library")
+})

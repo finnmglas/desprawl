@@ -188,7 +188,18 @@ export const stopAction = (id: string): Promise<{ stopped: boolean }> =>
 
 export const aliveActions = (): Promise<Alive[]> => ask<Alive[]>("/api/actions/alive", [])
 
+/** dropped from the list for good, which only a stopped one allows */
+export const forgetAction = (id: string): Promise<{ forgotten: boolean }> =>
+  ask(`/api/actions/forget?id=${encodeURIComponent(id)}`, { forgotten: false })
+
 export const agentHere = (): Promise<Agent | null> => ask<Agent | null>("/api/agent", null)
+
+/** anything watching agent runs, so a new one shows up on the press rather than on the beat */
+const watchers = new Set<(made: Talk) => void>()
+export const onAgent = (told: (made: Talk) => void) => {
+  watchers.add(told)
+  return () => watchers.delete(told)
+}
 
 /** the task goes over as text: the argv it turns into is built on the other side */
 export const startFix = (said: {
@@ -215,6 +226,9 @@ export const startFix = (said: {
       install: said.install,
       trust: said.trust,
     }),
+  }).then((made) => {
+    if (made) for (const told of watchers) told(made)
+    return made
   })
 
 /** every agent run this desprawl started, with everything said in it */

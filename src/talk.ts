@@ -21,6 +21,8 @@ export interface Talk {
   model: string
   mode: string
   since: number
+  /** when it stopped, since a clock that keeps going says it is still working */
+  until: number
   running: boolean
   code: number | null
   /** what the cli calls this conversation, and the only way to say more into it */
@@ -114,12 +116,15 @@ const run = (repo: string, talk: Talk, prompt: string, install: string, trust: s
   talk.answerable = sent.streams
   talk.running = true
   talk.code = null
+  talk.since = Date.now()
+  talk.until = 0
   const rest = { left: "" }
   return begin(repo, talk.id, sent.argv, sent.env, (chunk, done) => {
     if (chunk) return feed(talk, chunk, rest)
     if (rest.left) swallow(talk, rest.left)
     rest.left = ""
     talk.running = false
+    talk.until = Date.now()
     talk.code = done
   })
 }
@@ -142,6 +147,7 @@ const blank = (id: string, task: string, model: string, mode: string): Talk => (
   model,
   mode,
   since: Date.now(),
+  until: 0,
   running: false,
   code: null,
   session: "",
@@ -183,6 +189,9 @@ export function say(repo: string, id: string, text: string, install = "", trust 
 /** stopped by hand, and said so in the transcript rather than only in the exit code */
 export function hush(id: string): boolean {
   const talk = going.get(id)
-  if (talk?.running) add(talk, { who: "note", text: "stopped by you" })
+  if (talk?.running) {
+    add(talk, { who: "note", text: "stopped by you" })
+    talk.until = Date.now()
+  }
   return stop(id)
 }

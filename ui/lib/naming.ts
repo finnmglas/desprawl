@@ -79,16 +79,21 @@ const said = (part: string) =>
     .replace(/[-_.]+/g, " ")
     .trim()
 
-const cased = (phrase: string) =>
-  phrase
-    .split(" ")
-    .filter(Boolean)
+const cased = (phrase: string) => {
+  const words = phrase.split(" ").filter(Boolean)
+  // `app_ui/ui` borrows the folder above and lands on "app ui ui": a word the rest of the
+  // name already says is said once, and it is the later one that keeps its place
+  return words
+    .filter(
+      (word, i) => !words.slice(i + 1).some((later) => later.toLowerCase() === word.toLowerCase()),
+    )
     .map((raw, i) => {
       const word = SPELLED[raw.toLowerCase()] ?? raw
       if (SHOUT.has(word.toLowerCase())) return word.toUpperCase()
       return i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word
     })
     .join(" ")
+}
 
 /** a hash or uuid: chunks of letters and digits, none of them a word */
 export function isId(segment: string): boolean {

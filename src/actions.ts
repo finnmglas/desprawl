@@ -317,3 +317,11 @@ export function stop(id: string): boolean {
 }
 
 export const alive = (): Alive[] => [...held.values()].map((one) => one.alive)
+
+/** dropped from the list, once it has stopped: a running one is stopped rather than hidden */
+export function forget(id: string): boolean {
+  const one = held.get(id)
+  if (!one || one.alive.running) return false
+  held.delete(id)
+  return true
+}

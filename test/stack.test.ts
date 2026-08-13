@@ -220,3 +220,36 @@ test("serverless names its own cloud rather than assuming one", () => {
   })
   assert.deepEqual(stack(dir).hosts, ["Google Cloud"], "the framework runs on more than aws")
 })
+
+test("a web app in a native shell says which app it is built into", () => {
+  const dir = repo({
+    "package.json": JSON.stringify({
+      name: "shell",
+      dependencies: { "@capacitor/core": "6.0.0", "@capacitor/android": "6.0.0" },
+    }),
+    "android/app/build.gradle": "apply plugin: 'com.android.application'\n",
+  })
+  const s = stack(dir)
+  assert.ok(s.frameworks.includes("Capacitor"), "the shell itself")
+  assert.deepEqual(s.apps, ["Android"], "and the one platform it was actually added for")
+})
+
+test("a repo that only builds a web page is not built into anything", () => {
+  const dir = repo({
+    "package.json": JSON.stringify({ name: "web", dependencies: { next: "15.0.0" } }),
+  })
+  assert.deepEqual(stack(dir).apps, [])
+})
+
+test("what a repo is built into is one of the parts it is made of", () => {
+  const dir = repo({
+    "package.json": JSON.stringify({
+      name: "shell",
+      dependencies: { next: "15.0.0", "@capacitor/core": "6.0.0", "@capacitor/ios": "6.0.0" },
+    }),
+  })
+  const s = stack(dir)
+  assert.ok(s.parts.includes("frontend"))
+  assert.ok(s.parts.includes("ios"), "the platform is named, not filed under mobile")
+  assert.ok(!s.parts.includes("android"), "and only the one it was actually set up for")
+})

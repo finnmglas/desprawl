@@ -8,8 +8,7 @@ import { Select } from "../atoms/input.tsx"
 import { Sparkle } from "../atoms/icons.tsx"
 import { Tabs } from "../atoms/tabs.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { agentHere, isLive, startFix, stopAction, talksNow } from "../../lib/live.ts"
-import { Transcript } from "./transcript.tsx"
+import { agentHere, isLive, startFix, talksNow } from "../../lib/live.ts"
 import { readPrefs, savePrefs, type Prefs } from "../../lib/prefs.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Agent } from "../../../src/agent.ts"
@@ -299,37 +298,20 @@ export function Fix({
             {/* folded or not: the button is about to be disabled and this says why */}
             {said.blocked && <span className="text-xs text-amber-500">{said.blocked}</span>}
 
-            {run?.running ? (
-              <div className="flex flex-col gap-2">
-                <div className="bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1.5">
-                  <Transcript turns={run.turns.slice(-8)} />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    void stopAction(run.id).then(() => setRun({ ...run, running: false }))
-                  }}
-                >
-                  stop it
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {run && !run.running && run.turns.length > 1 && (
-                  <div className="bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1.5">
-                    <Transcript turns={run.turns.slice(-8)} />
-                  </div>
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={start}
-                  disabled={!!said.blocked || (!task && !wish.trim())}
-                >
-                  {said.id === "plan" ? "ask it for a plan" : said.label}
-                </Button>
-              </div>
+            {/* this panel hands the work over and stops there. What it then said and did is
+                one list on the page, not a copy of it behind every button that started one */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={start}
+              disabled={!!said.blocked || (!task && !wish.trim())}
+            >
+              {said.id === "plan" ? "ask it for a plan" : said.label}
+            </Button>
+            {run && (
+              <span className="text-muted-foreground text-xs">
+                {run.running ? "working, under Agents below" : "it finished, see Agents below"}
+              </span>
             )}
           </div>,
           document.body,

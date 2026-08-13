@@ -65,6 +65,8 @@ export const HINTS: Record<string, string> = {
   "monorepo root": "workspaces and no dependencies of its own, so it only holds packages",
   mobile: "react native or expo",
   desktop: "electron or tauri",
+  android: "it builds an android app, not only a web page",
+  ios: "it builds an iphone app, not only a web page",
   infra: "dockerfiles, compose, kubernetes or terraform in the tree",
   Assistants: "ai coding tools this repo shows a trace of",
   Signed: "commits whose author line or trailers name an ai",

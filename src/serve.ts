@@ -13,7 +13,7 @@ import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
 import { run as runTests, tests } from "./tests.ts"
-import { act, actions, alive, begin, stop as stopAction } from "./actions.ts"
+import { act, actions, alive, begin, forget, stop as stopAction } from "./actions.ts"
 import { agent, ask } from "./agent.ts"
 import { close, hush, say, startTalk, talks } from "./talk.ts"
 import type { Suite } from "./tests.ts"
@@ -319,6 +319,8 @@ export function serve(
                 said.extra ?? "",
                 said.mode ?? "",
                 said.id ?? "task",
+                // typed into the box, so it may be a question rather than an instruction
+                (said.id ?? "").startsWith("asked:"),
               )
               json(
                 startTalk(
@@ -379,7 +381,14 @@ export function serve(
         if (url.pathname === "/api/actions/stop") {
           return json({ stopped: stopAction(url.searchParams.get("id") ?? "") })
         }
-        if (url.pathname === "/api/actions/alive") return json(alive())
+        // an agent run is watched here like anything else long, but it is not one of this
+        // repo's commands, and listing it beside pnpm dev reads as one
+        // a finished one is only a line on a page by then, and the page is allowed to drop it
+        if (url.pathname === "/api/actions/forget")
+          return json({ forgotten: forget(url.searchParams.get("id") ?? "") })
+
+        if (url.pathname === "/api/actions/alive")
+          return json(alive().filter((one) => !one.id.startsWith("fix:")))
 
         // by id: the command itself is never taken from the url
         if (url.pathname === "/api/actions/run") {

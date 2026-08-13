@@ -268,6 +268,32 @@ const PLATFORM: Table = {
   "@aws-sdk/client-lambda": "AWS", "@azure/static-web-apps-cli": "Azure",
 }
 
+/**
+ * A package that says this repo is built into an app for something other than a browser.
+ * A shell framework says how, the platform packages say which: Capacitor with only
+ * `@capacitor/android` builds an android app and not an iphone one.
+ */
+// prettier-ignore
+const BUILT_FOR: Table = {
+  "@capacitor/android": "Android", "@capacitor/ios": "iOS", "@capacitor/electron": "Desktop",
+  "cordova-android": "Android", "cordova-ios": "iOS",
+  "react-native": "Android,iOS", "expo": "Android,iOS",
+  "react-native-macos": "macOS", "react-native-windows": "Windows",
+  "electron": "Desktop", "@tauri-apps/cli": "Desktop", "nw": "Desktop",
+  "@lynx-js/rspeedy": "Android,iOS",
+}
+
+/** a folder or file that only exists once a shell has actually been added for a platform */
+// prettier-ignore
+const NATIVE: [RegExp, string][] = [
+  [/(^|\/)android\/(app\/)?build\.gradle(\.kts)?$/, "Android"],
+  [/(^|\/)ios\/[^/]+\.xcodeproj\//, "iOS"],
+  [/(^|\/)ios\/Podfile$/, "iOS"],
+  [/(^|\/)macos\/[^/]+\.xcodeproj\//, "macOS"],
+  [/(^|\/)windows\/[^/]+\.sln$/, "Windows"],
+  [/(^|\/)src-tauri\/tauri\.conf\.json$/, "Desktop"],
+]
+
 /** a package whose whole job is putting this repo somewhere */
 // prettier-ignore
 const SHIPS: Table = {
@@ -480,6 +506,7 @@ function markers(repo: string, paths: string[]) {
   const agents: string[] = []
   const agentFiles: Record<string, number> = {}
   const hosts: string[] = []
+  const apps: string[] = []
 
   const port = (value: number) => {
     if (value > 0 && value < 65536 && !ports.includes(value)) ports.push(value)
@@ -500,6 +527,7 @@ function markers(repo: string, paths: string[]) {
       if (match.test(path)) add((found[where] ??= []), path.split("/").pop() ?? path)
     }
     for (const [match, host] of HOSTED) if (match.test(path)) add(hosts, host)
+    for (const [match, made] of NATIVE) if (match.test(path)) add(apps, made)
     for (const [named, says, host] of AMBIGUOUS)
       if (named.test(path) && says.test(read(repo, path))) add(hosts, host)
 
@@ -538,7 +566,7 @@ function markers(repo: string, paths: string[]) {
         port(Number(line[1]))
     }
   }
-  return { found, counts, node, env, strict, ports, agents, agentFiles, hosts, port }
+  return { found, counts, node, env, strict, ports, agents, agentFiles, hosts, apps, port }
 }
 
 /** a licence beside the manifest speaks for the project, the rest come with vendored code */
@@ -586,6 +614,7 @@ function shipped(
   workspaces: boolean,
   manifests: Manifest[],
   boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
+  apps: string[],
 ): string[] {
   const parts: string[] = []
   if (frameworks.some((f) => CLIENT.includes(f))) add(parts, "frontend")
@@ -594,18 +623,17 @@ function shipped(
     add(parts, "monorepo root")
   if (manifests.some((m) => m.workspaces) || workspaces) add(parts, "monorepo")
   if (manifests.some((m) => m.bin)) add(parts, "cli")
-  if (frameworks.includes("React Native") || frameworks.includes("Expo")) add(parts, "mobile")
-  if (frameworks.includes("Electron") || frameworks.includes("Tauri")) add(parts, "desktop")
+  // what it is built into is a part of the project as much as a frontend is: a repo that
+  // ships an android app says android, not "mobile", since only one of those is checkable
+  for (const made of apps) add(parts, made.toLowerCase())
   if (boxes.dockerfiles || boxes.compose || boxes.kubernetes || boxes.terraform) add(parts, "infra")
   return parts
 }
 
 export function stack(repo: string, languages: Node[] = []): Stack {
   const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
-  const { found, counts, node, env, strict, ports, agents, agentFiles, hosts, port } = markers(
-    repo,
-    paths,
-  )
+  const { found, counts, node, env, strict, ports, agents, agentFiles, hosts, apps, port } =
+    markers(repo, paths)
   const licenses: string[] = []
   const modules: string[] = []
 
@@ -659,6 +687,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
       pinning[pin(String(range))]++
       if (name === "typescript") add(typescript, String(range))
       add(hosts, label(SHIPS, name))
+      for (const made of (label(BUILT_FOR, name) ?? "").split(",")) add(apps, made)
       const platform = label(PLATFORM, name)
       if (platform) {
         add(hosts, platform)
@@ -701,6 +730,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     !!found.workspaces,
     manifests,
     counts,
+    apps,
   )
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
@@ -750,6 +780,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     bundlers,
     ports: ports.sort((a, b) => a - b),
     hosts,
+    apps,
     node,
     modules,
     strict,

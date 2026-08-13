@@ -172,6 +172,8 @@ export interface Stack {
   ports: number[]
   /** where this repo looks like it deploys, from config, infrastructure and workflows */
   hosts: string[]
+  /** what it is built into besides a web page: a phone app, a desktop one */
+  apps: string[]
   /** node versions asked for, from engines and .nvmrc */
   node: string[]
   /** esm, cjs or both, from package type and file extensions */

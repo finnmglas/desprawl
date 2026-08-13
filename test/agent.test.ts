@@ -67,3 +67,27 @@ test("every cli offers its own leashes, and auto is never one of them", () => {
     if (one.who) assert.ok(one.label.endsWith(one.who), "the account is what tells them apart")
   }
 })
+
+test("a question typed by hand is answered, not turned into a change", () => {
+  const asked = ask("how many files does the repo have?", "", ".", "", "local", "asked:x", true)
+  assert.match(asked, /Answer this question/)
+  assert.match(asked, /Change no file/, "the mode said commit, the question says do not")
+  assert.doesNotMatch(asked, /branch called/, "and there is nothing to branch for")
+
+  // the same box, an instruction rather than a question
+  const told = ask("rename the weight helper", "", ".", "", "local", "asked:y", true)
+  assert.match(told, /do the following task/)
+  assert.match(told, /branch called/)
+
+  // a found task is not read for question words: "Delete X" is work whatever it starts with
+  const found = ask("Do not ship this file", "nothing reaches it", "a.ts", "", "unstaged")
+  assert.match(found, /do the following task/)
+})
+
+test("whatever it is asked, it is told how to say it back", () => {
+  for (const said of [
+    ask("what is here?", "", ".", "", "plan", "asked:x", true),
+    ask("t", "w", "p", "", "unstaged"),
+  ])
+    assert.match(said, /short, direct, the outcome first/)
+})

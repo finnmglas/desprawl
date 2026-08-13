@@ -363,6 +363,24 @@ const branchOf = (id: string) =>
     .toLowerCase()
     .slice(0, 40)}`
 
+// what it is told about writing, whoever it is talking to: an agent that opens with a
+// paragraph about what it is about to do has already wasted the answer
+const VOICE = [
+  "Answer the way a colleague would in chat: short, direct, the outcome first.",
+  "No preamble, no restating what was asked, no summary of what you just did.",
+]
+
+/**
+ * Whether what somebody typed is a question rather than an instruction. Read off the words
+ * because a person typing into a box should not have to say which one it was: the cost of
+ * getting it wrong is one sentence of an answer, and it is told to work it out itself too.
+ */
+const asking = (said: string) =>
+  /\?\s*$/.test(said.trim()) ||
+  /^(what|which|who|whom|whose|where|when|why|how|is|are|was|were|do|does|did|can|could|should|would|will|has|have|any|list|show|tell|explain|count|find out)\b/i.test(
+    said.trim(),
+  )
+
 /** the whole of what it is told, which is shown before it is sent */
 export function ask(
   task: string,
@@ -371,7 +389,20 @@ export function ask(
   extra: string,
   mode = "unstaged",
   id = "task",
+  /** typed into the box rather than found by reading the repo, so it may be a question */
+  loose = false,
 ): string {
+  // a question gets an answer and nothing else, whatever the mode says to do with the work
+  if (loose && asking(task))
+    return [
+      `Answer this question about the repository you are in: ${task}`,
+      extra.trim() && `Also: ${extra.trim()}`,
+      "Read whatever you need to. Change no file, and do not commit or push anything.",
+      ...VOICE,
+    ]
+      .filter(Boolean)
+      .join("\n")
+
   const ending =
     mode === "plan"
       ? ["Describe the change you would make, briefly. Change no file."]
@@ -389,11 +420,12 @@ export function ask(
           ]
   return [
     `In this repository, do the following task: ${task}`,
-    `Why it was raised: ${why}`,
-    `Where it is: ${where}`,
+    !loose && `Why it was raised: ${why}`,
+    !loose && where && where !== "." && `Where it is: ${where}`,
     extra.trim() && `Extra instructions from the person asking: ${extra.trim()}`,
     "Follow the repository's own conventions.",
     ...ending,
+    ...VOICE,
   ]
     .filter(Boolean)
     .join("\n")
