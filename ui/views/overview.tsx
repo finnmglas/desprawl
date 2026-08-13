@@ -295,7 +295,7 @@ const DEPS: Column<Row>[] = [
           <span className="text-muted-foreground">indirectly</span>
         </Tip>
       ),
-    hint: "whether this repo imports it. Dev or runtime is only known for the ones it does, since a pulled in package is whatever pulled it",
+    hint: "whether this repo names it, and whether anything that ships reaches it. Dev only is worked out through the whole tree, so a package pulled in by a dev one is dev too",
   },
   {
     key: "advisories",
@@ -810,7 +810,9 @@ export function Overview({
           hint={
             kit.offline
               ? "licences from node_modules, check didn't reach osv.dev"
-              : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
+              : kit.missed
+                ? `${plural(picked.length, "package")}: osv.dev named ${kit.missed} advisories it then would not describe, so this column is short`
+                : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
           }
           // worst first
           onFind={setHunt}

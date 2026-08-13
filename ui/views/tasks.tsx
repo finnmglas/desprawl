@@ -8,6 +8,7 @@ import { Card, CardContent } from "../components/atoms/card.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Fix } from "../components/molecules/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
+import { Agents } from "../components/molecules/agents.tsx"
 import { Kpi } from "../components/molecules/kpi.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
@@ -16,7 +17,7 @@ import { Tip } from "../components/atoms/tip.tsx"
 import { Waiting } from "../components/atoms/waiting.tsx"
 import { callGraph, dependencies, importGraph } from "../lib/live.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
-import { KINDS, tasks, type Task } from "../lib/tasks.ts"
+import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
 import { balanced, fold } from "../../src/layers.ts"
 import { cn } from "../lib/ui.ts"
 import type { Calls } from "../../src/calls.ts"
@@ -39,6 +40,13 @@ const TONES: Record<string, string> = {
 /** an hour is not 60 minutes to read, it is "an hour" */
 const spell = (minutes: number) =>
   minutes < 90 ? `${Math.round(minutes)}m` : `${(minutes / 60).toFixed(1)}h`
+
+const TOLL: Record<Hits, string> = {
+  runtime: "border-red-500/60 text-red-700 dark:text-red-300",
+  shipping: "border-amber-500/60 text-amber-700 dark:text-amber-300",
+  "local dev": "border-sky-500/50 text-sky-700 dark:text-sky-300",
+  maintainability: "text-muted-foreground",
+}
 
 export function Tasks({
   stats,
@@ -167,6 +175,19 @@ export function Tasks({
       hint: "an agent's time, scaled off the two runs anybody has timed here rather than off a feeling. Sort by it against Clears to pick",
     },
     {
+      key: "hits",
+      label: "Impact",
+      get: (one) => one.hits,
+      cell: (one) => (
+        <Tip text={FELT[one.hits]}>
+          <Badge variant="outline" className={TOLL[one.hits]}>
+            {one.hits}
+          </Badge>
+        </Tip>
+      ),
+      hint: "who feels it if nobody does it. Not severity: a folder nobody can open and a dead export both cost only the people working here",
+    },
+    {
       key: "how",
       label: "Cure",
       get: (one) => (one.mechanical ? "known" : "judgement"),
@@ -193,11 +214,22 @@ export function Tasks({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <Back onTab={onTab} />
+        {/* the table is what this repo needs doing, this is whatever you need doing */}
+        <Fix className="ml-auto" label="Ask an agent" />
         <Save
-          className="ml-auto"
           name="tasks"
           rows={() => [
-            ["task", "found by", "where", "clears", "lines", "estimate minutes", "cure", "why"],
+            [
+              "task",
+              "found by",
+              "where",
+              "clears",
+              "lines",
+              "estimate minutes",
+              "impact",
+              "cure",
+              "why",
+            ],
             ...found.map((one) => [
               one.title,
               one.kind,
@@ -205,6 +237,7 @@ export function Tasks({
               one.reach,
               one.lines,
               one.minutes,
+              one.hits,
               one.mechanical ? "known" : "judgement",
               one.why,
             ]),
@@ -245,16 +278,18 @@ export function Tasks({
           }}
         />
         <Kpi
-          label="Worst kind"
-          value={KINDS.filter((one) => found.some((task) => task.kind === one))[0] ?? "none"}
-          sub={`${num(found.filter((one) => one.kind === KINDS.find((k) => found.some((t) => t.kind === k))).length)} of them`}
+          label="Reaches anyone"
+          value={num(found.filter((one) => one.hits === "runtime").length)}
+          sub={`of ${plural(found.length, "task")}, the rest cost only us`}
           verdict={{
-            label: "by severity",
-            tone: "plain",
-            why: "security first, then licence, then the structure ones. It is an order to read in, not a judgement of the repo",
+            label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",
+            tone: found.some((one) => one.hits === "runtime") ? "watch" : "fine",
+            why: "how many of these can be felt by somebody running this, rather than by whoever works on it. The badge names the worst impact on the list",
           }}
         />
       </div>
+
+      <Agents />
 
       <div className="flex flex-wrap items-center gap-2">
         <Tabs

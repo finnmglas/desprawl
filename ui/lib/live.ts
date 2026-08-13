@@ -7,6 +7,7 @@ import type { Deps } from "../../src/deps.ts"
 import type { Run, Suite } from "../../src/tests.ts"
 import type { Action, Alive } from "../../src/actions.ts"
 import type { Agent } from "../../src/agent.ts"
+import type { Talk } from "../../src/talk.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -200,8 +201,8 @@ export const startFix = (said: {
   mode: string
   install: string
   trust: string
-}): Promise<Alive | null> =>
-  ask<Alive | null>("/api/agent/fix", null, {
+}): Promise<Talk | null> =>
+  ask<Talk | null>("/api/agent/fix", null, {
     method: "POST",
     body: JSON.stringify({
       id: said.id,
@@ -215,3 +216,19 @@ export const startFix = (said: {
       trust: said.trust,
     }),
   })
+
+/** every agent run this desprawl started, with everything said in it */
+export const talksNow = (): Promise<Talk[]> => ask<Talk[]>("/api/agent/talks", [])
+
+/** thrown away on purpose: a run is kept for as long as it is not asked to go */
+export const closeTalk = (id: string): Promise<{ closed: boolean; why?: string }> =>
+  ask(`/api/agent/close?id=${encodeURIComponent(id)}`, { closed: false, why: "not live" })
+
+/** one more thing said into a run that has stopped talking */
+export const sayToAgent = (said: {
+  id: string
+  text: string
+  install: string
+  trust: string
+}): Promise<Talk | null> =>
+  ask<Talk | null>("/api/agent/say", null, { method: "POST", body: JSON.stringify(said) })

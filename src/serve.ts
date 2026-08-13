@@ -14,7 +14,8 @@ import { build } from "./graph.ts"
 import { deps } from "./deps.ts"
 import { run as runTests, tests } from "./tests.ts"
 import { act, actions, alive, begin, stop as stopAction } from "./actions.ts"
-import { agent, ask, fix } from "./agent.ts"
+import { agent, ask } from "./agent.ts"
+import { close, hush, say, startTalk, talks } from "./talk.ts"
 import type { Suite } from "./tests.ts"
 import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
@@ -159,10 +160,24 @@ export function serve(
         req.on("close", () => {
           tabs.delete(res)
           if (keep || tabs.size) return
-          farewell = setTimeout(() => {
+          let waited = false
+          const leave = () => {
+            if (tabs.size) return
+            const working = alive().filter((one) => one.running)
+            if (working.length) {
+              // said once: a run of twenty minutes would otherwise print this six hundred times
+              if (!waited)
+                console.log(
+                  `\nTab closed, but ${working.length} agent run${working.length === 1 ? " is" : "s are"} still going, so desprawl stayed up.\n`,
+                )
+              waited = true
+              farewell = setTimeout(leave, GRACE)
+              return
+            }
             console.log("\n\nTab closed, so desprawl stopped. Pass --keep to leave it running.\n")
             process.exit(0)
-          }, GRACE)
+          }
+          farewell = setTimeout(leave, GRACE)
         })
         return
       }
@@ -306,9 +321,10 @@ export function serve(
                 said.id ?? "task",
               )
               json(
-                fix(
+                startTalk(
                   repo,
                   said.id ?? "task",
+                  said.task ?? "",
                   prompt,
                   said.model ?? "",
                   said.mode ?? "",
@@ -316,6 +332,32 @@ export function serve(
                   said.trust ?? "auto",
                 ),
               )
+            } catch (err) {
+              json({ error: (err as Error).message }, 400)
+            }
+          })
+          return
+        }
+
+        if (url.pathname === "/api/agent/talks") return json(talks())
+
+        // asked for by name, and refused while it is working: closing one throws it away
+        if (url.pathname === "/api/agent/close")
+          return json(close(url.searchParams.get("id") ?? ""))
+
+        if (url.pathname === "/api/agent/say" && req.method === "POST") {
+          let body = ""
+          req.on("data", (chunk) => {
+            body += chunk
+            if (body.length > 64_000) {
+              send(413, "a message is smaller than this", "text/plain")
+              req.destroy()
+            }
+          })
+          req.on("end", () => {
+            try {
+              const said = JSON.parse(body) as Record<string, string>
+              json(say(repo, said.id ?? "", said.text ?? "", said.install ?? "", said.trust))
             } catch (err) {
               json({ error: (err as Error).message }, 400)
             }
@@ -331,6 +373,9 @@ export function serve(
             return json({ error: (err as Error).message }, 400)
           }
         }
+        if (url.pathname === "/api/actions/stop" && url.searchParams.get("id")?.startsWith("fix:"))
+          return json({ stopped: hush(url.searchParams.get("id") ?? "") })
+
         if (url.pathname === "/api/actions/stop") {
           return json({ stopped: stopAction(url.searchParams.get("id") ?? "") })
         }
@@ -366,9 +411,13 @@ export function serve(
           return
         }
 
-        // read once a page asks, since it reaches the network
+        // read once a page asks, since it reaches the network. A read that did not get an
+        // answer is not kept: cached silence reads as "nothing filed" for the whole session
         if (url.pathname === "/api/deps") {
-          ;(known ? Promise.resolve(known) : deps(repo).then((d) => (known = d))).then(
+          ;(known
+            ? Promise.resolve(known)
+            : deps(repo).then((d) => (d.offline || d.missed ? d : (known = d)))
+          ).then(
             (d) => json(d),
             (err: Error) => json({ error: err.message }, 500),
           )

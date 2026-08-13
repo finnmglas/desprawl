@@ -10,6 +10,22 @@ import type { Cut, Layout, Unit } from "../../src/layers.ts"
 
 export type Sort = "broken" | "licence" | "security" | "cycle" | "dead" | "shape" | "size"
 
+/**
+ * Who feels it if this is never done. It is not severity: a bloated folder and a dead export
+ * are both work nobody outside the repo would notice, and that is worth saying next to a
+ * broken import that stops the thing running.
+ */
+export type Hits = "runtime" | "local dev" | "shipping" | "maintainability"
+
+export const IMPACTS: Hits[] = ["runtime", "shipping", "local dev", "maintainability"]
+
+export const FELT: Record<Hits, string> = {
+  runtime: "it can reach whoever runs this, so it is not only a repo problem",
+  shipping: "it decides what may be shipped or under what terms, rather than whether it works",
+  "local dev": "it lands on whoever builds or tests here, and never on anybody running it",
+  maintainability: "nothing breaks today: it is the cost of every change made after it",
+}
+
 export interface Task {
   id: string
   title: string
@@ -26,6 +42,8 @@ export interface Task {
   minutes: number
   /** a cure known to be mechanical, which is what an agent is good for */
   mechanical: boolean
+  /** who feels it if nobody does it */
+  hits: Hits
 }
 
 const SEVERITY: Record<string, number> = { critical: 4, high: 3, moderate: 2, low: 1 }
@@ -76,6 +94,8 @@ function fromDeps(deps: Deps | null): Task[] {
         ),
         minutes: 4,
         mechanical: true,
+        // a dev dependency is not in anything anybody runs, whatever is filed against it
+        hits: dep.dev ? "local dev" : "runtime",
       })
     }
     // nothing installed means nothing was read: an uninstalled package has no licence here to
@@ -102,6 +122,7 @@ function fromDeps(deps: Deps | null): Task[] {
         reach: 1,
         minutes: 6,
         mechanical: false,
+        hits: "shipping",
       })
   }
   return found
@@ -132,6 +153,8 @@ function fromMissing(graph: Graph | null): Task[] {
     reach: 1,
     minutes: timed(1),
     mechanical: true,
+    // an import of something that is not there is not a style question
+    hits: "runtime",
   }))
 }
 
@@ -150,6 +173,8 @@ function fromLayout(layout: Layout | null, lines: Map<string, number>): Task[] {
       reach: ring.length,
       minutes: timed(ring.length),
       mechanical: false,
+      // a ring loads in an order nobody chose, which is a runtime fact and not a tidiness one
+      hits: "runtime",
     })
   }
   for (const loop of layout.tangles)
@@ -167,6 +192,7 @@ function fromLayout(layout: Layout | null, lines: Map<string, number>): Task[] {
         reach: loop.units.length,
         minutes: timed(1),
         mechanical: true,
+        hits: "maintainability",
       })
   return found
 }
@@ -191,6 +217,7 @@ function fromUnits(units: Unit[]): Task[] {
       reach: unit.spread,
       minutes: timed(unit.spread * 0.5),
       mechanical: false,
+      hits: "maintainability" as const,
     }))
 }
 
@@ -212,6 +239,8 @@ function fromCalls(calls: Calls | null): Task[] {
       reach: 1,
       minutes: timed(1, one.lines),
       mechanical: true,
+      // it ships, it builds, and it is read: none of that stops, it only costs
+      hits: "maintainability",
     })
   // one declaration long enough that nobody holds it at once. A file being long is not the
   // same thing: the longest files in these repos are word lists and fixtures, and there is
@@ -229,6 +258,7 @@ function fromCalls(calls: Calls | null): Task[] {
       reach: 1,
       minutes: timed(4, one.lines),
       mechanical: false,
+      hits: "maintainability",
     })
 
   // a name in many files is not work: handleSubmit is thirteen different functions of four to

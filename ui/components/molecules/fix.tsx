@@ -8,11 +8,12 @@ import { Select } from "../atoms/input.tsx"
 import { Sparkle } from "../atoms/icons.tsx"
 import { Tabs } from "../atoms/tabs.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { agentHere, aliveActions, isLive, startFix, stopAction } from "../../lib/live.ts"
+import { agentHere, isLive, startFix, stopAction, talksNow } from "../../lib/live.ts"
+import { Transcript } from "./transcript.tsx"
 import { readPrefs, savePrefs, type Prefs } from "../../lib/prefs.ts"
 import { cn } from "../../lib/ui.ts"
 import type { Agent } from "../../../src/agent.ts"
-import type { Alive } from "../../../src/actions.ts"
+import type { Talk } from "../../../src/talk.ts"
 import type { Task } from "../../lib/tasks.ts"
 
 /** asked once for the whole page rather than once per row */
@@ -22,7 +23,17 @@ const here = () => (asked ??= agentHere())
 const WIDE = 380
 const EDGE = 12
 
-export function Fix({ task }: { task: Task }) {
+/** no task is the wildcard: whatever the person types becomes the task */
+export function Fix({
+  task,
+  label,
+  className,
+}: {
+  task?: Task
+  label?: string
+  className?: string
+}) {
+  const [wish, setWish] = useState("")
   const [agent, setAgent] = useState<Agent | null>(null)
   const [open, setOpen] = useState(false)
   const [extra, setExtra] = useState("")
@@ -35,7 +46,9 @@ export function Fix({ task }: { task: Task }) {
     savePrefs({ ...readPrefs(), agent: merged })
   }
   const [more, setMore] = useState(false)
-  const [run, setRun] = useState<Alive | null>(null)
+  // one panel per row and one loose one, and every one of them opens somewhere else
+  const seat = task?.id ?? "anything"
+  const [run, setRun] = useState<Talk | null>(null)
   const [at, setAt] = useState({ top: 0, left: 0 })
   const host = useRef<HTMLButtonElement>(null)
 
@@ -50,7 +63,7 @@ export function Fix({ task }: { task: Task }) {
     if (!box) return
     // measured rather than assumed: it grows as it runs, and a guessed height puts the
     // button that starts it under the fold
-    const tall = document.getElementById(`fix-${task.id}`)?.getBoundingClientRect().height ?? 360
+    const tall = document.getElementById(`fix-${seat}`)?.getBoundingClientRect().height ?? 360
     setAt({
       top: Math.max(EDGE, Math.min(box.bottom + 6, innerHeight - EDGE - tall)),
       left: Math.max(EDGE, Math.min(box.right - WIDE, innerWidth - WIDE - EDGE)),
@@ -67,7 +80,7 @@ export function Fix({ task }: { task: Task }) {
       if (event instanceof KeyboardEvent && event.key !== "Escape") return
       if (event.type === "pointerdown" && host.current?.contains(event.target as globalThis.Node))
         return
-      const panel = document.getElementById(`fix-${task.id}`)
+      const panel = document.getElementById(`fix-${seat}`)
       if (event.type === "pointerdown" && panel?.contains(event.target as globalThis.Node)) return
       setOpen(false)
     }
@@ -87,15 +100,15 @@ export function Fix({ task }: { task: Task }) {
   useEffect(() => {
     if (!run?.running) return
     const timer = setInterval(() => {
-      void aliveActions().then((list) => {
-        const mine = list.find((one) => one.id === `fix:${task.id}`)
+      void talksNow().then((list) => {
+        const mine = list.find((one) => one.id === run.id)
         if (!mine) return
         setRun(mine)
         if (!mine.running) toast(mine.code ? "It stopped" : "It finished", `exit ${mine.code}`)
       })
     }, 1500)
     return () => clearInterval(timer)
-  }, [run?.running])
+  }, [run?.running, run?.id])
 
   if (!isLive() || !agent) return null
 
@@ -104,9 +117,22 @@ export function Fix({ task }: { task: Task }) {
   // switching from claude to codex leaves "opus" selected, which codex has never heard of
   const picked = chosen.models.includes(pick.model) ? pick.model : chosen.models[0]
   const leash = chosen.trusts.includes(pick.trust) ? pick.trust : "auto"
+  // a typed wish is a task with nothing measured about it, which is the honest shape
+  const asked: Task = task ?? {
+    id: `asked:${wish.slice(0, 40).replace(/\W+/g, "-").replace(/^-|-$/g, "").toLowerCase()}`,
+    title: wish.trim(),
+    kind: "shape",
+    where: ".",
+    why: "asked for by hand, rather than found by reading the repo",
+    lines: 0,
+    reach: 0,
+    minutes: 0,
+    mechanical: false,
+    hits: "maintainability",
+  }
   const start = () => {
     void startFix({
-      ...task,
+      ...asked,
       extra,
       model: picked,
       mode: said.id,
@@ -116,6 +142,7 @@ export function Fix({ task }: { task: Task }) {
       if (!made) return toast("Could not start it", `${chosen.tool} did not take the task`)
       setRun(made)
       toast(`${chosen.tool} is on it, ${picked}`, said.note)
+      setWish("")
     })
   }
 
@@ -123,7 +150,7 @@ export function Fix({ task }: { task: Task }) {
     <>
       <button
         ref={host}
-        title={`Hand "${task.title}" to an agent`}
+        title={task ? `Hand "${task.title}" to an agent` : "Hand an agent anything"}
         onClick={(event) => {
           // the row underneath opens the file, and pressing this is not asking for that
           event.stopPropagation()
@@ -134,18 +161,21 @@ export function Fix({ task }: { task: Task }) {
           setOpen(!open)
         }}
         className={cn(
-          "hover:border-ring text-muted-foreground hover:text-foreground cursor-pointer rounded-md border p-1.5 transition-colors",
+          "hover:border-ring text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 rounded-md border transition-colors",
+          label ? "h-9 px-3 text-sm" : "p-1.5",
           (open || run?.running) && "border-ring text-foreground",
           run?.running && "animate-pulse",
+          className,
         )}
       >
         <Sparkle />
+        {label}
       </button>
 
       {open &&
         createPortal(
           <div
-            id={`fix-${task.id}`}
+            id={`fix-${seat}`}
             // it hangs off the body, but react sends events up the tree it was written in,
             // not the one it is drawn in: without this every click in here also presses the
             // row underneath, which opens the file
@@ -161,11 +191,23 @@ export function Fix({ task }: { task: Task }) {
                 Hand this to {chosen.tool}
                 {chosen.who && `, ${chosen.who}`}
               </div>
-              <div className="text-sm">{task.title}</div>
-              {/* two lines and a hover: the reason can be a paragraph, and this is a panel */}
-              <div className="text-muted-foreground line-clamp-2 text-xs" title={task.why}>
-                {task.why}
-              </div>
+              {task ? (
+                <>
+                  <div className="text-sm">{task.title}</div>
+                  {/* two lines and a hover: a reason can be a paragraph, and this is a panel */}
+                  <div className="text-muted-foreground line-clamp-2 text-xs" title={task.why}>
+                    {task.why}
+                  </div>
+                </>
+              ) : (
+                <textarea
+                  value={wish}
+                  onChange={(event) => setWish(event.target.value)}
+                  autoFocus
+                  placeholder="what should it do? it works in this repo, with the same conventions"
+                  className="border-input focus-visible:ring-ring h-20 w-full resize-none rounded-md border bg-transparent px-2 py-1.5 text-xs focus-visible:ring-1 focus-visible:outline-none"
+                />
+              )}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -259,14 +301,14 @@ export function Fix({ task }: { task: Task }) {
 
             {run?.running ? (
               <div className="flex flex-col gap-2">
-                <pre className="text-muted-foreground bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1 text-[10px] whitespace-pre-wrap">
-                  {run.output.slice(-1400) || "working…"}
-                </pre>
+                <div className="bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1.5">
+                  <Transcript turns={run.turns.slice(-8)} />
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    void stopAction(`fix:${task.id}`).then(() => setRun(null))
+                    void stopAction(run.id).then(() => setRun({ ...run, running: false }))
                   }}
                 >
                   stop it
@@ -274,12 +316,17 @@ export function Fix({ task }: { task: Task }) {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {run && !run.running && run.output && (
-                  <pre className="text-muted-foreground bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1 text-[10px] whitespace-pre-wrap">
-                    {run.output.slice(-1400)}
-                  </pre>
+                {run && !run.running && run.turns.length > 1 && (
+                  <div className="bg-muted/40 max-h-40 overflow-auto rounded px-2 py-1.5">
+                    <Transcript turns={run.turns.slice(-8)} />
+                  </div>
                 )}
-                <Button variant="outline" size="sm" onClick={start} disabled={!!said.blocked}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={start}
+                  disabled={!!said.blocked || (!task && !wish.trim())}
+                >
                   {said.id === "plan" ? "ask it for a plan" : said.label}
                 </Button>
               </div>

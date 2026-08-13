@@ -84,6 +84,8 @@ interface Tool {
   who: (config?: string) => string
   /** the whole command, since no two of these spell "do this and stop" the same way */
   argv: (bin: string, prompt: string, model: string, trust: string) => string[]
+  /** the same run, saying what it does as it does it, and picking a conversation back up */
+  watch?: (bin: string, prompt: string, model: string, trust: string, session: string) => string[]
 }
 
 const TOOLS: Tool[] = [
@@ -109,6 +111,21 @@ const TOOLS: Tool[] = [
       model,
       "--permission-mode",
       trust,
+    ],
+    // one json object per line, which is the only way to know what it is doing while it
+    // does it rather than after. --resume carries the same conversation into another run
+    watch: (bin, prompt, model, trust, session) => [
+      bin,
+      "-p",
+      prompt,
+      "--model",
+      model,
+      "--permission-mode",
+      trust,
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      ...(session ? ["--resume", session] : []),
     ],
   },
   {
@@ -382,6 +399,50 @@ export function ask(
     .join("\n")
 }
 
+/** what would be run, decided here and refused here, so nothing is spawned to find out */
+export interface Sent {
+  argv: string[]
+  env: Record<string, string>
+  tool: string
+  /** whether it will narrate itself as json, which is what makes a transcript possible */
+  streams: boolean
+}
+
+export function plan(
+  repo: string,
+  prompt: string,
+  model: string,
+  mode: string,
+  install = "",
+  trust = "auto",
+  session = "",
+): Sent {
+  const here = agent(repo)
+  // the path comes from the list this machine produced, never from the request
+  const which = here?.installs.find((one) => one.id === install) ?? here?.installs[0]
+  if (!which) throw new Error("no agent cli on this machine, so there is nothing to ask")
+  const found = here?.modes.find((one) => one.id === mode)
+  if (!found) throw new Error(`no mode called ${mode}`)
+  if (found.blocked) throw new Error(found.blocked)
+  if (!which.models.includes(model)) throw new Error(`${which.tool} has no model called ${model}`)
+  const tool = TOOLS.find((one) => one.id === which.tool)!
+  const leash = trustOf(tool, mode, trust)
+  // a token read off a helper is handed on rather than asked for again, and never anywhere
+  // it could be read back: it goes in the child's environment and nowhere else
+  const signed = mode === "pr" ? ticket(repo) : null
+  return {
+    argv: tool.watch
+      ? tool.watch(which.bin, prompt, model, leash, session)
+      : tool.argv(which.bin, prompt, model, leash),
+    env: {
+      ...(signed?.token ? { GH_TOKEN: signed.token } : {}),
+      ...(which.config && tool.home ? { [tool.home]: which.config } : {}),
+    },
+    tool: which.tool,
+    streams: !!tool.watch,
+  }
+}
+
 /** started and watched like any other long thing here, so one panel stops it */
 export function fix(
   repo: string,
@@ -392,20 +453,6 @@ export function fix(
   install = "",
   trust = "auto",
 ): Alive {
-  const here = agent(repo)
-  // the path comes from the list this machine produced, never from the request
-  const which = here?.installs.find((one) => one.id === install) ?? here?.installs[0]
-  if (!which) throw new Error("no agent cli on this machine, so there is nothing to ask")
-  const found = here?.modes.find((one) => one.id === mode)
-  if (!found) throw new Error(`no mode called ${mode}`)
-  if (found.blocked) throw new Error(found.blocked)
-  if (!which.models.includes(model)) throw new Error(`${which.tool} has no model called ${model}`)
-  const tool = TOOLS.find((one) => one.id === which.tool)!
-  // a token read off a helper is handed on rather than asked for again, and never anywhere
-  // it could be read back: it goes in the child's environment and nowhere else
-  const signed = mode === "pr" ? ticket(repo) : null
-  return begin(repo, `fix:${id}`, tool.argv(which.bin, prompt, model, trustOf(tool, mode, trust)), {
-    ...(signed?.token ? { GH_TOKEN: signed.token } : {}),
-    ...(which.config && tool.home ? { [tool.home]: which.config } : {}),
-  })
+  const sent = plan(repo, prompt, model, mode, install, trust)
+  return begin(repo, `fix:${id}`, sent.argv, sent.env)
 }

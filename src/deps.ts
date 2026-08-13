@@ -20,6 +20,7 @@ export interface Dep {
   /** what is actually installed, when it is */
   version: string
   license: string
+  /** nothing that ships reaches it, however it got installed: a build or test only package */
   dev: boolean
   /** named by this repo's manifest, rather than pulled in by something that was */
   direct: boolean
@@ -77,6 +78,8 @@ export interface Deps {
   list: Dep[]
   /** why a column is empty, rather than leaving the reader to guess */
   offline: boolean
+  /** advisories osv named but would not describe, so an empty column is not read as a clean one */
+  missed: number
   checked: string
 }
 
@@ -93,6 +96,8 @@ interface Held {
   version: string
   license: string
   bytes: number
+  /** what it asks for at runtime, which is how dev only is worked out for the whole tree */
+  needs: string[]
   /** installed at the top of node_modules, so it is what the manifest resolved to */
   top: boolean
 }
@@ -161,6 +166,7 @@ function tree(root: string): Map<string, Held> {
           name: own.name,
           version: own.version,
           license: licensed(own),
+          needs: Object.keys({ ...own.dependencies, ...own.optionalDependencies }),
           // weighed once per name and version: the same package is reached down many paths
           bytes: found.get(key)?.bytes ?? weigh(at),
           top,
@@ -176,11 +182,18 @@ function tree(root: string): Map<string, Held> {
 }
 
 const CHUNK = 500
+const TRIES = 3
 
-async function osv(list: Dep[]): Promise<Map<string, Advisory[]>> {
+/** what osv answered, and whether it answered all of it: silence is not the same as none */
+interface Filed {
+  found: Map<string, Advisory[]>
+  missed: number
+}
+
+async function osv(list: Dep[]): Promise<Filed> {
   const found = new Map<string, Advisory[]>()
   const asked = list.filter((one) => one.version)
-  if (!asked.length) return found
+  if (!asked.length) return { found, missed: 0 }
 
   // a whole tree is thousands of packages, and one batch has a limit
   const hits: { id: string; at: string }[] = []
@@ -207,32 +220,40 @@ async function osv(list: Dep[]): Promise<Map<string, Advisory[]>> {
   // Paced rather than capped: a cap would quietly under report a repo with a long list
   const wanted = [...new Map(hits.map((h) => [h.id + h.at, h])).values()]
   const details: { at: string; advisory: Advisory }[] = []
+  let missed = 0
   await Promise.all(
     Array.from({ length: PACE }, async () => {
       for (let one = wanted.pop(); one; one = wanted.pop()) {
-        try {
-          const got = (await (await fetch(`https://api.osv.dev/v1/vulns/${one.id}`)).json()) as {
-            summary?: string
-            aliases?: string[]
-            database_specific?: { severity?: string }
+        // the batch already said this one exists, so failing to read it is a gap rather than
+        // an answer, and it is worth asking twice before calling it one
+        for (let go = 0; go < TRIES; go++) {
+          try {
+            const res = await fetch(`https://api.osv.dev/v1/vulns/${one.id}`)
+            if (!res.ok) throw new Error(String(res.status))
+            const got = (await res.json()) as {
+              summary?: string
+              aliases?: string[]
+              database_specific?: { severity?: string }
+            }
+            details.push({
+              at: one.at,
+              advisory: {
+                id: got.aliases?.find((a) => a.startsWith("CVE-")) ?? one.id,
+                summary: got.summary ?? "no summary",
+                severity: got.database_specific?.severity ?? "UNKNOWN",
+                url: `https://osv.dev/vulnerability/${one.id}`,
+              },
+            })
+            break
+          } catch {
+            if (go === TRIES - 1) missed++
           }
-          details.push({
-            at: one.at,
-            advisory: {
-              id: got.aliases?.find((a) => a.startsWith("CVE-")) ?? one.id,
-              summary: got.summary ?? "no summary",
-              severity: got.database_specific?.severity ?? "UNKNOWN",
-              url: `https://osv.dev/vulnerability/${one.id}`,
-            },
-          })
-        } catch {
-          // one advisory failing to load is not the whole panel failing
         }
       }
     }),
   )
   for (const { at, advisory } of details) found.set(at, [...(found.get(at) ?? []), advisory])
-  return found
+  return { found, missed }
 }
 
 /** every declared dependency, with its licence from disk and its advisories from osv */
@@ -251,11 +272,18 @@ export async function deps(repo: string): Promise<Deps> {
       "") as string
 
   const held = tree(root)
+  // a package named in devDependencies does not ship, and neither does anything only it
+  // asks for: image-size is not a runtime dependency because pptxgenjs is not one
+  const ships = new Set(Object.keys((manifest?.dependencies ?? {}) as Record<string, string>))
+  const byName = new Map<string, Held[]>()
+  for (const one of held.values()) byName.set(one.name, [...(byName.get(one.name) ?? []), one])
+  for (const name of ships)
+    for (const one of byName.get(name) ?? []) for (const next of one.needs) ships.add(next)
   const list: Dep[] = [...held.values()]
     .map((one) => ({
       ...one,
       range: range(one.name),
-      dev: wanted.get(one.name) ?? false,
+      dev: !ships.has(one.name),
       direct: wanted.has(one.name) && one.top,
       released: "",
       used: "",
@@ -283,14 +311,16 @@ export async function deps(repo: string): Promise<Deps> {
     )
 
   let offline = false
+  let missed = 0
   try {
-    const [found, when] = await Promise.all([
+    const [filed, when] = await Promise.all([
       osv(list),
       // the whole tree would be thousands of calls, and a transitive package is not chosen
       published([...new Set(list.filter((one) => one.direct).map((one) => one.name))]),
     ])
+    missed = filed.missed
     for (const one of list) {
-      one.advisories = found.get(`${one.name}@${one.version}`) ?? []
+      one.advisories = filed.found.get(`${one.name}@${one.version}`) ?? []
       const told = when.get(one.name)
       one.released = told?.times.modified ?? ""
       one.used = told?.times[one.version] ?? ""
@@ -300,5 +330,5 @@ export async function deps(repo: string): Promise<Deps> {
     // no network, or osv is down: the licences still came off disk
     offline = true
   }
-  return { list, offline, checked: new Date().toISOString() }
+  return { list, offline, missed, checked: new Date().toISOString() }
 }

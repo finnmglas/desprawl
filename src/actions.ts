@@ -224,6 +224,8 @@ export function begin(
   given?: string[],
   /** handed to the child only, for the one thing that needs a credential */
   extra?: Record<string, string>,
+  /** read as it arrives, for a child that narrates itself rather than just printing */
+  onSay?: (chunk: string, done: number | null) => void,
 ): Alive {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const found = given ? { command: given.join(" ") } : actions(repo).find((one) => one.id === id)
@@ -251,12 +253,14 @@ export function begin(
   }
   const take = (chunk: Buffer) => {
     alive.output = (alive.output + chunk.toString()).slice(-KEEP)
+    onSay?.(chunk.toString(), null)
   }
   child.stdout?.on("data", take)
   child.stderr?.on("data", take)
   child.on("exit", (code) => {
     alive.running = false
     alive.code = code ?? 0
+    onSay?.("", code ?? 0)
   })
   held.set(id, { child, alive })
   return alive

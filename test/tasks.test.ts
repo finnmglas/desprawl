@@ -6,7 +6,8 @@ import { test } from "node:test"
 import { build } from "../src/graph.ts"
 import { calls } from "../src/calls.ts"
 import { balanced, fold } from "../src/layers.ts"
-import { tasks, weigh } from "../ui/lib/tasks.ts"
+import { IMPACTS, tasks, weigh } from "../ui/lib/tasks.ts"
+import type { Deps } from "../src/deps.ts"
 import { repo } from "./repo.ts"
 
 const found = (files: Record<string, string>) => {
@@ -57,4 +58,36 @@ test("an import of something that is not there is the one finding with nothing t
   assert.ok(broken, "an import naming a file that does not exist is a task")
   assert.match(broken.title, /gone\.ts/)
   assert.equal(broken.mechanical, true)
+})
+
+/** one package with one advisory against it, which is the smallest thing that makes a task */
+const kit = (dev: boolean): Deps => ({
+  offline: false,
+  missed: 0,
+  checked: "2026-08-13T00:00:00.000Z",
+  list: [
+    {
+      name: "axios",
+      range: "^1.0.0",
+      version: "1.0.0",
+      license: "MIT",
+      dev,
+      direct: true,
+      released: "",
+      used: "",
+      latest: "",
+      bytes: 0,
+      advisories: [
+        { id: "CVE-1", summary: "something", severity: "HIGH", url: "https://osv.dev/x" },
+      ],
+    },
+  ],
+})
+
+test("every task says who feels it, and a dev only advisory is not a runtime one", () => {
+  const shipped = tasks(null, null, kit(false), new Map())
+  const local = tasks(null, null, kit(true), new Map())
+  assert.equal(shipped[0].hits, "runtime", "a package that ships reaches whoever runs it")
+  assert.equal(local[0].hits, "local dev", "one that never ships cannot")
+  for (const task of [...shipped, ...local]) assert.ok(IMPACTS.includes(task.hits), task.title)
 })
