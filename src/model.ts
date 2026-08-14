@@ -89,6 +89,10 @@ export interface Contributor {
   files: number
   first: string
   last: string
+  /** other emails folded into this row, since a name this close is not a coincidence */
+  also?: string[]
+  /** the tool this identity signs as, if it names one, so it reads apart from a person */
+  bot?: string
 }
 
 export interface Manifest {
@@ -203,6 +207,8 @@ export interface Stats extends Split {
   /** a partial clone holds no file contents, so every line count here is 0 */
   thin: boolean
   contributors: Contributor[]
+  /** one row per raw git identity, before names are folded together */
+  identities: Contributor[]
   log: Commit[]
   /** Per day, the contributor indices who committed */
   active: number[][]

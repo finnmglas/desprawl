@@ -6,9 +6,19 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-/** the developer's own git config must never decide what a test counts */
+// the developer's own git config must never decide what a test counts. Set on
+// process.env itself, not just passed to the calls this file makes: the app's own
+// git() has no env override and inherits process.env, so a fixture built isolated
+// but then read by history() under a real ~/.gitconfig (mailmap, rename limits,
+// anything) would count differently on every machine that has one
 const NOWHERE = process.platform === "win32" ? "NUL" : "/dev/null"
-const ISOLATED = { ...process.env, GIT_CONFIG_GLOBAL: NOWHERE, GIT_CONFIG_SYSTEM: NOWHERE }
+// git exports GIT_AUTHOR_NAME, GIT_INDEX_FILE and friends to its own hooks, and an
+// env author beats the -c one set below, so under the pre-commit hook every fixture
+// commit would be signed by whoever is committing and every identity test collapse
+for (const key of Object.keys(process.env)) if (key.startsWith("GIT_")) delete process.env[key]
+process.env.GIT_CONFIG_GLOBAL = NOWHERE
+process.env.GIT_CONFIG_SYSTEM = NOWHERE
+const ISOLATED = process.env
 
 export interface Commit {
   /** path to contents. A value of null makes a symlink instead, see link() */

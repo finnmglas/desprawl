@@ -107,6 +107,9 @@ const Fact = ({
 // what this repo asked for, against everything that arrived with it
 const SCOPE = ["direct deps", "all deps"]
 
+// a name close enough to fold together, against one row per email git actually saw
+const IDENTITY = ["by person", "by email"]
+
 /** two years without a release: not dead, but worth knowing before leaning on it */
 const quiet = (released: string) => !!released && Date.now() - Date.parse(released) > 730 * 864e5
 
@@ -378,7 +381,21 @@ const people = (
     cell: (p) => (
       <span className="flex min-w-0 items-center gap-2">
         <Avatar name={p.name} email={p.email} found={faces[p.email.toLowerCase()]} />
-        <span className="truncate">{p.name}</span>
+        <span className="min-w-0 truncate">{p.name}</span>
+        {p.bot && (
+          <Tip text={`signs its commits as ${p.bot}, not a person`}>
+            <Badge variant="outline" className="shrink-0">
+              {p.bot}
+            </Badge>
+          </Tip>
+        )}
+        {p.also && p.also.length > 0 && (
+          <Tip text={`same name, folded in from ${p.also.join(", ")}`}>
+            <span className="text-muted-foreground shrink-0 text-xs">
+              +{plural(p.also.length, "email")}
+            </span>
+          </Tip>
+        )}
       </span>
     ),
   },
@@ -518,6 +535,9 @@ export function Overview({
   const wall_ = useRef<HTMLDivElement>(null)
   const [kit, setKit] = useState<Deps | null>(null)
   const [scope, setScope] = useState(SCOPE[0])
+  const [identity, setIdentity] = useState(IDENTITY[0])
+  // moot once a time frame is picked below: that list is already one row per person
+  const contributors = identity === IDENTITY[1] ? stats.identities : stats.contributors
   const [hunt, setHunt] = useState("")
   // the scope decides which rows there are and the table searches within them: the totals
   // row is a prop rather than a row, so it has to be told what the search left
@@ -706,8 +726,10 @@ export function Overview({
             did
               ? `${plural(did.length, "person")} committed between ${range?.[0]} and ${range?.[1]}`
               : anon
-                ? `${stats.contributors.length} people, addresses left out`
-                : `${stats.contributors.length} identities by email`
+                ? `${contributors.length} people, addresses left out`
+                : identity === IDENTITY[1]
+                  ? `${contributors.length} identities by email`
+                  : `${contributors.length} people, close names folded together`
           }
           file={did ? "contributors-in-range" : "contributors"}
           columns={people(
@@ -716,10 +738,16 @@ export function Overview({
             faces,
             anon,
           )}
-          rows={did ?? stats.contributors}
+          rows={did ?? contributors}
           id={(p) => p.email || p.name}
           fold={8}
-        />
+        >
+          {!did && (
+            <div className="ml-auto flex items-center gap-2">
+              <Tabs tabs={IDENTITY} value={identity} onChange={setIdentity} />
+            </div>
+          )}
+        </DataTable>
       </Section>
 
       <Section id="ai_overview">

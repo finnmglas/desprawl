@@ -2,7 +2,21 @@
 // goal: git log to churn
 
 import { COMMIT_MAX, LOG_MAX, git } from "./model.ts"
+import { SIGNERS } from "./stack.ts"
 import type { Churn, Commit, Contributor, Series } from "./model.ts"
+
+/** letters and digits only, so casing, initials and spacing never split one person in two */
+const norm = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "")
+
+/** a prefix, not a substring: "ann" sits inside "joanne" too, "vivek" only starts "vivekgopalakrishnan".
+ * five characters keeps a real first name from bridging two different "sam"s */
+const near = (a: string, b: string): boolean =>
+  Math.min(a.length, b.length) >= 5 && (a.startsWith(b) || b.startsWith(a))
+
+/** what this identity signs as, if it names a known tool, so it reads apart from a person */
+const botOf = (name: string, email: string): string =>
+  SIGNERS.find(([match]) => match.test(name) || match.test(email))?.[1] ??
+  (/\[bot\]/.test(email) ? "bot" : "")
 
 // -M writes renames as a{b => c}d or b => c. Braces without an arrow are just a path
 const source = (path: string): string => {
@@ -435,17 +449,84 @@ export function history(repo: string, cap = COMMIT_MAX) {
   if (!first) first = oldest
   if (!last) last = newest
 
-  const contributors = [...by.values()]
-    .map(({ paths, names, ...c }) => ({
-      ...c,
-      // most used name
-      name: [...names].sort((a, b) => b[1] - a[1])[0][0],
-      files: paths.size,
-    }))
+  // one row per raw identity, for whoever wants folding turned off
+  const identities: Contributor[] = [...by.values()]
+    .map(({ paths, names, ...c }) => {
+      const name = [...names].sort((a, b) => b[1] - a[1])[0][0]
+      return { ...c, name, files: paths.size, bot: botOf(name, c.email) || undefined }
+    })
     .sort((a, b) => b.commits - a.commits)
 
-  // indices need the final order
-  const order = new Map(contributors.map((c, i) => [(c.email || c.name).toLowerCase(), i]))
+  // union-find over raw identities, merged only on an unmistakable name prefix: a
+  // repo's own .mailmap (already respected above, through %aN/%aE) is the real fix,
+  // this only stands in for the ones that never wrote one
+  const parent = new Map<string, string>()
+  const find = (k: string): string => {
+    let r = k
+    while (parent.get(r) !== r) r = parent.get(r)!
+    return r
+  }
+  const keys = [...by.keys()]
+  for (const k of keys) parent.set(k, k)
+  const bestName = (k: string) => [...by.get(k)!.names].sort((a, b) => b[1] - a[1])[0][0]
+  for (let i = 0; i < keys.length; i++) {
+    const ni = norm(bestName(keys[i]))
+    for (let j = i + 1; j < keys.length; j++) {
+      if (!near(ni, norm(bestName(keys[j])))) continue
+      const ra = find(keys[i])
+      const rb = find(keys[j])
+      if (ra !== rb) parent.set(ra, rb)
+    }
+  }
+  const clusters = new Map<string, string[]>()
+  for (const k of keys) {
+    const root = find(k)
+    clusters.set(root, [...(clusters.get(root) ?? []), k])
+  }
+
+  const merged = [...clusters.values()]
+    .map((group) => {
+      const people = group.map((k) => by.get(k)!)
+      const names = new Map<string, number>()
+      const paths = new Set<string>()
+      for (const p of people) {
+        for (const [name, n] of p.names) names.set(name, (names.get(name) ?? 0) + n)
+        for (const path of p.paths) paths.add(path)
+      }
+      // the identity with the most commits speaks for the group, so its email is the one shown
+      const lead = [...people].sort((a, b) => b.commits - a.commits)[0]
+      const name = [...names].sort((a, b) => b[1] - a[1])[0][0]
+      const also =
+        group.length > 1
+          ? people.map((p) => p.email).filter((e) => e && e !== lead.email)
+          : undefined
+      return {
+        group,
+        name,
+        email: lead.email,
+        commits: people.reduce((sum, p) => sum + p.commits, 0),
+        insertions: people.reduce((sum, p) => sum + p.insertions, 0),
+        deletions: people.reduce((sum, p) => sum + p.deletions, 0),
+        files: paths.size,
+        first: people.reduce(
+          (min, p) => (Date.parse(p.first) < Date.parse(min) ? p.first : min),
+          people[0].first,
+        ),
+        last: people.reduce(
+          (max, p) => (Date.parse(p.last) > Date.parse(max) ? p.last : max),
+          people[0].last,
+        ),
+        also,
+        bot: botOf(name, lead.email) || undefined,
+      }
+    })
+    .sort((a, b) => b.commits - a.commits)
+
+  // every raw identity in a cluster points at the same, final row
+  const order = new Map<string, number>()
+  merged.forEach(({ group }, i) => group.forEach((k) => order.set(k, i)))
+  const contributors: Contributor[] = merged.map(({ group, ...c }) => c)
+
   history.forEach((commit, i) => {
     commit.who = order.get(byCommit[i]) ?? 0
   })
@@ -459,19 +540,23 @@ export function history(repo: string, cap = COMMIT_MAX) {
     truncated: commits >= cap,
     thin,
     contributors,
+    identities,
     log: history,
     active,
     first,
     last,
     byPath,
-    // resolved to the same indices the contributor list uses
+    // resolved to the same indices the contributor list uses. Object.fromEntries would
+    // drop one side when a merge lands two raw identities on the same index, so this sums
     byWho: new Map(
-      [...byWho].map(([path, hands]) => [
-        path,
-        Object.fromEntries(
-          [...hands].map(([key, n]) => [order.get(key) ?? 0, n] as const),
-        ) as Record<number, number>,
-      ]),
+      [...byWho].map(([path, hands]) => {
+        const at: Record<number, number> = {}
+        for (const [key, n] of hands) {
+          const i = order.get(key) ?? 0
+          at[i] = (at[i] ?? 0) + n
+        }
+        return [path, at]
+      }),
     ),
     series: spread(byDay, first, last),
   }

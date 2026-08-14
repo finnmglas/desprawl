@@ -53,6 +53,41 @@ test("contributors merge on email, not on the name they used", () => {
   assert.equal(s.contributors[0].commits, 2)
 })
 
+test("a name that clearly repeats under another email folds in too", () => {
+  const s = analyze(
+    repo(
+      { files: { "a.ts": "a\n" }, author: "Vivek <vivek@example.com>" },
+      { files: { "a.ts": "b\n" }, author: "VivekSGopalakrishnan <v2@example.com>" },
+    ),
+  )
+  assert.equal(s.contributors.length, 1)
+  assert.equal(s.contributors[0].commits, 2)
+  assert.equal(s.contributors[0].also?.length, 1)
+})
+
+test("two short or unrelated names never merge on a coincidence", () => {
+  const s = analyze(
+    repo(
+      { files: { "a.ts": "a\n" }, author: "Ann <ann@example.com>" },
+      { files: { "a.ts": "b\n" }, author: "Anna Smith <anna@example.com>" },
+      { files: { "a.ts": "c\n" }, author: "Bob <bob@example.com>" },
+    ),
+  )
+  assert.equal(s.contributors.length, 3, "Ann is too short to bridge two different people")
+})
+
+test("a bot-signing identity is labelled, not folded in as a person", () => {
+  const s = analyze(
+    repo(
+      { files: { "a.ts": "a\n" }, author: "Cursor Agent <cursoragent@cursor.com>" },
+      { files: { "a.ts": "b\n" }, author: "Finn <f@example.com>" },
+    ),
+  )
+  const bot = s.contributors.find((c) => c.email === "cursoragent@cursor.com")
+  assert.equal(bot?.bot, "Cursor")
+  assert.equal(s.contributors.find((c) => c.email === "f@example.com")?.bot, undefined)
+})
+
 test("a rename carries its history, it is not a new file", () => {
   const dir = repo({ "old.ts": "a\nb\nc\n" })
   inRepo(dir, "mv", "old.ts", "new.ts")

@@ -366,7 +366,7 @@ const AGENTS: [RegExp, string][] = [
 
 /** What an ai calls itself in a trailer or an author line. */
 // prettier-ignore
-const SIGNERS: [RegExp, string][] = [
+export const SIGNERS: [RegExp, string][] = [
   [/claude/i, "Claude Code"], [/cursor/i, "Cursor"], [/copilot/i, "Copilot"],
   [/devin/i, "Devin"], [/aider/i, "aider"], [/codex|chatgpt|openai/i, "Codex"],
   [/gemini|jules/i, "Gemini CLI"], [/windsurf|codeium/i, "Windsurf"], [/cline/i, "Cline"],
