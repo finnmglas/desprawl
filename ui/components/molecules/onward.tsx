@@ -3,8 +3,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "../atoms/card.tsx"
 import { Back } from "../atoms/back.tsx"
+import { Eye } from "../atoms/icons.tsx"
 import { Waiting } from "../atoms/waiting.tsx"
 import { num, plural } from "../../lib/format.ts"
+import { TAB_SECTIONS, useHidden } from "../../lib/sections.ts"
 import type { Stats } from "../../../src/model.ts"
 
 /** what a graph view shows until its graph arrives */
@@ -45,6 +47,8 @@ export function Onward({
   current: string
   onTab: (tab: string) => void
 }) {
+  const [hidden, setHidden] = useHidden()
+  const revealable = (TAB_SECTIONS[current] ?? []).filter((id) => hidden.includes(id))
   const folders = (stats.tree.children ?? []).filter((c) => c.children).length
 
   const links = [
@@ -87,6 +91,22 @@ export function Onward({
 
   return (
     <div data-print="hide" className="contents">
+      {revealable.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs">Hidden on this tab:</span>
+          {revealable.map((id) => (
+            <button
+              key={id}
+              onClick={() => setHidden(id, false)}
+              className="hover:border-ring flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors"
+            >
+              <Eye className="size-3" />
+              {id.replaceAll("_", " ")}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2">
         {links.map((link) => (
           <Card

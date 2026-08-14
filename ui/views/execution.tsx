@@ -7,6 +7,7 @@ import { Badge } from "../components/atoms/badge.tsx"
 import { Card, CardContent, Note } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
@@ -136,222 +137,238 @@ export function Execution({
         />
       </div>
 
-      <Kpis>
-        <Kpi
-          label="Declarations"
-          value={num(declared.length)}
-          sub={`${num(calls.stats.functions)} functions, ${num(calls.stats.components)} components, ${num(calls.stats.classes)} classes`}
-          verdict={{
-            label: `${plural(calls.stats.files, "file")}`,
-            tone: "plain",
-            why: "every top level function, class and component. A closure inside one belongs to it",
-          }}
-        />
-        <Kpi
-          label="Calls"
-          value={num(calls.stats.edges)}
-          sub={`${num(calls.stats.external)} into packages, ${num(calls.stats.builtin)} into the runtime`}
-          verdict={{
-            label: `${(calls.stats.edges / Math.max(1, declared.length)).toFixed(1)} each`,
-            tone: "plain",
-            why: "one declaration calling another, counted once per pair",
-          }}
-        />
-        <Kpi
-          label="Resolution"
-          value={`${(calls.stats.coverage * 100).toFixed(calls.stats.coverage === 1 ? 0 : 1)}%`}
-          sub={
-            calls.unresolved.length
-              ? `${plural(calls.unresolved.length, "call")} land nowhere we can name`
-              : "every call site placed"
-          }
-          verdict={
-            calls.stats.coverage > 0.9
-              ? {
-                  label: "most of it",
-                  tone: "fine",
-                  why: "the rest is dynamic, or a global this build does not know",
-                }
-              : {
-                  label: "partial",
-                  tone: "watch",
-                  why: "many call sites resolve to nothing, so read the tables as a floor",
-                }
-          }
-        />
-        <Kpi
-          label="Unreachable"
-          value={num(dead.length)}
-          sub={`${plural(deadLines, "line")} nothing arrives at`}
-          verdict={deadOf(deadLines, declaredLines)}
-        />
-      </Kpis>
+      <Section id="kpis_execution_general">
+        <Kpis>
+          <Kpi
+            label="Declarations"
+            value={num(declared.length)}
+            sub={`${num(calls.stats.functions)} functions, ${num(calls.stats.components)} components, ${num(calls.stats.classes)} classes`}
+            verdict={{
+              label: `${plural(calls.stats.files, "file")}`,
+              tone: "plain",
+              why: "every top level function, class and component. A closure inside one belongs to it",
+            }}
+          />
+          <Kpi
+            label="Calls"
+            value={num(calls.stats.edges)}
+            sub={`${num(calls.stats.external)} into packages, ${num(calls.stats.builtin)} into the runtime`}
+            verdict={{
+              label: `${(calls.stats.edges / Math.max(1, declared.length)).toFixed(1)} each`,
+              tone: "plain",
+              why: "one declaration calling another, counted once per pair",
+            }}
+          />
+          <Kpi
+            label="Resolution"
+            value={`${(calls.stats.coverage * 100).toFixed(calls.stats.coverage === 1 ? 0 : 1)}%`}
+            sub={
+              calls.unresolved.length
+                ? `${plural(calls.unresolved.length, "call")} land nowhere we can name`
+                : "every call site placed"
+            }
+            verdict={
+              calls.stats.coverage > 0.9
+                ? {
+                    label: "most of it",
+                    tone: "fine",
+                    why: "the rest is dynamic, or a global this build does not know",
+                  }
+                : {
+                    label: "partial",
+                    tone: "watch",
+                    why: "many call sites resolve to nothing, so read the tables as a floor",
+                  }
+            }
+          />
+          <Kpi
+            label="Unreachable"
+            value={num(dead.length)}
+            sub={`${plural(deadLines, "line")} nothing arrives at`}
+            verdict={deadOf(deadLines, declaredLines)}
+          />
+        </Kpis>
+      </Section>
 
-      <div className="flex flex-wrap items-center gap-1">
-        <Tabs tabs={KINDS} value={kind} onChange={setKind} />
-        {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
-        <Tabs className="ml-auto" tabs={ROOTS} value={roots} onChange={setRoots} />
-      </div>
+      <Section id="kpis_execution_reach" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-1">
+          <Tabs tabs={KINDS} value={kind} onChange={setKind} />
+          {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
+          <Tabs className="ml-auto" tabs={ROOTS} value={roots} onChange={setRoots} />
+        </div>
 
-      <Kpis>
-        <Kpi
-          label="Only exported"
-          value={num(only.length)}
-          sub="handed out, never called in here"
-          verdict={{
-            label: roots === ROOTS[0] ? "counted as reached" : "counted as dead",
-            tone: "plain",
-            why: "an export nothing calls is a public surface or a leftover, and only you know which. The switch above decides how the tables read it",
-          }}
-        />
-        <Kpi
-          label="Most called"
-          value={busiest ? num(busiest.callers.length) : "0"}
-          sub={busiest ? `callers of ${busiest.name}` : "nothing is called twice"}
-          verdict={{
-            label: busiest ? shortPath(busiest.file, 24) : "none",
-            tone: "plain",
-            why: "the declaration the most others reach for. Changing its behaviour reaches every one of them",
-          }}
-        />
-        <Kpi
-          label="Recursion"
-          value={num(loops.length)}
-          sub={
-            loops.length
-              ? `${plural(
-                  loops.reduce((sum, ring) => sum + ring.length, 0),
-                  "declaration",
-                )} in rings`
-              : "no two declarations call each other"
-          }
-          verdict={{
-            label: loops.length ? `biggest ${Math.max(...loops.map((r) => r.length))}` : "none",
-            tone: "plain",
-            why: "declarations calling each other round a ring. Self calls are not recorded, so a ring spans two",
-          }}
-        />
-        <Kpi
-          label="Repeated names"
-          value={num(repeated.length)}
-          sub={`declared in ${plural(new Set(repeated.flatMap((t) => t.files)).size, "file")}`}
-          verdict={{
-            label: repeated[0] ? `${repeated[0].name} in ${repeated[0].files.length}` : "none",
-            tone: "plain",
-            why: "one name declared in several files. A convention, or the same code twice: the table says where, you say which",
-          }}
-        />
-      </Kpis>
+        <Kpis>
+          <Kpi
+            label="Only exported"
+            value={num(only.length)}
+            sub="handed out, never called in here"
+            verdict={{
+              label: roots === ROOTS[0] ? "counted as reached" : "counted as dead",
+              tone: "plain",
+              why: "an export nothing calls is a public surface or a leftover, and only you know which. The switch above decides how the tables read it",
+            }}
+          />
+          <Kpi
+            label="Most called"
+            value={busiest ? num(busiest.callers.length) : "0"}
+            sub={busiest ? `callers of ${busiest.name}` : "nothing is called twice"}
+            verdict={{
+              label: busiest ? shortPath(busiest.file, 24) : "none",
+              tone: "plain",
+              why: "the declaration the most others reach for. Changing its behaviour reaches every one of them",
+            }}
+          />
+          <Kpi
+            label="Recursion"
+            value={num(loops.length)}
+            sub={
+              loops.length
+                ? `${plural(
+                    loops.reduce((sum, ring) => sum + ring.length, 0),
+                    "declaration",
+                  )} in rings`
+                : "no two declarations call each other"
+            }
+            verdict={{
+              label: loops.length ? `biggest ${Math.max(...loops.map((r) => r.length))}` : "none",
+              tone: "plain",
+              why: "declarations calling each other round a ring. Self calls are not recorded, so a ring spans two",
+            }}
+          />
+          <Kpi
+            label="Repeated names"
+            value={num(repeated.length)}
+            sub={`declared in ${plural(new Set(repeated.flatMap((t) => t.files)).size, "file")}`}
+            verdict={{
+              label: repeated[0] ? `${repeated[0].name} in ${repeated[0].files.length}` : "none",
+              tone: "plain",
+              why: "one name declared in several files. A convention, or the same code twice: the table says where, you say which",
+            }}
+          />
+        </Kpis>
+      </Section>
 
-      <DataTable
-        title="Declarations"
-        hint="sort by callers for what everything leans on, by calls and lines for what does too much"
-        rows={[...shown].sort((a, b) => b.callers.length - a.callers.length || b.lines - a.lines)}
-        id={(s) => s.id}
-        columns={columns}
-        onRowClick={(s) => walk(s.file)}
-        fold={12}
-        file="declarations"
-      >
-        <Input
-          value={find}
-          onChange={(event) => setFind(event.target.value)}
-          placeholder={`Search ${num(declared.length)} names`}
-          className="ml-auto w-44"
-        />
-      </DataTable>
-
-      {dead.length > 0 && (
+      <Section id="table_declarations">
         <DataTable
-          title="Nothing arrives at these"
-          hint={
-            roots === ROOTS[0]
-              ? "no path from any file's top level or any export reaches them"
-              : "no path from any file's top level reaches them, exports included"
-          }
-          rows={[...dead].sort((a, b) => b.lines - a.lines)}
+          title="Declarations"
+          hint="sort by callers for what everything leans on, by calls and lines for what does too much"
+          rows={[...shown].sort((a, b) => b.callers.length - a.callers.length || b.lines - a.lines)}
           id={(s) => s.id}
-          columns={DEAD}
+          columns={columns}
           onRowClick={(s) => walk(s.file)}
           fold={12}
-          file="unreachable"
-        />
+          file="declarations"
+        >
+          <Input
+            value={find}
+            onChange={(event) => setFind(event.target.value)}
+            placeholder={`Search ${num(declared.length)} names`}
+            className="ml-auto w-44"
+          />
+        </DataTable>
+      </Section>
+
+      {dead.length > 0 && (
+        <Section id="table_unreachable">
+          <DataTable
+            title="Nothing arrives at these"
+            hint={
+              roots === ROOTS[0]
+                ? "no path from any file's top level or any export reaches them"
+                : "no path from any file's top level reaches them, exports included"
+            }
+            rows={[...dead].sort((a, b) => b.lines - a.lines)}
+            id={(s) => s.id}
+            columns={DEAD}
+            onRowClick={(s) => walk(s.file)}
+            fold={12}
+            file="unreachable"
+          />
+        </Section>
       )}
 
       {only.length > 0 && (
-        <DataTable
-          title="Handed out, never called here"
-          hint="exported, and nothing in this repo reaches for it: a public surface, or an export nobody took up"
-          rows={[...only].sort((a, b) => b.lines - a.lines)}
-          id={(s) => s.id}
-          columns={ONLY}
-          onRowClick={(s) => walk(s.file)}
-          fold={12}
-          file="only-exported"
-        />
+        <Section id="table_only_exported">
+          <DataTable
+            title="Handed out, never called here"
+            hint="exported, and nothing in this repo reaches for it: a public surface, or an export nobody took up"
+            rows={[...only].sort((a, b) => b.lines - a.lines)}
+            id={(s) => s.id}
+            columns={ONLY}
+            onRowClick={(s) => walk(s.file)}
+            fold={12}
+            file="only-exported"
+          />
+        </Section>
       )}
 
       {lost.length > 0 && (
-        <DataTable
-          title="Calls we could not place"
-          hint="a name used like a call that resolves to nothing here: a prop from an enclosing component, a global we do not know, or prose that reads like code"
-          rows={lost}
-          id={(row) => row.name}
-          columns={LOST}
-          fold={8}
-          file="unresolved"
-        />
+        <Section id="table_unresolved">
+          <DataTable
+            title="Calls we could not place"
+            hint="a name used like a call that resolves to nothing here: a prop from an enclosing component, a global we do not know, or prose that reads like code"
+            rows={lost}
+            id={(row) => row.name}
+            columns={LOST}
+            fold={8}
+            file="unresolved"
+          />
+        </Section>
       )}
 
       {repeated.length > 0 && (
-        <DataTable
-          title="Names declared in more than one file"
-          hint="the same name in several files: a convention, or the same code written twice"
-          rows={repeated}
-          id={(row) => row.name}
-          columns={TWINS}
-          fold={10}
-          file="repeated-names"
-        />
+        <Section id="table_repeated_names">
+          <DataTable
+            title="Names declared in more than one file"
+            hint="the same name in several files: a convention, or the same code written twice"
+            rows={repeated}
+            id={(row) => row.name}
+            columns={TWINS}
+            fold={10}
+            file="repeated-names"
+          />
+        </Section>
       )}
 
       {loops.length > 0 && (
-        <Card>
-          <CardHead
-            title="Declarations that call each other"
-            hint="a ring of calls, so no one of them can be read on its own"
-          >
-            <CopyButton
-              className="ml-auto"
-              label="Copy every ring, as text"
-              text={() => loops.map((ring) => ring.map(named).join(" -> ")).join("\n")}
-              message={`Copied ${plural(loops.length, "ring")}`}
-              note="Each ring, in call order"
-            />
-          </CardHead>
-          <CardContent className="flex flex-col gap-2">
-            {loops.map((ring) => (
-              <div
-                key={ring.join()}
-                className="flex flex-wrap items-center gap-1 border-t pt-2 first:border-0"
-              >
-                <span className="text-muted-foreground w-28 shrink-0 text-xs">
-                  {plural(ring.length, "declaration")}
-                </span>
-                {ring.map((id) => (
-                  <Tip key={id} text={fileOf(id)}>
-                    <button
-                      onClick={() => walk(fileOf(id))}
-                      className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 font-mono text-xs"
-                    >
-                      {named(id)}
-                    </button>
-                  </Tip>
-                ))}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        <Section id="card_recursion">
+          <Card>
+            <CardHead
+              title="Declarations that call each other"
+              hint="a ring of calls, so no one of them can be read on its own"
+            >
+              <CopyButton
+                className="ml-auto"
+                label="Copy every ring, as text"
+                text={() => loops.map((ring) => ring.map(named).join(" -> ")).join("\n")}
+                message={`Copied ${plural(loops.length, "ring")}`}
+                note="Each ring, in call order"
+              />
+            </CardHead>
+            <CardContent className="flex flex-col gap-2">
+              {loops.map((ring) => (
+                <div
+                  key={ring.join()}
+                  className="flex flex-wrap items-center gap-1 border-t pt-2 first:border-0"
+                >
+                  <span className="text-muted-foreground w-28 shrink-0 text-xs">
+                    {plural(ring.length, "declaration")}
+                  </span>
+                  {ring.map((id) => (
+                    <Tip key={id} text={fileOf(id)}>
+                      <button
+                        onClick={() => walk(fileOf(id))}
+                        className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 font-mono text-xs"
+                      >
+                        {named(id)}
+                      </button>
+                    </Tip>
+                  ))}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </Section>
       )}
 
       <Onward stats={stats} current="Execution" onTab={onTab} />

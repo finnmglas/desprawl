@@ -10,6 +10,7 @@ import { Face, Hands } from "../components/molecules/hands.tsx"
 import { Circle } from "../components/molecules/circle.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Refresh } from "../components/atoms/icons.tsx"
 import { Input } from "../components/atoms/input.tsx"
@@ -278,420 +279,436 @@ export function Modules({
         />
       </div>
 
-      <Kpis>
-        <Kpi
-          label="Importing files"
-          value={num(graph.stats.files)}
-          sub={`reaching ${plural(Object.keys(graph.packages).length, "installed package")}`}
-          verdict={{
-            label: "in graph",
-            tone: "plain",
-            why: "every ts, js file git tracks",
-          }}
-        />
-        <Kpi
-          label="Imports"
-          value={num(graph.stats.edges)}
-          sub={`${num(graph.stats.external)} more into packages`}
-          verdict={{
-            label: "file to file",
-            tone: "plain",
-            why: "imports resolve to other files in repo.",
-          }}
-        />
-        <Kpi
-          label="Imports/file"
-          value={(graph.stats.edges / Math.max(1, graph.stats.files)).toFixed(1)}
-          sub="imports per average file"
-          verdict={{
-            label: "average",
-            tone: "plain",
-            why: "High means little standalone, low that repo is loosely tied",
-          }}
-        />
-        <Kpi
-          label="Resolution"
-          value={`${(graph.stats.coverage * 100).toFixed(graph.stats.coverage === 1 ? 0 : 2)}%`}
-          sub={
-            graph.missing.length
-              ? `${plural(graph.missing.length, "import")} are unresolved`
-              : "every imported file found"
-          }
-          verdict={
-            graph.missing.length
-              ? {
-                  label: "partial",
-                  tone: "watch",
-                  why: "some faulty or non-resolvable imports",
-                }
-              : {
-                  label: "complete",
-                  tone: "fine",
-                  why: "every file + package found",
-                }
-          }
-        />
-      </Kpis>
+      <Section id="kpis_modules_imports">
+        <Kpis>
+          <Kpi
+            label="Importing files"
+            value={num(graph.stats.files)}
+            sub={`reaching ${plural(Object.keys(graph.packages).length, "installed package")}`}
+            verdict={{
+              label: "in graph",
+              tone: "plain",
+              why: "every ts, js file git tracks",
+            }}
+          />
+          <Kpi
+            label="Imports"
+            value={num(graph.stats.edges)}
+            sub={`${num(graph.stats.external)} more into packages`}
+            verdict={{
+              label: "file to file",
+              tone: "plain",
+              why: "imports resolve to other files in repo.",
+            }}
+          />
+          <Kpi
+            label="Imports/file"
+            value={(graph.stats.edges / Math.max(1, graph.stats.files)).toFixed(1)}
+            sub="imports per average file"
+            verdict={{
+              label: "average",
+              tone: "plain",
+              why: "High means little standalone, low that repo is loosely tied",
+            }}
+          />
+          <Kpi
+            label="Resolution"
+            value={`${(graph.stats.coverage * 100).toFixed(graph.stats.coverage === 1 ? 0 : 2)}%`}
+            sub={
+              graph.missing.length
+                ? `${plural(graph.missing.length, "import")} are unresolved`
+                : "every imported file found"
+            }
+            verdict={
+              graph.missing.length
+                ? {
+                    label: "partial",
+                    tone: "watch",
+                    why: "some faulty or non-resolvable imports",
+                  }
+                : {
+                    label: "complete",
+                    tone: "fine",
+                    why: "every file + package found",
+                  }
+            }
+          />
+        </Kpis>
+      </Section>
 
-      <div className="flex flex-wrap items-center gap-1">
-        <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
-        <Tabs className="ml-auto" tabs={GROUPS} value={at} onChange={setGroup} />
-      </div>
+      <Section id="kpis_modules_groups" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-1">
+          <Tabs tabs={KEEP} value={keep} onChange={setKeep} />
+          <Tabs className="ml-auto" tabs={GROUPS} value={at} onChange={setGroup} />
+        </div>
 
-      <Kpis>
-        <Kpi
-          label="Module groups"
-          value={num(units.length)}
-          sub={`${plural(files, "file")}, grouped ${at === AUTO ? "by weight" : `by ${at}`}`}
-          verdict={{
-            label: at,
-            tone: "plain",
-            why:
-              at === AUTO
-                ? "folders picked by code size, trying to evenly cluster them"
-                : `every file counts as its ${at}, so src/ui/lib/thing.ts is bucketed ${JOINS[at]}`,
-          }}
-        />
-        <Kpi
-          label="Depth"
-          value={num(levels)}
-          sub={levels > 1 ? "steps from top to bottom" : "everything side by side"}
-          verdict={layeringOf(levels, units.length)}
-        />
-        <Kpi
-          label="Cycles"
-          value={num(cycles.length)}
-          sub={
-            cycles.length
-              ? `${plural(
-                  cycles.reduce((sum, ring) => sum + ring.length, 0),
-                  "file",
-                )} caught in them`
-              : "no file imports one that imports it back"
-          }
-          verdict={tanglesOf(cycles.length, graph.stats.files)}
-        />
-        <Kpi
-          label="Module links"
-          value={num(links)}
-          sub={`from ${num(graph.stats.edges)} imports between files`}
-          verdict={{
-            label: `${(links / units.length).toFixed(1)} each`,
-            tone: "plain",
-            why: "Link = 1+ files in a group importing another",
-          }}
-        />
-      </Kpis>
+        <Kpis>
+          <Kpi
+            label="Module groups"
+            value={num(units.length)}
+            sub={`${plural(files, "file")}, grouped ${at === AUTO ? "by weight" : `by ${at}`}`}
+            verdict={{
+              label: at,
+              tone: "plain",
+              why:
+                at === AUTO
+                  ? "folders picked by code size, trying to evenly cluster them"
+                  : `every file counts as its ${at}, so src/ui/lib/thing.ts is bucketed ${JOINS[at]}`,
+            }}
+          />
+          <Kpi
+            label="Depth"
+            value={num(levels)}
+            sub={levels > 1 ? "steps from top to bottom" : "everything side by side"}
+            verdict={layeringOf(levels, units.length)}
+          />
+          <Kpi
+            label="Cycles"
+            value={num(cycles.length)}
+            sub={
+              cycles.length
+                ? `${plural(
+                    cycles.reduce((sum, ring) => sum + ring.length, 0),
+                    "file",
+                  )} caught in them`
+                : "no file imports one that imports it back"
+            }
+            verdict={tanglesOf(cycles.length, graph.stats.files)}
+          />
+          <Kpi
+            label="Module links"
+            value={num(links)}
+            sub={`from ${num(graph.stats.edges)} imports between files`}
+            verdict={{
+              label: `${(links / units.length).toFixed(1)} each`,
+              tone: "plain",
+              why: "Link = 1+ files in a group importing another",
+            }}
+          />
+        </Kpis>
+      </Section>
 
-      <DataTable
-        title="Module groups"
-        hint={at === AUTO ? "auto-detected structure" : `groups by ${at}`}
-        rows={[...shown].sort((a, b) => b.files - a.files)}
-        id={(u) => u.path}
-        columns={[
-          ...columns,
-          {
-            key: "owner",
-            label: "Dev",
-            get: (u) => hands(u.path, where, stats.contributors)[0]?.who.name ?? "",
-            cell: (u) => {
-              const crew = hands(u.path, where, stats.contributors)
-              if (!crew.length) return null
-              return (
-                <Tip
-                  className="flex justify-center"
-                  side="bottom"
-                  text={<Hands of={crew} faces={faces} />}
-                >
-                  <Face of={crew} faces={faces} />
-                </Tip>
-              )
+      <Section id="table_modules">
+        <DataTable
+          title="Module groups"
+          hint={at === AUTO ? "auto-detected structure" : `groups by ${at}`}
+          rows={[...shown].sort((a, b) => b.files - a.files)}
+          id={(u) => u.path}
+          columns={[
+            ...columns,
+            {
+              key: "owner",
+              label: "Dev",
+              get: (u) => hands(u.path, where, stats.contributors)[0]?.who.name ?? "",
+              cell: (u) => {
+                const crew = hands(u.path, where, stats.contributors)
+                if (!crew.length) return null
+                return (
+                  <Tip
+                    className="flex justify-center"
+                    side="bottom"
+                    text={<Hands of={crew} faces={faces} />}
+                  >
+                    <Face of={crew} faces={faces} />
+                  </Tip>
+                )
+              },
+              hint: "who committed most to contained files",
             },
-            hint: "who committed most to contained files",
-          },
-        ]}
-        onRowClick={(u) => open(u.path)}
-        onSort={setSort}
-        fold={12}
-      >
-        <Input
-          value={find}
-          onChange={(event) => setFind(event.target.value)}
-          placeholder={`Search ${plural(units.length, "group")}`}
-          className="ml-auto w-44"
-        />
-      </DataTable>
+          ]}
+          onRowClick={(u) => open(u.path)}
+          onSort={setSort}
+          fold={12}
+        >
+          <Input
+            value={find}
+            onChange={(event) => setFind(event.target.value)}
+            placeholder={`Search ${plural(units.length, "group")}`}
+            className="ml-auto w-44"
+          />
+        </DataTable>
+      </Section>
 
-      <Card>
-        <CardHead title="Dependency Grid" hint="Row imports column, module sort applies" wrap>
-          <div className="ml-auto flex items-center gap-1">
-            <Tabs tabs={VIEWS} value={view} onChange={setView} />
-            {crowded && view === VIEWS[0] && (
-              <Button variant="outline" size="sm" onClick={() => setWide(!wide)}>
-                {wide ? "hide some" : "show all"}
-              </Button>
-            )}
-            <CopyButton
-              label="Copy every dependency, as text"
-              text={() =>
-                shown
-                  .flatMap((u) =>
+      <Section id="card_dependency_grid">
+        <Card>
+          <CardHead title="Dependency Grid" hint="Row imports column, module sort applies" wrap>
+            <div className="ml-auto flex items-center gap-1">
+              <Tabs tabs={VIEWS} value={view} onChange={setView} />
+              {crowded && view === VIEWS[0] && (
+                <Button variant="outline" size="sm" onClick={() => setWide(!wide)}>
+                  {wide ? "hide some" : "show all"}
+                </Button>
+              )}
+              <CopyButton
+                label="Copy every dependency, as text"
+                text={() =>
+                  shown
+                    .flatMap((u) =>
+                      Object.entries(u.out)
+                        .filter(([to]) => kept.has(to))
+                        .map(
+                          ([to, n]) =>
+                            `${u.path}\t${to}\t${n}\t${rings.has(`${u.path} ${to}`) ? "cycle" : cuts.has(`${u.path} ${to}`) ? "break" : ""}`,
+                        ),
+                    )
+                    .join("\n")
+                }
+                message={`Copied ${plural(links, "dependency")}`}
+                note="From, to, how many files, and whether it is a cycle"
+              />
+              <Save
+                name="dependency-grid"
+                picture={() => grid.current}
+                rows={() => [
+                  ["from", "to", "imports", "kind"],
+                  ...shown.flatMap((u) =>
                     Object.entries(u.out)
                       .filter(([to]) => kept.has(to))
-                      .map(
-                        ([to, n]) =>
-                          `${u.path}\t${to}\t${n}\t${rings.has(`${u.path} ${to}`) ? "cycle" : cuts.has(`${u.path} ${to}`) ? "break" : ""}`,
-                      ),
-                  )
-                  .join("\n")
-              }
-              message={`Copied ${plural(links, "dependency")}`}
-              note="From, to, how many files, and whether it is a cycle"
-            />
-            <Save
-              name="dependency-grid"
-              picture={() => grid.current}
-              rows={() => [
-                ["from", "to", "imports", "kind"],
-                ...shown.flatMap((u) =>
-                  Object.entries(u.out)
-                    .filter(([to]) => kept.has(to))
-                    .map(([to, n]) => [
-                      u.path,
-                      to,
-                      n,
-                      rings.has(`${u.path} ${to}`)
-                        ? "cycle"
-                        : cuts.has(`${u.path} ${to}`)
-                          ? "break"
-                          : "import",
-                    ]),
-                ),
-              ]}
-              note={`${plural(links, "dependency")}, as`}
-            />
-          </div>
-        </CardHead>
-        <CardContent>
-          <div ref={grid}>
-            {view === VIEWS[0] ? (
-              <Matrix
-                rings={rings}
-                label={label}
-                units={shown}
-                across={units}
-                most={crowded && !wide ? 12 : shown.length}
-                order={order}
-                cuts={cuts}
-                onPick={open}
+                      .map(([to, n]) => [
+                        u.path,
+                        to,
+                        n,
+                        rings.has(`${u.path} ${to}`)
+                          ? "cycle"
+                          : cuts.has(`${u.path} ${to}`)
+                            ? "break"
+                            : "import",
+                      ]),
+                  ),
+                ]}
+                note={`${plural(links, "dependency")}, as`}
               />
-            ) : (
-              <Circle units={shown} cuts={cuts} rings={rings} label={label} onPick={open} />
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHead title="Dependency levels" hint="L0 imports nothing, L1 at least L0 etc">
-          <div className="ml-auto flex items-center gap-1">
-            <CopyButton
-              label="Copy the levels, as text"
-              text={() =>
-                stacked()
-                  .map(([level, here]) => `L${level}\t${here.map((u) => u.path).join(", ")}`)
-                  .join("\n")
-              }
-              message={`Copied ${plural(levels, "level")}`}
-              note="Each level and the groups sitting on it"
-            />
-            <Save
-              name="levels"
-              rows={() => [
-                ["level", "group", "path", "files", "lines", "classification"],
-                ...stacked().flatMap(([level, here]) =>
-                  here.map((u) => [
-                    level,
-                    label?.(u.path) ?? u.path,
-                    u.path,
-                    u.files,
-                    u.lines,
-                    shaped(shapeOf(u.internal, count(u.out), count(u.in), reach(u))),
-                  ]),
-                ),
-              ]}
-              note={`${plural(units.length, "group")} over ${plural(levels, "level")}, as`}
-            />
-          </div>
-        </CardHead>
-        <CardContent className="flex flex-col gap-2">
-          {Array.from({ length: levels }, (_, i) => levels - 1 - i).map((level) => {
-            const here = units.filter((u) => u.level === level)
-            if (!here.length) return null
-            return (
-              <div key={level} className="flex items-start gap-3 border-t pt-2 first:border-0">
-                <div className="w-28 shrink-0">
-                  <div className="text-xs font-medium">level {level}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {plural(here.length, "group")}, {num(here.reduce((s, u) => s + u.files, 0))}{" "}
-                    files
-                  </div>
-                </div>
-                <Some>
-                  {[...here]
-                    .sort((a, b) => b.files - a.files)
-                    .map((unit) => (
-                      <Tip
-                        key={unit.path}
-                        text={
-                          <>
-                            <span className="font-mono">{unit.path}</span>
-                            <br />
-                            {plural(unit.files, "file")}, {num(unit.exports)} exported names
-                            <br />
-                            leans on {plural(Object.keys(unit.out).length, "group")}, carried by{" "}
-                            {plural(Object.keys(unit.in).length, "group")}
-                            {unit.tangle >= 0 && <> · in loop</>}
-                          </>
-                        }
-                      >
-                        <button
-                          onClick={() => open(unit.path)}
-                          className={cn(
-                            "hover:border-ring flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
-                            unit.tangle >= 0 && "border-amber-500/60",
-                          )}
-                        >
-                          <span className="max-w-56 truncate">
-                            {label?.(unit.path) ?? unit.path}
-                          </span>
-                          <span className="text-muted-foreground tabular-nums">
-                            {num(unit.files)}
-                          </span>
-                        </button>
-                      </Tip>
-                    ))}
-                </Some>
-              </div>
-            )
-          })}
-          {dropped > 0 && (
-            <p className="text-muted-foreground border-t pt-2 text-xs">
-              {plural(dropped, "group")} left out tests, config, scripts for the source-only
-              setting.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {cycles.length > 0 && (
-        <DataTable
-          title="Cycles"
-          hint="files that import each other in a ring, read off the files themselves"
-          rows={cycles.map((ring) => ({
-            ring,
-            where: rooted(ring),
-            spans: new Set(ring.map(groupOf)).size,
-          }))}
-          id={(row) => row.ring[0]}
-          columns={RINGS}
-          fold={8}
-        />
-      )}
-
-      {loops.length > 0 && (
-        <Card>
-          <CardHead
-            title="Folders that import each other"
-            hint={`at the ${at} grain: real coupling, but only the ones marked below are cycles in the code`}
-          >
-            <CopyButton
-              className="ml-auto"
-              label="Copy every loop, as text"
-              text={() =>
-                loops
-                  .map((loop) =>
-                    [
-                      loop.units.join(" + "),
-                      `${loop.units.length} groups, ${loop.edges} imports, ${loop.runtime ? (loop.deep ? "loops at runtime, a file cycle spans it" : "loops at this grain only, no file cycle spans it") : "only types close it"}${glued(loop) ? ", held together by barrels" : ""}`,
-                      ...loop.cut.map(
-                        (edge) =>
-                          `  remove ${edge.from} -> ${edge.to} (${edge.imports} imports, ${costOf(edge).label}${edge.alone ? ", opens the loop alone" : ""})`,
-                      ),
-                    ].join("\n"),
-                  )
-                  .join("\n\n")
-              }
-              message={`Copied ${loops.length === 1 ? "1 loop" : `${loops.length} loops`}`}
-              note="Members, size, every import to remove"
-            />
+            </div>
           </CardHead>
-          <CardContent className="flex flex-col gap-5">
-            {loops.map((loop) => {
-              const held = loop.units.reduce(
-                (sum, path) => sum + (units.find((u) => u.path === path)?.files ?? 0),
-                0,
-              )
+          <CardContent>
+            <div ref={grid}>
+              {view === VIEWS[0] ? (
+                <Matrix
+                  rings={rings}
+                  label={label}
+                  units={shown}
+                  across={units}
+                  most={crowded && !wide ? 12 : shown.length}
+                  order={order}
+                  cuts={cuts}
+                  onPick={open}
+                />
+              ) : (
+                <Circle units={shown} cuts={cuts} rings={rings} label={label} onPick={open} />
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </Section>
+
+      <Section id="card_dependency_levels">
+        <Card>
+          <CardHead title="Dependency levels" hint="L0 imports nothing, L1 at least L0 etc">
+            <div className="ml-auto flex items-center gap-1">
+              <CopyButton
+                label="Copy the levels, as text"
+                text={() =>
+                  stacked()
+                    .map(([level, here]) => `L${level}\t${here.map((u) => u.path).join(", ")}`)
+                    .join("\n")
+                }
+                message={`Copied ${plural(levels, "level")}`}
+                note="Each level and the groups sitting on it"
+              />
+              <Save
+                name="levels"
+                rows={() => [
+                  ["level", "group", "path", "files", "lines", "classification"],
+                  ...stacked().flatMap(([level, here]) =>
+                    here.map((u) => [
+                      level,
+                      label?.(u.path) ?? u.path,
+                      u.path,
+                      u.files,
+                      u.lines,
+                      shaped(shapeOf(u.internal, count(u.out), count(u.in), reach(u))),
+                    ]),
+                  ),
+                ]}
+                note={`${plural(units.length, "group")} over ${plural(levels, "level")}, as`}
+              />
+            </div>
+          </CardHead>
+          <CardContent className="flex flex-col gap-2">
+            {Array.from({ length: levels }, (_, i) => levels - 1 - i).map((level) => {
+              const here = units.filter((u) => u.level === level)
+              if (!here.length) return null
               return (
-                <div key={loop.units.join()} className="flex flex-col gap-2">
-                  <Some few={FEW}>
-                    {loop.units.map((path) => (
-                      <button
-                        key={path}
-                        onClick={() => open(path)}
-                        className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 text-xs"
-                      >
-                        {label?.(path) ?? path}
-                      </button>
-                    ))}
+                <div key={level} className="flex items-start gap-3 border-t pt-2 first:border-0">
+                  <div className="w-28 shrink-0">
+                    <div className="text-xs font-medium">level {level}</div>
+                    <div className="text-muted-foreground text-xs">
+                      {plural(here.length, "group")}, {num(here.reduce((s, u) => s + u.files, 0))}{" "}
+                      files
+                    </div>
+                  </div>
+                  <Some>
+                    {[...here]
+                      .sort((a, b) => b.files - a.files)
+                      .map((unit) => (
+                        <Tip
+                          key={unit.path}
+                          text={
+                            <>
+                              <span className="font-mono">{unit.path}</span>
+                              <br />
+                              {plural(unit.files, "file")}, {num(unit.exports)} exported names
+                              <br />
+                              leans on {plural(Object.keys(unit.out).length, "group")}, carried by{" "}
+                              {plural(Object.keys(unit.in).length, "group")}
+                              {unit.tangle >= 0 && <> · in loop</>}
+                            </>
+                          }
+                        >
+                          <button
+                            onClick={() => open(unit.path)}
+                            className={cn(
+                              "hover:border-ring flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
+                              unit.tangle >= 0 && "border-amber-500/60",
+                            )}
+                          >
+                            <span className="max-w-56 truncate">
+                              {label?.(unit.path) ?? unit.path}
+                            </span>
+                            <span className="text-muted-foreground tabular-nums">
+                              {num(unit.files)}
+                            </span>
+                          </button>
+                        </Tip>
+                      ))}
                   </Some>
-                  <p className="text-muted-foreground text-xs">
-                    {plural(loop.units.length, "group")} holding {plural(held, "file")}, tied
-                    together by {plural(loop.edges, "import")}.{" "}
-                    {!loop.runtime ? (
-                      <Tip text="real in source, gone in builds">
-                        <span className="underline decoration-dotted">
-                          Type import loop, nothing loops at runtime.
-                        </span>
-                      </Tip>
-                    ) : loop.deep ? (
-                      <Tip text="checked at file grain: a single file cycle already spans these folders, so no amount of regrouping removes it">
-                        <span className="underline decoration-dotted">
-                          There in runtime, decides load order.
-                        </span>
-                      </Tip>
-                    ) : (
-                      <Tip text="checked at file grain: no file cycle spans these folders, so the loop is where the files sit, not how they run">
-                        <span className="underline decoration-dotted">
-                          Only a loop at this grain, no file cycle spans it.
-                        </span>
-                      </Tip>
-                    )}{" "}
-                    {glued(loop) ? (
-                      <Tip text="these imports go through a file that only forwards, so naming the file that declares it is the whole fix">
-                        <span className="underline decoration-dotted">
-                          Held together by barrels.
-                        </span>
-                      </Tip>
-                    ) : null}{" "}
-                    Removing {plural(loop.cut.length, "import")} of them fixes it, see below.
-                  </p>
                 </div>
               )
             })}
+            {dropped > 0 && (
+              <p className="text-muted-foreground border-t pt-2 text-xs">
+                {plural(dropped, "group")} left out tests, config, scripts for the source-only
+                setting.
+              </p>
+            )}
           </CardContent>
         </Card>
+      </Section>
+
+      {cycles.length > 0 && (
+        <Section id="table_cycles">
+          <DataTable
+            title="Cycles"
+            hint="files that import each other in a ring, read off the files themselves"
+            rows={cycles.map((ring) => ({
+              ring,
+              where: rooted(ring),
+              spans: new Set(ring.map(groupOf)).size,
+            }))}
+            id={(row) => row.ring[0]}
+            columns={RINGS}
+            fold={8}
+          />
+        </Section>
       )}
 
       {loops.length > 0 && (
-        <DataTable
-          title="Imports to remove"
-          hint="every import to remove loops, cheapest first"
-          rows={loops.flatMap((loop, id) => loop.cut.map((edge) => ({ ...edge, loop: id + 1 })))}
-          id={(edge) => `${edge.from} ${edge.to}`}
-          columns={CUTS}
-          fold={12}
-        />
+        <Section id="card_loops">
+          <Card>
+            <CardHead
+              title="Folders that import each other"
+              hint={`at the ${at} grain: real coupling, but only the ones marked below are cycles in the code`}
+            >
+              <CopyButton
+                className="ml-auto"
+                label="Copy every loop, as text"
+                text={() =>
+                  loops
+                    .map((loop) =>
+                      [
+                        loop.units.join(" + "),
+                        `${loop.units.length} groups, ${loop.edges} imports, ${loop.runtime ? (loop.deep ? "loops at runtime, a file cycle spans it" : "loops at this grain only, no file cycle spans it") : "only types close it"}${glued(loop) ? ", held together by barrels" : ""}`,
+                        ...loop.cut.map(
+                          (edge) =>
+                            `  remove ${edge.from} -> ${edge.to} (${edge.imports} imports, ${costOf(edge).label}${edge.alone ? ", opens the loop alone" : ""})`,
+                        ),
+                      ].join("\n"),
+                    )
+                    .join("\n\n")
+                }
+                message={`Copied ${loops.length === 1 ? "1 loop" : `${loops.length} loops`}`}
+                note="Members, size, every import to remove"
+              />
+            </CardHead>
+            <CardContent className="flex flex-col gap-5">
+              {loops.map((loop) => {
+                const held = loop.units.reduce(
+                  (sum, path) => sum + (units.find((u) => u.path === path)?.files ?? 0),
+                  0,
+                )
+                return (
+                  <div key={loop.units.join()} className="flex flex-col gap-2">
+                    <Some few={FEW}>
+                      {loop.units.map((path) => (
+                        <button
+                          key={path}
+                          onClick={() => open(path)}
+                          className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 text-xs"
+                        >
+                          {label?.(path) ?? path}
+                        </button>
+                      ))}
+                    </Some>
+                    <p className="text-muted-foreground text-xs">
+                      {plural(loop.units.length, "group")} holding {plural(held, "file")}, tied
+                      together by {plural(loop.edges, "import")}.{" "}
+                      {!loop.runtime ? (
+                        <Tip text="real in source, gone in builds">
+                          <span className="underline decoration-dotted">
+                            Type import loop, nothing loops at runtime.
+                          </span>
+                        </Tip>
+                      ) : loop.deep ? (
+                        <Tip text="checked at file grain: a single file cycle already spans these folders, so no amount of regrouping removes it">
+                          <span className="underline decoration-dotted">
+                            There in runtime, decides load order.
+                          </span>
+                        </Tip>
+                      ) : (
+                        <Tip text="checked at file grain: no file cycle spans these folders, so the loop is where the files sit, not how they run">
+                          <span className="underline decoration-dotted">
+                            Only a loop at this grain, no file cycle spans it.
+                          </span>
+                        </Tip>
+                      )}{" "}
+                      {glued(loop) ? (
+                        <Tip text="these imports go through a file that only forwards, so naming the file that declares it is the whole fix">
+                          <span className="underline decoration-dotted">
+                            Held together by barrels.
+                          </span>
+                        </Tip>
+                      ) : null}{" "}
+                      Removing {plural(loop.cut.length, "import")} of them fixes it, see below.
+                    </p>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+        </Section>
+      )}
+
+      {loops.length > 0 && (
+        <Section id="table_loop_cuts">
+          <DataTable
+            title="Imports to remove"
+            hint="every import to remove loops, cheapest first"
+            rows={loops.flatMap((loop, id) => loop.cut.map((edge) => ({ ...edge, loop: id + 1 })))}
+            id={(edge) => `${edge.from} ${edge.to}`}
+            columns={CUTS}
+            fold={12}
+          />
+        </Section>
       )}
 
       <Onward stats={stats} current="Modules" onTab={onTab} />

@@ -6,6 +6,7 @@ import { Back } from "../components/atoms/back.tsx"
 import { Button } from "../components/atoms/button.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
@@ -788,138 +789,141 @@ export function Network({
         </div>
       </div>
 
-      <Card>
-        <CardHead
-          title="Graph"
-          hint={
-            !bounds
-              ? "no bounds, so the whole graph arranges itself and the modules show as colour"
-              : grain === "module"
-                ? "every module a dot, sitting on the level its imports put it on"
-                : grain === "file"
-                  ? "every file a dot, bounded by the module holding it"
-                  : "every declaration a dot, bounded by its file, bounded by its module"
-          }
-          wrap
-        >
-          <div className="ml-auto flex items-center gap-1">
-            {only && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setOnly("")
-                  whole()
-                }}
-              >
-                {called.get(only) ?? only} ✕
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={whole}>
-              fit
-            </Button>
-          </div>
-        </CardHead>
-        <CardContent>
-          {/* what the colours mean, said where the drawing is rather than in a menu */}
-          {!!drawn && (
-            <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-              {legend.map((one) => (
-                <span key={one.label} className="flex items-center gap-1.5 text-xs">
-                  <span
-                    className="size-2.5 shrink-0 rounded-[2px]"
-                    style={{ background: one.colour ?? "var(--muted-foreground)" }}
-                  />
-                  <span className="text-muted-foreground">{one.label}</span>
-                </span>
-              ))}
-            </div>
-          )}
-          <div ref={frame} className="w-full">
-            {heavy ? (
-              <div className="text-muted-foreground flex h-40 flex-col items-center justify-center gap-3 text-sm">
-                <span>
-                  {num(size)} nodes at this grain. Laying that out takes a while, and reading it
-                  takes longer.
-                </span>
-                <Button variant="outline" size="sm" onClick={() => setGo(true)}>
-                  draw it anyway
+      <Section id="network_graph" className="flex flex-col gap-4">
+        <Card>
+          <CardHead
+            title="Graph"
+            hint={
+              !bounds
+                ? "no bounds, so the whole graph arranges itself and the modules show as colour"
+                : grain === "module"
+                  ? "every module a dot, sitting on the level its imports put it on"
+                  : grain === "file"
+                    ? "every file a dot, bounded by the module holding it"
+                    : "every declaration a dot, bounded by its file, bounded by its module"
+            }
+            wrap
+          >
+            <div className="ml-auto flex items-center gap-1">
+              {only && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOnly("")
+                    whole()
+                  }}
+                >
+                  {called.get(only) ?? only} ✕
                 </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={whole}>
+                fit
+              </Button>
+            </div>
+          </CardHead>
+          <CardContent>
+            {/* what the colours mean, said where the drawing is rather than in a menu */}
+            {!!drawn && (
+              <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                {legend.map((one) => (
+                  <span key={one.label} className="flex items-center gap-1.5 text-xs">
+                    <span
+                      className="size-2.5 shrink-0 rounded-[2px]"
+                      style={{ background: one.colour ?? "var(--muted-foreground)" }}
+                    />
+                    <span className="text-muted-foreground">{one.label}</span>
+                  </span>
+                ))}
               </div>
-            ) : (
-              <canvas
-                ref={board}
-                className="block cursor-crosshair touch-none select-none"
-                onMouseDown={(event) => {
-                  drag.current = { x: event.clientX, y: event.clientY }
-                }}
-                onMouseUp={() => {
-                  drag.current = null
-                }}
-                onMouseLeave={() => {
-                  drag.current = null
-                  setNear(null)
-                }}
-                onMouseMove={(event) => {
-                  const box = board.current!.getBoundingClientRect()
-                  if (drag.current) {
-                    view.current.x += event.clientX - drag.current.x
-                    view.current.y += event.clientY - drag.current.y
-                    drag.current = { x: event.clientX, y: event.clientY }
-                    return rushed()
-                  }
-                  const found = spotAt(event.clientX - box.left, event.clientY - box.top)
-                  if (found?.id !== near?.id) setNear(found)
-                }}
-                onClick={(event) => {
-                  const box = board.current!.getBoundingClientRect()
-                  const px = event.clientX - box.left
-                  const py = event.clientY - box.top
-                  // its name is always the module, whatever sits under the rest of it
-                  const named = boxUnder(px, py, true)
-                  const under = named ?? (near ? null : boxUnder(px, py))
-                  if (!under) return near ? walk(near) : setOnly("")
-                  const same = under.id === only
-                  setOnly(same ? "" : under.id)
-                  if (same) whole()
-                  else zoomTo(under)
-                }}
-              />
             )}
-          </div>
-        </CardContent>
-      </Card>
+            <div ref={frame} className="w-full">
+              {heavy ? (
+                <div className="text-muted-foreground flex h-40 flex-col items-center justify-center gap-3 text-sm">
+                  <span>
+                    {num(size)} nodes at this grain. Laying that out takes a while, and reading it
+                    takes longer.
+                  </span>
+                  <Button variant="outline" size="sm" onClick={() => setGo(true)}>
+                    draw it anyway
+                  </Button>
+                </div>
+              ) : (
+                <canvas
+                  ref={board}
+                  className="block cursor-crosshair touch-none select-none"
+                  onMouseDown={(event) => {
+                    drag.current = { x: event.clientX, y: event.clientY }
+                  }}
+                  onMouseUp={() => {
+                    drag.current = null
+                  }}
+                  onMouseLeave={() => {
+                    drag.current = null
+                    setNear(null)
+                  }}
+                  onMouseMove={(event) => {
+                    const box = board.current!.getBoundingClientRect()
+                    if (drag.current) {
+                      view.current.x += event.clientX - drag.current.x
+                      view.current.y += event.clientY - drag.current.y
+                      drag.current = { x: event.clientX, y: event.clientY }
+                      return rushed()
+                    }
+                    const found = spotAt(event.clientX - box.left, event.clientY - box.top)
+                    if (found?.id !== near?.id) setNear(found)
+                  }}
+                  onClick={(event) => {
+                    const box = board.current!.getBoundingClientRect()
+                    const px = event.clientX - box.left
+                    const py = event.clientY - box.top
+                    // its name is always the module, whatever sits under the rest of it
+                    const named = boxUnder(px, py, true)
+                    const under = named ?? (near ? null : boxUnder(px, py))
+                    if (!under) return near ? walk(near) : setOnly("")
+                    const same = under.id === only
+                    setOnly(same ? "" : under.id)
+                    if (same) whole()
+                    else zoomTo(under)
+                  }}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* fixed height: a caption that grows on hover moves the graph under the cursor */}
-      <p className="text-muted-foreground min-h-10 text-xs">
-        {near ? (
-          <>
-            <span className="text-foreground font-mono">{near.label}</span>
-            {near.box && <> in {called.get(near.box) ?? near.box}</>} ·{" "}
-            {plural(near.weight, "line")} ·{" "}
-            {plural((drawn?.wires ?? []).filter((w) => w.from === near.id).length, "link")} out,{" "}
-            {(drawn?.wires ?? []).filter((w) => w.to === near.id).length} in · click to open it in
-            Files
-          </>
-        ) : drawn ? (
-          <>
-            {plural(drawn.spots.length, "node")} and {plural(drawn.wires.length, "link")},{" "}
-            {bounds
-              ? "each inside the module holding it, click a module name to keep only it"
-              : "arranged loose, since bounds are off"}
-            . Drag to move, wheel to zoom, hover to keep only what one touches. An import bows one
-            way and a call the other, so a pair with both shows both. A faint line is a type only
-            import, and{" "}
-            {drawn.wires.length > HEADS
-              ? "arrows are drawn on hover only at this size"
-              : "the arrow sits at the end it arrives at"}
-            .{" "}
-            {drawn.passes < 60 && `Laid out in ${drawn.passes} passes, fewer than usual for size.`}
-          </>
-        ) : (
-          "Nothing to draw yet."
-        )}
-      </p>
+        {/* fixed height: a caption that grows on hover moves the graph under the cursor */}
+        <p className="text-muted-foreground min-h-10 text-xs">
+          {near ? (
+            <>
+              <span className="text-foreground font-mono">{near.label}</span>
+              {near.box && <> in {called.get(near.box) ?? near.box}</>} ·{" "}
+              {plural(near.weight, "line")} ·{" "}
+              {plural((drawn?.wires ?? []).filter((w) => w.from === near.id).length, "link")} out,{" "}
+              {(drawn?.wires ?? []).filter((w) => w.to === near.id).length} in · click to open it in
+              Files
+            </>
+          ) : drawn ? (
+            <>
+              {plural(drawn.spots.length, "node")} and {plural(drawn.wires.length, "link")},{" "}
+              {bounds
+                ? "each inside the module holding it, click a module name to keep only it"
+                : "arranged loose, since bounds are off"}
+              . Drag to move, wheel to zoom, hover to keep only what one touches. An import bows one
+              way and a call the other, so a pair with both shows both. A faint line is a type only
+              import, and{" "}
+              {drawn.wires.length > HEADS
+                ? "arrows are drawn on hover only at this size"
+                : "the arrow sits at the end it arrives at"}
+              .{" "}
+              {drawn.passes < 60 &&
+                `Laid out in ${drawn.passes} passes, fewer than usual for size.`}
+            </>
+          ) : (
+            "Nothing to draw yet."
+          )}
+        </p>
+      </Section>
 
       <Onward stats={stats} current="Graph" onTab={onTab} />
     </div>

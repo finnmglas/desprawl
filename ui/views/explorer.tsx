@@ -8,6 +8,7 @@ import { Button } from "../components/atoms/button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
 import { Distribution } from "../components/molecules/distribution.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kind } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
@@ -177,48 +178,50 @@ export function Explorer({
       {/* a grid cell is as wide as its content unless told otherwise, and a wide table
           would push the page sideways rather than scroll inside its own card */}
       <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-        <DataTable
-          className="min-w-0 lg:col-span-2"
-          title={path.length ? path.join("/") : "/"}
-          hint={
-            here.leaves && !fetched[key]
-              ? `loading ${num(here.leaves)} files`
-              : lang || kind
-                ? `shaded by ${lang || kind.toLowerCase()} share`
-                : "click a folder to descend"
-          }
-          columns={columns}
-          rows={rows}
-          id={(n) => n.path}
-          fold={100}
-          saves={[
-            {
-              name: `${path.join("-") || "root"}-tree`,
-              label: "Folder tree",
-              note: `${num(here.files)} files, every child of ${path.join("/") || "/"}, as`,
-              rows: () => flatten(here),
-            },
-          ]}
-          onRowClick={enter}
-          rowStyle={(n) =>
-            lang || kind
-              ? {
-                  backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
-                  backgroundRepeat: "no-repeat",
-                  backgroundSize: `${(share(n) / (whole || 1)) * 100}% 100%`,
-                }
-              : undefined
-          }
-        >
-          {/* the folder you are standing in, judged like the ones listed inside it */}
-          <Tip text={standing.why}>
-            <Badge variant="outline" className={standing.tone}>
-              {standing.label}
-            </Badge>
-          </Tip>
-        </DataTable>
+        <Section id="tree_files" className="min-w-0 lg:col-span-2">
+          <DataTable
+            className="min-w-0"
+            title={path.length ? path.join("/") : "/"}
+            hint={
+              here.leaves && !fetched[key]
+                ? `loading ${num(here.leaves)} files`
+                : lang || kind
+                  ? `shaded by ${lang || kind.toLowerCase()} share`
+                  : "click a folder to descend"
+            }
+            columns={columns}
+            rows={rows}
+            id={(n) => n.path}
+            fold={100}
+            saves={[
+              {
+                name: `${path.join("-") || "root"}-tree`,
+                label: "Folder tree",
+                note: `${num(here.files)} files, every child of ${path.join("/") || "/"}, as`,
+                rows: () => flatten(here),
+              },
+            ]}
+            onRowClick={enter}
+            rowStyle={(n) =>
+              lang || kind
+                ? {
+                    backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: `${(share(n) / (whole || 1)) * 100}% 100%`,
+                  }
+                : undefined
+            }
+          >
+            {/* the folder you are standing in, judged like the ones listed inside it */}
+            <Tip text={standing.why}>
+              <Badge variant="outline" className={standing.tone}>
+                {standing.label}
+              </Badge>
+            </Tip>
+          </DataTable>
+        </Section>
 
-        <div className="flex min-w-0 flex-col gap-3">
+        <Section id="distribution_languages" className="flex min-w-0 flex-col gap-3">
           <Distribution
             title={path.length ? `${path.join("/")} languages` : "Languages"}
             langs={here.langs}
@@ -238,7 +241,7 @@ export function Explorer({
               setKind(next)
             }}
           />
-        </div>
+        </Section>
       </div>
 
       <Onward stats={stats} current="Files" onTab={onTab} />

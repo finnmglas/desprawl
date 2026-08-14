@@ -11,6 +11,7 @@ import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Fix } from "../components/molecules/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Agents } from "../components/molecules/agents.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
@@ -303,75 +304,81 @@ export function Tasks({
         />
       </div>
 
-      <Kpis>
-        <Kpi
-          label="Tasks"
-          value={num(found.length)}
-          sub={`from ${plural(new Set(found.map((one) => one.kind)).size, "kind")} of reading`}
-          verdict={{
-            label: found.length ? "collected" : "nothing found",
-            tone: found.length ? "plain" : "fine",
-            why: "every task the other tabs imply. Not a score: each row is a thing found, with what it takes",
-          }}
-        />
-        <Kpi
-          label="Estimated"
-          value={spell(minutes)}
-          sub="of an agent's time, all of it"
-          verdict={{
-            label: "a guess",
-            tone: "plain",
-            why: "the files each opens and the lines it reads, off two timed plan runs of 1.2 and 1.9 minutes. A fix writes too, so it counts as a few plans",
-          }}
-        />
-        <Kpi
-          label="Mechanical"
-          value={num(easy.length)}
-          sub={`${spell(easy.reduce((sum, one) => sum + one.minutes, 0))} of the total`}
-          verdict={{
-            label: found.length ? `${Math.round((easy.length / found.length) * 100)}%` : "none",
-            tone: "plain",
-            why: "the cure is known: a type import moves, a barrel import is renamed, dead code goes",
-          }}
-        />
-        <Kpi
-          label="Reaches anyone"
-          value={num(found.filter((one) => one.hits === "runtime").length)}
-          sub={`of ${plural(found.length, "task")}, the rest cost only us`}
-          verdict={{
-            label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",
-            tone: found.some((one) => one.hits === "runtime") ? "watch" : "fine",
-            why: "how many can be felt by somebody running this rather than working on it. The badge names the worst on the list",
-          }}
-        />
-      </Kpis>
+      <Section id="kpis_tasks">
+        <Kpis>
+          <Kpi
+            label="Tasks"
+            value={num(found.length)}
+            sub={`from ${plural(new Set(found.map((one) => one.kind)).size, "kind")} of reading`}
+            verdict={{
+              label: found.length ? "collected" : "nothing found",
+              tone: found.length ? "plain" : "fine",
+              why: "every task the other tabs imply. Not a score: each row is a thing found, with what it takes",
+            }}
+          />
+          <Kpi
+            label="Estimated"
+            value={spell(minutes)}
+            sub="of an agent's time, all of it"
+            verdict={{
+              label: "a guess",
+              tone: "plain",
+              why: "the files each opens and the lines it reads, off two timed plan runs of 1.2 and 1.9 minutes. A fix writes too, so it counts as a few plans",
+            }}
+          />
+          <Kpi
+            label="Mechanical"
+            value={num(easy.length)}
+            sub={`${spell(easy.reduce((sum, one) => sum + one.minutes, 0))} of the total`}
+            verdict={{
+              label: found.length ? `${Math.round((easy.length / found.length) * 100)}%` : "none",
+              tone: "plain",
+              why: "the cure is known: a type import moves, a barrel import is renamed, dead code goes",
+            }}
+          />
+          <Kpi
+            label="Reaches anyone"
+            value={num(found.filter((one) => one.hits === "runtime").length)}
+            sub={`of ${plural(found.length, "task")}, the rest cost only us`}
+            verdict={{
+              label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",
+              tone: found.some((one) => one.hits === "runtime") ? "watch" : "fine",
+              why: "how many can be felt by somebody running this rather than working on it. The badge names the worst on the list",
+            }}
+          />
+        </Kpis>
+      </Section>
 
-      <Agents />
+      <Section id="card_agents">
+        <Agents />
+      </Section>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs
-          tabs={[ALL, ...KINDS.filter((one) => found.some((task) => task.kind === one))]}
-          value={kind}
-          onChange={setKind}
-        />
-        <Input
-          value={find}
-          onChange={(event) => setFind(event.target.value)}
-          placeholder="Find"
-          className={cn("ml-auto w-40")}
-        />
-      </div>
+      <Section id="table_tasks" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            tabs={[ALL, ...KINDS.filter((one) => found.some((task) => task.kind === one))]}
+            value={kind}
+            onChange={setKind}
+          />
+          <Input
+            value={find}
+            onChange={(event) => setFind(event.target.value)}
+            placeholder="Find"
+            className={cn("ml-auto w-40")}
+          />
+        </div>
 
-      <DataTable
-        title="What there is to do"
-        hint="sort Clears against Est. for what is worth doing first"
-        rows={shown}
-        id={(one) => one.id}
-        columns={columns}
-        onRowClick={setOpened}
-        fold={14}
-        file="tasks"
-      />
+        <DataTable
+          title="What there is to do"
+          hint="sort Clears against Est. for what is worth doing first"
+          rows={shown}
+          id={(one) => one.id}
+          columns={columns}
+          onRowClick={setOpened}
+          fold={14}
+          file="tasks"
+        />
+      </Section>
 
       <Dialog
         open={!!opened}

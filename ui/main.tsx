@@ -20,6 +20,7 @@ import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
+import { syncHidden } from "./lib/sections.ts"
 import { copy, describes } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
 import { cn } from "./lib/ui.ts"
@@ -339,6 +340,7 @@ function Root() {
       if (!saved) return
       setPrefs(saved)
       setLocale(saved.region)
+      syncHidden(saved.hidden)
     })
   }, [])
   const themed = useTheme(prefs.theme, (theme) => change({ theme }))

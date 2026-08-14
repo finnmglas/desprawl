@@ -16,6 +16,8 @@ export interface Prefs {
   metadata: boolean
   /** what the fix panel was last set to: nobody picks a different cli every time */
   agent: { install: string; model: string; mode: string; trust: string }
+  /** section ids folded away by the eye toggle, reactivated from the tab's footer */
+  hidden: string[]
 }
 
 export const FALLBACK: Prefs = {
@@ -26,6 +28,7 @@ export const FALLBACK: Prefs = {
   brands: "flashy",
   metadata: true,
   agent: { install: "", model: "", mode: "local", trust: "auto" },
+  hidden: [],
 }
 
 const KEY = "desprawl-prefs"

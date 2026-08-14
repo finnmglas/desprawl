@@ -6,6 +6,7 @@ import { AiCard } from "../components/molecules/ai-card.tsx"
 import { Avatar } from "../components/atoms/avatar.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
+import { Section } from "../components/atoms/section.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { REGISTRIES, linkTo } from "../../src/registries.ts"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
@@ -551,44 +552,46 @@ export function Overview({
 
   return (
     <div className="flex flex-col gap-4">
-      <Kpis>
-        {[
-          {
-            label: "Lines of code",
-            value: num(stats.code),
-            sub: `${num(stats.files)} files${stats.stack.primary ? `, primarily ${stats.stack.primary}` : ""}`,
-            verdict: sizeOf(stats.code),
-            to: "Files",
-            shade: "Code",
-          },
-          {
-            label: "Comments",
-            value: num(stats.comment),
-            sub: `${pct(stats.comment, source)} of source`,
-            verdict: commentsOf(stats.comment, source),
-            to: "Files",
-            shade: "Comments",
-          },
-          {
-            label: "Tokens",
-            value: `~${num(tokens(stats.chars))}`,
-            sub: `${num(stats.chars)} chars`,
-            verdict: contextOf(tokens(stats.chars)),
-            to: "Files",
-          },
-          {
-            label: "Commits",
-            value: num(total),
-            sub: stats.truncated
-              ? `${plural(stats.contributors.length, "dev")} in the latest ${num(stats.commits)}`
-              : `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
-            verdict: historyOf(total),
-            to: "History",
-          },
-        ].map(({ shade, ...card }) => (
-          <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to, shade)} />
-        ))}
-      </Kpis>
+      <Section id="kpis_overview">
+        <Kpis>
+          {[
+            {
+              label: "Lines of code",
+              value: num(stats.code),
+              sub: `${num(stats.files)} files${stats.stack.primary ? `, primarily ${stats.stack.primary}` : ""}`,
+              verdict: sizeOf(stats.code),
+              to: "Files",
+              shade: "Code",
+            },
+            {
+              label: "Comments",
+              value: num(stats.comment),
+              sub: `${pct(stats.comment, source)} of source`,
+              verdict: commentsOf(stats.comment, source),
+              to: "Files",
+              shade: "Comments",
+            },
+            {
+              label: "Tokens",
+              value: `~${num(tokens(stats.chars))}`,
+              sub: `${num(stats.chars)} chars`,
+              verdict: contextOf(tokens(stats.chars)),
+              to: "Files",
+            },
+            {
+              label: "Commits",
+              value: num(total),
+              sub: stats.truncated
+                ? `${plural(stats.contributors.length, "dev")} in the latest ${num(stats.commits)}`
+                : `${plural(stats.contributors.length, "dev")} in ${plural(span, "day")}`,
+              verdict: historyOf(total),
+              to: "History",
+            },
+          ].map(({ shade, ...card }) => (
+            <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to, shade)} />
+          ))}
+        </Kpis>
+      </Section>
 
       {stats.files === 0 && (
         <Card>
@@ -598,267 +601,285 @@ export function Overview({
         </Card>
       )}
 
-      <Card>
-        <CardHead
-          title={
-            <span className="flex items-center gap-1">
-              Project architecture
-              <Working on={asking} />
-            </span>
-          }
-          hint="modules and services, generated from repo"
-          wrap
-        >
-          {graph && units.length > 0 && (
-            <div className="ml-auto flex items-center gap-1">
-              <CopyButton
-                label="Copy the architecture, as text"
-                text={() => wall(name, units, stats.stack)}
-                message={`Copied ${plural(units.length, "group")}`}
-                note="Every band, its groups and what they talk to"
-              />
-              <Save
-                name="architecture"
-                picture={() => wall_.current}
-                rows={() => [
-                  ["group", "name", "level", "files", "lines", "classification", "packages"],
-                  ...units.map((u) => [
-                    u.path,
-                    u.path,
-                    u.level,
-                    u.files,
-                    u.lines,
-                    shapeOf(u.internal, count(u.out), count(u.in), Object.keys(u.out).length).label,
-                    u.packages,
-                  ]),
-                ]}
-                note={`${plural(units.length, "group")}, as`}
-              />
-            </div>
-          )}
-        </CardHead>
-        <CardContent>
-          <div ref={wall_}>
-            {graph ? (
-              <System
-                name={name}
-                moved={range && isLive() ? changed : undefined}
-                people={stats.contributors}
-                worked={where}
-                faces={faces}
-                units={units}
-                stack={stats.stack}
-                onPick={() => onTab("Modules")}
-              />
-            ) : (
-              <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
-            )}
-          </div>
-          {range && !isLive() && (
-            <p className="text-muted-foreground mt-3 text-xs">Needs live npx desprawl server.</p>
-          )}
-          <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
-        </CardContent>
-      </Card>
-
-      {/* after what the repo is, before what happened to it */}
-      <Doing />
-
-      <OverTime
-        stats={stats}
-        all={all}
-        onCommits={onCommits}
-        onZoom={(from, to) => setRange(from && to ? [from, to] : null)}
-      />
-
-      <DataTable
-        title="Languages"
-        hint="Click to see files"
-        columns={LANGS}
-        rows={stats.languages}
-        id={(l) => l.name}
-        fold={8}
-        onRowClick={(l) => onLang(l.name)}
-        total={{ ...stats.tree, name: "total" }}
-      />
-
-      <DataTable
-        title={
-          <span className="flex items-center gap-1">
-            {did ? "Contributors (time frame)" : "Contributors"}
-            <Working on={asking} />
-          </span>
-        }
-        hint={
-          did
-            ? `${plural(did.length, "person")} committed between ${range?.[0]} and ${range?.[1]}`
-            : anon
-              ? `${stats.contributors.length} people, addresses left out`
-              : `${stats.contributors.length} identities by email`
-        }
-        file={did ? "contributors-in-range" : "contributors"}
-        columns={people(
-          did ? did.reduce((sum, one) => sum + one.commits, 0) : stats.commits,
-          did ? did.reduce((sum, one) => sum + one.insertions + one.deletions, 0) : moved,
-          faces,
-          anon,
-        )}
-        rows={did ?? stats.contributors}
-        id={(p) => p.email || p.name}
-        fold={8}
-      />
-
-      <AiCard ai={stats.stack.ai} />
-
-      {suite && (suite.files > 0 || suite.script) && (
+      <Section id="system_overview">
         <Card>
           <CardHead
-            title="Tests"
-            hint={
-              suite.runners.length
-                ? `${suite.runners.join(", ")}, counted by reading the files rather than running them`
-                : "no runner named in the manifest"
+            title={
+              <span className="flex items-center gap-1">
+                Project architecture
+                <Working on={asking} />
+              </span>
             }
+            hint="modules and services, generated from repo"
+            wrap
           >
-            {suite.script && isLive() && (
+            {graph && units.length > 0 && (
               <div className="ml-auto flex items-center gap-1">
-                {[
-                  { label: suite.script, note: suite.command, cover: false },
-                  ...(suite.measured || suite.measure
-                    ? [
-                        {
-                          label: "with coverage",
-                          note: suite.measure ? `the ${suite.measure} script` : suite.measured,
-                          cover: true,
-                        },
-                      ]
-                    : []),
-                ].map((one) => (
-                  <Button
-                    key={one.label}
-                    variant="outline"
-                    size="sm"
-                    className="bg-card"
-                    title={one.note}
-                    disabled={!!running}
-                    onClick={() => {
-                      setRunning(one.label)
-                      toast(`Running ${one.note}`, "the slow one, so it only runs on a click")
-                      void runTests(suite.script, one.cover).then((made) => {
-                        setRunning("")
-                        if (made) setSuite(made)
-                        toast(
-                          made?.ran?.ok ? "Tests passed" : "Tests failed",
-                          made?.ran ? `${made.ran.seconds}s, exit ${made.ran.code}` : "no answer",
-                        )
-                      })
-                    }}
-                  >
-                    {running === one.label ? "running…" : one.label}
-                  </Button>
-                ))}
+                <CopyButton
+                  label="Copy the architecture, as text"
+                  text={() => wall(name, units, stats.stack)}
+                  message={`Copied ${plural(units.length, "group")}`}
+                  note="Every band, its groups and what they talk to"
+                />
+                <Save
+                  name="architecture"
+                  picture={() => wall_.current}
+                  rows={() => [
+                    ["group", "name", "level", "files", "lines", "classification", "packages"],
+                    ...units.map((u) => [
+                      u.path,
+                      u.path,
+                      u.level,
+                      u.files,
+                      u.lines,
+                      shapeOf(u.internal, count(u.out), count(u.in), Object.keys(u.out).length)
+                        .label,
+                      u.packages,
+                    ]),
+                  ]}
+                  note={`${plural(units.length, "group")}, as`}
+                />
               </div>
             )}
           </CardHead>
-          <CardContent className="flex flex-col gap-3">
-            {/* five facts, so four across leaves one alone on a second row */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <Fact
-                label="Suite"
-                value={suite.ran ? (suite.ran.ok ? "green" : "red") : "not run"}
-                note={
-                  suite.ran
-                    ? `${suite.ran.seconds}s, exit ${suite.ran.code}`
-                    : "read, not run: press the button"
-                }
-                verdict={suiteOf(suite.ran, suite.cases)}
-              />
-              <Fact label="Test files" value={num(suite.files)} note="by folder and file name" />
-              <Fact
-                label="Cases"
-                value={num(suite.cases)}
-                note="test and it calls, read off the code"
-              />
-              <Fact
-                label="Coverage"
-                value={suite.coverage ? `${suite.coverage.lines}%` : "—"}
-                note={
-                  suite.coverage
-                    ? `${suite.coverage.branches}% branches, ${suite.coverage.functions}% functions`
-                    : "no report on disk, run the suite with coverage"
-                }
-                verdict={suite.coverage ? coverageOf(suite.coverage.lines) : undefined}
-              />
-              <Fact
-                label="Command"
-                value={suite.script || "none"}
-                note={suite.command || "no test script in the manifest"}
-              />
+          <CardContent>
+            <div ref={wall_}>
+              {graph ? (
+                <System
+                  name={name}
+                  moved={range && isLive() ? changed : undefined}
+                  people={stats.contributors}
+                  worked={where}
+                  faces={faces}
+                  units={units}
+                  stack={stats.stack}
+                  onPick={() => onTab("Modules")}
+                />
+              ) : (
+                <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
+              )}
             </div>
-            {/* a file cannot run anything, and a number in one is as old as the file */}
-            {!isLive() && (
-              <p className="text-muted-foreground text-xs">
-                Counted when this page was saved, by reading the files rather than running them.
-                {suite.coverage
-                  ? ` The coverage figure is whatever ${suite.covered} held at that moment.`
-                  : " No coverage report was on disk then, so there is no figure to show."}{" "}
-                Running the suite needs a live desprawl:{" "}
-                <span className="font-mono">npx desprawl</span>
-                {suite.script && (
-                  <>
-                    {" "}
-                    here, then the <span className="font-mono">{suite.script}</span> button.
-                  </>
-                )}
-              </p>
+            {range && !isLive() && (
+              <p className="text-muted-foreground mt-3 text-xs">Needs live npx desprawl server.</p>
             )}
-            {suite.ran && (
-              <pre
-                className={cn(
-                  "max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs",
-                  suite.ran.ok ? "bg-muted" : "border-red-500/50",
-                )}
-              >
-                {suite.ran.output || "(no output)"}
-              </pre>
-            )}
-            {suite.ran && !isLive() && (
-              <p className="text-muted-foreground text-xs">
-                That run happened before this page was saved, so it says what passed then, not now.
-              </p>
-            )}
+            <StackCard stack={stats.stack} folded open={metadata} onOpen={onMetadata} />
           </CardContent>
         </Card>
+      </Section>
+
+      {/* after what the repo is, before what happened to it */}
+      <Section id="actions_overview">
+        <Doing />
+      </Section>
+
+      <Section id="timeline_overview">
+        <OverTime
+          stats={stats}
+          all={all}
+          onCommits={onCommits}
+          onZoom={(from, to) => setRange(from && to ? [from, to] : null)}
+        />
+      </Section>
+
+      <Section id="table_languages">
+        <DataTable
+          title="Languages"
+          hint="Click to see files"
+          columns={LANGS}
+          rows={stats.languages}
+          id={(l) => l.name}
+          fold={8}
+          onRowClick={(l) => onLang(l.name)}
+          total={{ ...stats.tree, name: "total" }}
+        />
+      </Section>
+
+      <Section id="table_contributors">
+        <DataTable
+          title={
+            <span className="flex items-center gap-1">
+              {did ? "Contributors (time frame)" : "Contributors"}
+              <Working on={asking} />
+            </span>
+          }
+          hint={
+            did
+              ? `${plural(did.length, "person")} committed between ${range?.[0]} and ${range?.[1]}`
+              : anon
+                ? `${stats.contributors.length} people, addresses left out`
+                : `${stats.contributors.length} identities by email`
+          }
+          file={did ? "contributors-in-range" : "contributors"}
+          columns={people(
+            did ? did.reduce((sum, one) => sum + one.commits, 0) : stats.commits,
+            did ? did.reduce((sum, one) => sum + one.insertions + one.deletions, 0) : moved,
+            faces,
+            anon,
+          )}
+          rows={did ?? stats.contributors}
+          id={(p) => p.email || p.name}
+          fold={8}
+        />
+      </Section>
+
+      <Section id="ai_overview">
+        <AiCard ai={stats.stack.ai} />
+      </Section>
+
+      {suite && (suite.files > 0 || suite.script) && (
+        <Section id="card_tests">
+          <Card>
+            <CardHead
+              title="Tests"
+              hint={
+                suite.runners.length
+                  ? `${suite.runners.join(", ")}, counted by reading the files rather than running them`
+                  : "no runner named in the manifest"
+              }
+            >
+              {suite.script && isLive() && (
+                <div className="ml-auto flex items-center gap-1">
+                  {[
+                    { label: suite.script, note: suite.command, cover: false },
+                    ...(suite.measured || suite.measure
+                      ? [
+                          {
+                            label: "with coverage",
+                            note: suite.measure ? `the ${suite.measure} script` : suite.measured,
+                            cover: true,
+                          },
+                        ]
+                      : []),
+                  ].map((one) => (
+                    <Button
+                      key={one.label}
+                      variant="outline"
+                      size="sm"
+                      className="bg-card"
+                      title={one.note}
+                      disabled={!!running}
+                      onClick={() => {
+                        setRunning(one.label)
+                        toast(`Running ${one.note}`, "the slow one, so it only runs on a click")
+                        void runTests(suite.script, one.cover).then((made) => {
+                          setRunning("")
+                          if (made) setSuite(made)
+                          toast(
+                            made?.ran?.ok ? "Tests passed" : "Tests failed",
+                            made?.ran ? `${made.ran.seconds}s, exit ${made.ran.code}` : "no answer",
+                          )
+                        })
+                      }}
+                    >
+                      {running === one.label ? "running…" : one.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </CardHead>
+            <CardContent className="flex flex-col gap-3">
+              {/* five facts, so four across leaves one alone on a second row */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <Fact
+                  label="Suite"
+                  value={suite.ran ? (suite.ran.ok ? "green" : "red") : "not run"}
+                  note={
+                    suite.ran
+                      ? `${suite.ran.seconds}s, exit ${suite.ran.code}`
+                      : "read, not run: press the button"
+                  }
+                  verdict={suiteOf(suite.ran, suite.cases)}
+                />
+                <Fact label="Test files" value={num(suite.files)} note="by folder and file name" />
+                <Fact
+                  label="Cases"
+                  value={num(suite.cases)}
+                  note="test and it calls, read off the code"
+                />
+                <Fact
+                  label="Coverage"
+                  value={suite.coverage ? `${suite.coverage.lines}%` : "—"}
+                  note={
+                    suite.coverage
+                      ? `${suite.coverage.branches}% branches, ${suite.coverage.functions}% functions`
+                      : "no report on disk, run the suite with coverage"
+                  }
+                  verdict={suite.coverage ? coverageOf(suite.coverage.lines) : undefined}
+                />
+                <Fact
+                  label="Command"
+                  value={suite.script || "none"}
+                  note={suite.command || "no test script in the manifest"}
+                />
+              </div>
+              {/* a file cannot run anything, and a number in one is as old as the file */}
+              {!isLive() && (
+                <p className="text-muted-foreground text-xs">
+                  Counted when this page was saved, by reading the files rather than running them.
+                  {suite.coverage
+                    ? ` The coverage figure is whatever ${suite.covered} held at that moment.`
+                    : " No coverage report was on disk then, so there is no figure to show."}{" "}
+                  Running the suite needs a live desprawl:{" "}
+                  <span className="font-mono">npx desprawl</span>
+                  {suite.script && (
+                    <>
+                      {" "}
+                      here, then the <span className="font-mono">{suite.script}</span> button.
+                    </>
+                  )}
+                </p>
+              )}
+              {suite.ran && (
+                <pre
+                  className={cn(
+                    "max-h-64 overflow-auto rounded-md border p-3 font-mono text-xs",
+                    suite.ran.ok ? "bg-muted" : "border-red-500/50",
+                  )}
+                >
+                  {suite.ran.output || "(no output)"}
+                </pre>
+              )}
+              {suite.ran && !isLive() && (
+                <p className="text-muted-foreground text-xs">
+                  That run happened before this page was saved, so it says what passed then, not
+                  now.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </Section>
       )}
 
       {kit && kit.list.length > 0 && (
-        <DataTable
-          title="External dependencies"
-          hint={
-            kit.offline
-              ? "licences from node_modules, check didn't reach osv.dev"
-              : kit.missed
-                ? `${plural(picked.length, "package")}: osv.dev named ${kit.missed} advisories it then would not describe, so this column is short`
-                : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
-          }
-          // worst first
-          onFind={setHunt}
-          rows={[...scoped].sort(
-            (a, b) =>
-              b.advisories.length - a.advisories.length ||
-              RANK.indexOf(worst(a.advisories)) - RANK.indexOf(worst(b.advisories)) ||
-              a.name.localeCompare(b.name),
-          )}
-          // dupes
-          id={(one) => `${one.name}@${one.version}`}
-          columns={columns}
-          total={{ ...kit.list[0], name: "", every: picked }}
-          fold={8}
-        >
-          <div className="ml-auto flex items-center gap-2">
-            <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
-          </div>
-        </DataTable>
+        <Section id="table_deps">
+          <DataTable
+            title="External dependencies"
+            hint={
+              kit.offline
+                ? "licences from node_modules, check didn't reach osv.dev"
+                : kit.missed
+                  ? `${plural(picked.length, "package")}: osv.dev named ${kit.missed} advisories it then would not describe, so this column is short`
+                  : `${plural(picked.length, "package")}, licences from disk, security from osv.dev on ${day(kit.checked)}`
+            }
+            // worst first
+            onFind={setHunt}
+            rows={[...scoped].sort(
+              (a, b) =>
+                b.advisories.length - a.advisories.length ||
+                RANK.indexOf(worst(a.advisories)) - RANK.indexOf(worst(b.advisories)) ||
+                a.name.localeCompare(b.name),
+            )}
+            // dupes
+            id={(one) => `${one.name}@${one.version}`}
+            columns={columns}
+            total={{ ...kit.list[0], name: "", every: picked }}
+            fold={8}
+          >
+            <div className="ml-auto flex items-center gap-2">
+              <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
+            </div>
+          </DataTable>
+        </Section>
       )}
 
       <Onward stats={stats} current="Overview" onTab={onTab} />

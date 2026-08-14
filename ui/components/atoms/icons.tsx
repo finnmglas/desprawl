@@ -87,6 +87,12 @@ export const Copy = ({ className }: { className?: string }) => (
 export const Check = ({ className }: { className?: string }) => (
   <Line className={className} d="m20 6-11 11-5-5" />
 )
+export const Eye = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z M12 9.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6Z"
+  />
+)
 export const Refresh = ({ className }: { className?: string }) => (
   <Line
     className={className}
