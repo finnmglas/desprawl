@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { Tip } from "../atoms/tip.tsx"
 import { PAINT, fit } from "../../lib/canvas.ts"
 import { num, plural, shortPath } from "../../lib/format.ts"
+import { cn } from "../../lib/ui.ts"
 import type { Unit } from "../../../src/layers.ts"
 
 const KEY: { colour: string; label: string; why: string; cross?: boolean }[] = [
@@ -47,6 +48,7 @@ export function Matrix({
   rings,
   order,
   label,
+  chosen,
   onPick,
 }: {
   units: Unit[]
@@ -62,6 +64,8 @@ export function Matrix({
   order?: (a: Unit, b: Unit) => number
   /** what to call a group, when the grouping derives a name for it */
   label?: (path: string) => string
+  /** the group the reader arrived holding, banded across its row and column */
+  chosen?: string
   onPick?: (path: string) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -155,6 +159,15 @@ export function Matrix({
       pen.stroke()
     }
 
+    // the band goes down first, so every cell of the chosen group is drawn on top of it
+    const pickedRow = rows.findIndex((r) => r.path === chosen)
+    const pickedCol = cols.findIndex((c) => c.path === chosen)
+    if (pickedRow >= 0 || pickedCol >= 0) {
+      pen.fillStyle = `rgba(${PAINT.down}, 0.14)`
+      if (pickedRow >= 0) pen.fillRect(0, pickedRow * cell, cols.length * cell, cell - 1)
+      if (pickedCol >= 0) pen.fillRect(pickedCol * cell, 0, cell - 1, rows.length * cell)
+    }
+
     rows.forEach((row, y) =>
       cols.forEach((col, x) => {
         // a ring held inside one group is invisible between groups, so it is drawn on the
@@ -201,7 +214,7 @@ export function Matrix({
         }
       })
     pen.stroke()
-  }, [units, most, cell, cuts, rings, order])
+  }, [units, most, cell, cuts, rings, order, chosen])
 
   const at = (event: React.MouseEvent) => {
     const box = canvas.current!.getBoundingClientRect()
@@ -251,7 +264,10 @@ export function Matrix({
                 <Tip text={row.path} className="min-w-0">
                   <button
                     onClick={() => onPick?.(row.path)}
-                    className="text-muted-foreground hover:text-foreground w-full cursor-pointer truncate text-right"
+                    className={cn(
+                      "hover:text-foreground w-full cursor-pointer truncate text-right",
+                      row.path === chosen ? "text-foreground font-medium" : "text-muted-foreground",
+                    )}
                   >
                     {label?.(row.path) ?? shortPath(row.path, 34)}
                   </button>

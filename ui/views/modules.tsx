@@ -22,6 +22,8 @@ import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { importGraph } from "../lib/live.ts"
+import { group as asGroup, holds, useGoing } from "../lib/going.tsx"
+import { useKept } from "../lib/kept.ts"
 import { hands, worked } from "../lib/people.ts"
 import { namesOf } from "../../src/naming.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/verdict.ts"
@@ -83,22 +85,14 @@ const glued = (loop: Tangle) => {
   return glue > 0 && glue / Math.max(1, imports) >= 0.5
 }
 
-function Empty({
-  stats,
-  onTab,
-  children,
-}: {
-  stats: Stats
-  onTab: (tab: string) => void
-  children: React.ReactNode
-}) {
+function Empty({ stats, children }: { stats: Stats; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-4">
-      <Back onTab={onTab} />
+      <Back />
       <Card>
         <CardContent className="text-muted-foreground p-6 text-sm">{children}</CardContent>
       </Card>
-      <Onward stats={stats} current="Modules" onTab={onTab} />
+      <Onward stats={stats} current="Modules" />
     </div>
   )
 }
@@ -132,28 +126,21 @@ function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number
 /** the same folder the tasks tab names, said for a reader rather than for a path */
 const rooted = (paths: string[]) => shared(paths).replace(/^\.$/, "the repo root")
 
-export function Modules({
-  stats,
-  faces,
-  onTab,
-  onPath,
-}: {
-  stats: Stats
-  faces: Record<string, string>
-  onTab: (tab: string) => void
-  onPath: (path: string[]) => void
-}) {
+export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, string> }) {
+  const going = useGoing()
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
-  const [group, setGroup] = useState("")
-  const [keep, setKeep] = useState(KEEP[0])
-  const [wide, setWide] = useState(false)
+  // the grain, the search and the sort are what a reader set up here, so leaving for
+  // another tab and coming back finds them still set rather than back at the defaults
+  const [group, setGroup] = useKept("modules.group", "")
+  const [keep, setKeep] = useKept("modules.keep", KEEP[0])
+  const [wide, setWide] = useKept("modules.wide", false)
 
   const grid = useRef<HTMLDivElement>(null)
-  const [sort, setSort] = useState<Sort | null>(null)
-  const [view, setView] = useState(VIEWS[0])
+  const [sort, setSort] = useKept<Sort | null>("modules.sort", null)
+  const [view, setView] = useKept("modules.view", VIEWS[0])
 
   const where = useMemo(() => worked(stats.tree), [stats.tree])
-  const [find, setFind] = useState("")
+  const [find, setFind] = useKept("modules.find", "")
 
   useEffect(() => {
     if (!graph) void importGraph().then(setGraph)
@@ -174,15 +161,10 @@ export function Modules({
     [layout, keep],
   )
 
-  if (!graph)
-    return <Loading stats={stats} current="Modules" onTab={onTab} what="Reading all imports," />
+  if (!graph) return <Loading stats={stats} current="Modules" what="Reading all imports," />
 
   if (!layout || !units.length)
-    return (
-      <Empty stats={stats} onTab={onTab}>
-        No imports, possibly no TS/JS here.
-      </Empty>
-    )
+    return <Empty stats={stats}>No imports, possibly no TS/JS here.</Empty>
 
   const kept = new Set(units.map((u) => u.path))
   const links = units.reduce(
@@ -255,17 +237,19 @@ export function Modules({
     Array.from({ length: levels }, (_, i) => levels - 1 - i)
       .map((level): [number, Unit[]] => [level, units.filter((u) => u.level === level)])
       .filter(([, here]) => here.length)
-  const folder = (path: string) => !/\.[a-z]+$/.test(path)
-  // remainder group = "/*"
-  const open = (path: string) => {
-    const at = path.replace(/\/?\*$/, "")
-    if (folder(at)) onPath(at ? at.split("/") : [])
-  }
+  // a group is a folder, a remainder like src/* or one file, and every one of those is
+  // worth reading, framing and opening: the click asks which rather than deciding for you
+  const choose = (path: string) => going.open(asGroup(path, label?.(path)))
+  // the group answering for whatever the reader arrived holding, picked on another tab
+  const focus = holds(
+    going.at.pick,
+    units.map((u) => u.path),
+  )
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Back onTab={onTab} />
+        <Back />
         <Save
           className="ml-auto"
           name="imports"
@@ -416,10 +400,16 @@ export function Modules({
               hint: "who committed most to contained files",
             },
           ]}
-          onRowClick={(u) => open(u.path)}
+          onRowClick={(u) => choose(u.path)}
           onSort={setSort}
+          mark={(u) => !!focus && u.path === focus}
           fold={12}
         >
+          {focus && (
+            <Button variant="outline" size="sm" onClick={() => going.go({ pick: "" })}>
+              {label?.(focus) ?? shortPath(focus, 24)} ✕
+            </Button>
+          )}
           <Input
             value={find}
             onChange={(event) => setFind(event.target.value)}
@@ -485,16 +475,24 @@ export function Modules({
               {view === VIEWS[0] ? (
                 <Matrix
                   rings={rings}
+                  chosen={focus}
                   label={label}
                   units={shown}
                   across={units}
                   most={crowded && !wide ? 12 : shown.length}
                   order={order}
                   cuts={cuts}
-                  onPick={open}
+                  onPick={choose}
                 />
               ) : (
-                <Circle units={shown} cuts={cuts} rings={rings} label={label} onPick={open} />
+                <Circle
+                  units={shown}
+                  cuts={cuts}
+                  rings={rings}
+                  chosen={focus}
+                  label={label}
+                  onPick={choose}
+                />
               )}
             </div>
           </CardContent>
@@ -566,10 +564,11 @@ export function Modules({
                           }
                         >
                           <button
-                            onClick={() => open(unit.path)}
+                            onClick={() => choose(unit.path)}
                             className={cn(
                               "hover:border-ring flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors",
                               unit.tangle >= 0 && "border-amber-500/60",
+                              unit.path === focus && "border-ring bg-sky-500/15",
                             )}
                           >
                             <span className="max-w-56 truncate">
@@ -607,6 +606,16 @@ export function Modules({
             }))}
             id={(row) => row.ring[0]}
             columns={RINGS}
+            onRowClick={(row) =>
+              going.open({
+                kind: "folder",
+                id: row.where === "the repo root" ? "" : row.where,
+                name: row.where,
+                note: `${plural(row.ring.length, "file")} importing each other in a ring`,
+                related: row.ring,
+                relation: "the ring, file by file",
+              })
+            }
             fold={8}
           />
         </Section>
@@ -652,7 +661,7 @@ export function Modules({
                       {loop.units.map((path) => (
                         <button
                           key={path}
-                          onClick={() => open(path)}
+                          onClick={() => choose(path)}
                           className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 text-xs"
                         >
                           {label?.(path) ?? path}
@@ -706,12 +715,13 @@ export function Modules({
             rows={loops.flatMap((loop, id) => loop.cut.map((edge) => ({ ...edge, loop: id + 1 })))}
             id={(edge) => `${edge.from} ${edge.to}`}
             columns={CUTS}
+            onRowClick={(edge) => going.open(asGroup(edge.from, label?.(edge.from)))}
             fold={12}
           />
         </Section>
       )}
 
-      <Onward stats={stats} current="Modules" onTab={onTab} />
+      <Onward stats={stats} current="Modules" />
     </div>
   )
 }

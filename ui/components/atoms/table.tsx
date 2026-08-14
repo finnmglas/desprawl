@@ -19,7 +19,7 @@ export const TBody = ({ className, ...props }: React.HTMLAttributes<HTMLTableSec
   <tbody className={cn("[&_tr:last-child]:border-0", className)} {...props} />
 )
 
-export const TR = ({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) => (
+export const TR = ({ className, ...props }: React.ComponentProps<"tr">) => (
   <tr className={cn("hover:bg-muted/50 border-b transition-colors", className)} {...props} />
 )
 

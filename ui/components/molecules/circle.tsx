@@ -13,6 +13,7 @@ export function Circle({
   cuts,
   rings,
   label,
+  chosen,
   onPick,
 }: {
   units: Unit[]
@@ -21,6 +22,8 @@ export function Circle({
   label?: (path: string) => string
   /** pairs a real file ring runs through, drawn heavier than a merely untidy one */
   rings?: Set<string>
+  /** the group the reader arrived holding, drawn lit whether or not it is hovered */
+  chosen?: string
   onPick?: (path: string) => void
 }) {
   const canvas = useRef<HTMLCanvasElement>(null)
@@ -84,7 +87,7 @@ export function Circle({
 
     shown.forEach((unit, i) => {
       const at = spot(i)
-      const lit = near === i
+      const lit = near === i || unit.path === chosen
       pen.fillStyle = `rgba(${PAINT.quiet}, ${lit ? 0.9 : 0.45})`
       pen.beginPath()
       pen.arc(at.x, at.y, lit ? 5 : 3, 0, Math.PI * 2)
@@ -105,7 +108,7 @@ export function Circle({
       )
       pen.restore()
     })
-  }, [units, cuts, rings, label, near])
+  }, [units, cuts, rings, label, near, chosen])
 
   const found = near >= 0 ? shown[near] : null
   return (

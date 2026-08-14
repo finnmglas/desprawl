@@ -33,6 +33,7 @@ const Solid = ({ d, className }: { d: string; className?: string }) => (
 )
 
 // the tabs
+export const Bars = () => <Line d="M3 20h18M6 20v-6M11 20V6M16 20v-9" />
 export const FolderMark = () => (
   <Line d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
 )
@@ -60,17 +61,18 @@ export const Moon = () => (
   <Line className="size-4" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
 )
 
-// a row in the tree, filled because an outline turns to mush at this size
+// a row in the tree, drawn the same way the tab above it is: outlined, so a folder and a
+// file read apart by shape at a glance rather than by two silhouettes of the same weight
 export const Folder = ({ className }: { className?: string }) => (
-  <Solid
+  <Line
     className={className}
-    d="M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6Z"
+    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
   />
 )
 export const File = ({ className }: { className?: string }) => (
-  <Solid
+  <Line
     className={className}
-    d="M6 2h8l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm8 1.5V9h5.5L14 3.5Z"
+    d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6"
   />
 )
 
@@ -150,3 +152,14 @@ export const NpmMark = ({ className }: { className?: string }) => (
 export const HostMark = ({ host, className }: { host: string; className?: string }) => (
   <Solid className={className} d={HOSTS[host] ?? HOSTS.git} />
 )
+
+/** the mark each tab is known by, so the tab bar and every link to one agree */
+export const MARKS: Record<string, React.ReactNode> = {
+  Overview: <Bars />,
+  Modules: <Blocks />,
+  Execution: <Run />,
+  Files: <FolderMark />,
+  History: <Clock />,
+  Tasks: <Checks />,
+  Graph: <Dots />,
+}

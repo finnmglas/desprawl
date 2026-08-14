@@ -18,6 +18,8 @@ import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/live.ts"
+import { isFile, useGoing } from "../lib/going.tsx"
+import { useKept } from "../lib/kept.ts"
 import { hands, handsOf, worked } from "../lib/people.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
@@ -55,22 +57,13 @@ const TOLL: Record<Hits, string> = {
   maintainability: OUTLINE.quiet,
 }
 
-export function Tasks({
-  stats,
-  faces,
-  onTab,
-  onPath,
-}: {
-  stats: Stats
-  faces: Record<string, string>
-  onTab: (tab: string) => void
-  onPath: (path: string[]) => void
-}) {
+export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, string> }) {
+  const { open } = useGoing()
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
   const [deps, setDeps] = useState<Deps | null>(window.__DESPRAWL_DEPS__ ?? null)
-  const [kind, setKind] = useState(ALL)
-  const [find, setFind] = useState("")
+  const [kind, setKind] = useKept("tasks.kind", ALL)
+  const [find, setFind] = useKept("tasks.find", "")
   // the row says as much as a row can, and the rest is a panel rather than a jump into
   // Files: opening a folder nobody asked to open is not what clicking a task means
   const [opened, setOpened] = useState<Task | null>(null)
@@ -110,7 +103,6 @@ export function Tasks({
       <Loading
         stats={stats}
         current="Tasks"
-        onTab={onTab}
         what="Reading what there is to do,"
         slow="It reads every graph first."
       />
@@ -126,13 +118,12 @@ export function Tasks({
   )
   const minutes = found.reduce((sum, one) => sum + one.minutes, 0)
   const easy = found.filter((one) => one.mechanical)
-  const walk = (where: string) =>
-    onPath(
-      where
-        .replace(/\/?\*$/, "")
-        .split("/")
-        .filter(Boolean),
-    )
+  // where a task is can be a file, a folder or the repo itself, and each leads somewhere
+  // different: the panel says which rather than opening a folder nobody asked for
+  const walk = (where: string) => {
+    const at = where.replace(/\/?\*$/, "")
+    open({ kind: isFile(at) ? "file" : "folder", id: at === "." ? "" : at })
+  }
 
   const written = (one: Task) => {
     const crew = crewOf(one)
@@ -269,7 +260,7 @@ export function Tasks({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Back onTab={onTab} />
+        <Back />
         {/* the table is what this repo needs doing, this is whatever you need doing */}
         <Fix className="ml-auto" label="Ask an agent" />
         <Save
@@ -439,7 +430,7 @@ export function Tasks({
                     walk(opened.where)
                     setOpened(null)
                   }}
-                  title="Open it in Files"
+                  title="What is there, and where it leads"
                   className="hover:text-foreground hover:border-ring min-w-0 cursor-pointer truncate rounded border px-1.5 py-0.5 font-mono text-xs transition-colors"
                 >
                   {opened.where}
@@ -463,7 +454,7 @@ export function Tasks({
         )}
       </Dialog>
 
-      <Onward stats={stats} current="Tasks" onTab={onTab} />
+      <Onward stats={stats} current="Tasks" />
     </div>
   )
 }

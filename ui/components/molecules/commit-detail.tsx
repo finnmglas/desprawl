@@ -42,7 +42,7 @@ export function CommitDetail({
               <button
                 key={file.path}
                 onClick={() => onFile(file.path)}
-                title="Open the folder in Files"
+                title="What this file is, and where it leads"
                 className="hover:bg-muted/60 flex cursor-pointer items-center gap-3 rounded-sm text-left text-xs tabular-nums"
               >
                 <Moved n={file.ins} kind="ins" className="w-14 text-right" />

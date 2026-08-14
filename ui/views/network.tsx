@@ -17,6 +17,8 @@ import { LANGS } from "../../src/langs.ts"
 import { onlyIn } from "../../src/dialects.ts"
 import { PAINT, fit } from "../lib/canvas.ts"
 import { callGraph, importGraph } from "../lib/live.ts"
+import { file as asFile, group as asGroup, holds, isFile, symbol, useGoing } from "../lib/going.tsx"
+import { keep, recall, useKept } from "../lib/kept.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { namesOf } from "../../src/naming.ts"
 import { shapeOf } from "../lib/verdict.ts"
@@ -59,37 +61,34 @@ const hued = (name: string) => {
 
 const langOf = (file: string) => LANGS[file.split(".").pop()?.toLowerCase() ?? ""] ?? ""
 
-export function Network({
-  stats,
-  onTab,
-  onPath,
-}: {
-  stats: Stats
-  onTab: (tab: string) => void
-  onPath: (path: string[]) => void
-}) {
+export function Network({ stats }: { stats: Stats }) {
+  const going = useGoing()
   const [read, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
-  const [lang, setLang] = useState("")
+  // a picture somebody set up is the work: the grain, the colouring, every toggle and the
+  // camera all outlive leaving for another tab, so coming back is coming back to it
+  const [lang, setLang] = useKept("net.lang", "")
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
-  const [grain, setGrain] = useState<Grain>("file")
-  const [imports, setImports] = useState(false)
-  const [wired, setWired] = useState(true)
-  const [bounds, setBounds] = useState(true)
-  const [names, setNames] = useState(true)
-  const [find, setFind] = useState("")
-  const [numbers, setNumbers] = useState(false)
-  const [bundle, setBundle] = useState(false)
-  const [paint, setPaint] = useState("")
-  const [edges, setEdges] = useState(WIRED[0])
-  const [only, setOnly] = useState("")
+  const [grain, setGrain] = useKept<Grain>("net.grain", "file")
+  const [imports, setImports] = useKept("net.imports", false)
+  const [wired, setWired] = useKept("net.calls", true)
+  const [bounds, setBounds] = useKept("net.bounds", true)
+  const [names, setNames] = useKept("net.names", true)
+  const [find, setFind] = useKept("net.find", "")
+  const [numbers, setNumbers] = useKept("net.numbers", false)
+  const [bundle, setBundle] = useKept("net.bundle", false)
+  const [paint, setPaint] = useKept("net.paint", "")
+  const [edges, setEdges] = useKept("net.edges", WIRED[0])
+  const [only, setOnly] = useKept("net.only", "")
   const [near, setNear] = useState<Spot | null>(null)
   const [go, setGo] = useState(false)
-  const [moves, setMoves] = useState(true)
-  const [plan, setPlan] = useState(false)
+  const [moves, setMoves] = useKept("net.moves", true)
+  const [plan, setPlan] = useKept("net.plan", false)
 
   const board = useRef<HTMLCanvasElement>(null)
   const frame = useRef<HTMLDivElement>(null)
-  const view = useRef({ scale: 1, x: 0, y: 0 })
+  const view = useRef(
+    recall<{ scale: number; x: number; y: number }>("net.camera") ?? { scale: 1, x: 0, y: 0 },
+  )
   const drag = useRef<{ x: number; y: number } | null>(null)
   const [wide, setWide] = useState(900)
   const [tall, setTall] = useState(640)
@@ -163,8 +162,17 @@ export function Network({
   }
   const seats = useRef(new Map<string, { x: number; y: number }>())
   // whether the camera is where the reader put it, or still where it was opened
-  const touched = useRef(false)
-  const framed = useRef({ w: 0, h: 0 })
+  const touched = useRef(recall<boolean>("net.touched") ?? false)
+  const framed = useRef(recall<{ w: number; h: number }>("net.framed") ?? { w: 0, h: 0 })
+  // written on the way out, so the next mount opens on the same corner of the same picture
+  useEffect(
+    () => () => {
+      keep("net.camera", view.current)
+      keep("net.touched", touched.current)
+      keep("net.framed", framed.current)
+    },
+    [],
+  )
   const moving = useRef<{ from: Map<string, { x: number; y: number }>; at: number } | null>(null)
 
   // a fresh picture opens whole: hunting for it loses the shape
@@ -222,6 +230,22 @@ export function Network({
     }
     schedule()
   }
+
+  // arriving with something picked frames the module holding it and lights the very dot,
+  // rather than opening the whole picture and leaving the reader to find it again
+  useEffect(() => {
+    const pick = going.at.pick
+    if (!pick || !layout) return
+    const unit = holds(
+      pick,
+      layout.units.map((u) => u.path),
+    )
+    if (unit) setOnly(unit)
+    const path = pick.split("#")[0]
+    if (isFile(path)) setFind(path.split("/").pop() ?? "")
+    const box = unit ? drawn?.boxes.find((b) => b.id === unit) : null
+    if (box) zoomTo(box)
+  }, [going.at.pick, layout, drawn])
 
   const units = useMemo(() => new Map((layout?.units ?? []).map((u) => [u.path, u])), [layout])
   const where = useMemo(() => worked(stats.tree), [stats.tree])
@@ -657,19 +681,18 @@ export function Network({
     return best
   }
 
-  if (!graph)
-    return (
-      <Loading stats={stats} current="Graph" onTab={onTab} what="Reading every import," rows={5} />
-    )
+  if (!graph) return <Loading stats={stats} current="Graph" what="Reading every import," rows={5} />
 
-  const walk = (spot: Spot) => {
-    const path = grain === "function" ? spot.box : spot.id
-    const folder = path
-      .replace(/\/?\*$/, "")
-      .split("/")
-      .slice(0, grain === "module" ? undefined : -1)
-    onPath(folder.filter(Boolean))
-  }
+  // a dot is a file, a declaration or a whole group depending on the grain, and each of
+  // those is worth reading, framing and opening: the click says which rather than picking
+  const walk = (spot: Spot) =>
+    going.open(
+      grain === "function"
+        ? symbol(spot.id, undefined, `declared in ${spot.box}`)
+        : grain === "file"
+          ? asFile(spot.id, `${plural(spot.weight, "line")}`)
+          : asGroup(spot.id, called.get(spot.id)),
+    )
 
   const toggle = (on: boolean, set: (next: boolean) => void, label: string, tone?: string) => (
     <Button
@@ -691,7 +714,7 @@ export function Network({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Back onTab={onTab} />
+        <Back />
         <Save
           className="ml-auto"
           name="graph"
@@ -811,6 +834,9 @@ export function Network({
                   size="sm"
                   onClick={() => {
                     setOnly("")
+                    // the pick came from another tab, and leaving it set would frame this
+                    // again the moment the reader stepped away and back
+                    if (going.at.pick) going.go({ pick: "" })
                     whole()
                   }}
                 >
@@ -900,8 +926,8 @@ export function Network({
               {near.box && <> in {called.get(near.box) ?? near.box}</>} ·{" "}
               {plural(near.weight, "line")} ·{" "}
               {plural((drawn?.wires ?? []).filter((w) => w.from === near.id).length, "link")} out,{" "}
-              {(drawn?.wires ?? []).filter((w) => w.to === near.id).length} in · click to open it in
-              Files
+              {(drawn?.wires ?? []).filter((w) => w.to === near.id).length} in · click to read it or
+              follow it
             </>
           ) : drawn ? (
             <>
@@ -925,7 +951,7 @@ export function Network({
         </p>
       </Section>
 
-      <Onward stats={stats} current="Graph" onTab={onTab} />
+      <Onward stats={stats} current="Graph" />
     </div>
   )
 }

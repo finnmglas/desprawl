@@ -11,6 +11,9 @@ export type View = {
   kind: string
   from: string
   to: string
+  /** what the reader picked to get here: a file, a folder, a group or a file#name.
+   * Every tab that can say something about it highlights it rather than opening blank */
+  pick: string
 }
 
 const read = (fallback: View): View => {
@@ -22,6 +25,7 @@ const read = (fallback: View): View => {
     kind: q.get("kind") || "",
     from: q.get("from") || "",
     to: q.get("to") || "",
+    pick: q.get("pick") || "",
   }
 }
 
@@ -33,14 +37,24 @@ const write = (view: View): string => {
   if (view.kind) q.set("kind", view.kind)
   if (view.from) q.set("from", view.from)
   if (view.to) q.set("to", view.to)
+  if (view.pick) q.set("pick", view.pick)
   return `#${q}`
 }
 
-export function useView(initial: View): [View, (next: Partial<View>) => void] {
+// the view that was current when this entry was pushed, so a back link can name where it
+// goes without keeping a stack of its own: the browser already holds one
+const behind = (): View | null => (history.state as { from?: View } | null)?.from ?? null
+
+export function useView(initial: View): [View, (next: Partial<View>) => void, View | null] {
   const [view, setView] = useState(() => read(initial))
+  const [was, setWas] = useState<View | null>(behind)
 
   useEffect(() => {
-    const onPop = () => setView(read(initial))
+    // fires after popstate, so history.state is already the entry landed on
+    const onPop = () => {
+      setView(read(initial))
+      setWas(behind())
+    }
     addEventListener("hashchange", onPop)
     return () => removeEventListener("hashchange", onPop)
   }, [initial])
@@ -48,8 +62,9 @@ export function useView(initial: View): [View, (next: Partial<View>) => void] {
   const go = (next: Partial<View>) => {
     const merged = { ...view, ...next }
     setView(merged)
-    history.pushState(null, "", write(merged))
+    setWas(view)
+    history.pushState({ from: view }, "", write(merged))
   }
 
-  return [view, go]
+  return [view, go, was]
 }

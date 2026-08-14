@@ -1,15 +1,24 @@
 // owner: finn
-// goal: returning
+// goal: returning to where you actually came from
 
-export function Back({ onTab }: { onTab: (tab: string) => void }) {
+import { useGoing } from "../../lib/going.tsx"
+
+const said = (view: { tab: string; path: string[] }, tab: string) =>
+  view.tab === tab ? (view.path.length ? view.path.join("/") : "where you were") : view.tab
+
+export function Back() {
+  const { at, was, go } = useGoing()
+  // a tab opened first has nothing behind it, and the summary is the sensible floor
+  const to = was && !(was.tab === at.tab && was.path.join("/") === at.path.join("/")) ? was : null
+
   return (
     <button
       data-print="hide"
-      onClick={() => onTab("Overview")}
-      title="Back to the summary"
+      onClick={() => (to ? history.back() : go({ tab: "Overview" }))}
+      title={to ? "Back to where you came from" : "Back to the summary"}
       className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-xs"
     >
-      ← Overview
+      ← {to ? said(to, at.tab) : "Overview"}
     </button>
   )
 }

@@ -39,6 +39,7 @@ import {
   TONES,
 } from "../lib/verdict.ts"
 import { allTime, importGraph, isLive, movedIn } from "../lib/live.ts"
+import { group, holds, useGoing } from "../lib/going.tsx"
 import { worked } from "../lib/people.ts"
 import { dependencies, runTests, testSuite } from "../lib/live.ts"
 import { Button } from "../components/atoms/button.tsx"
@@ -450,22 +451,30 @@ const people = (
 
 export function Overview({
   stats,
-  onLang,
-  onTab,
-  onCommits,
   faces,
   metadata,
   onMetadata,
 }: {
   stats: Stats
-  onLang: (lang: string) => void
-  /** a shade names the line kind the files tree should paint with, when the card is about one */
-  onTab: (tab: string, shade?: string) => void
-  onCommits: (from: string, to: string) => void
   faces: Record<string, string>
   metadata: boolean
   onMetadata: (open: boolean) => void
 }) {
+  const { at, go, open } = useGoing()
+  // every one of these carries what was clicked into the tab it opens: a language shades
+  // the tree by itself, a line kind shades it by that kind, a window opens on those days
+  const onLang = (picked: string) => {
+    go({ lang: picked, kind: "", path: [], pick: "", tab: "Files" })
+    toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
+  }
+  const onCard = (next: string, shade?: string) => {
+    go(next === "Files" ? { tab: next, kind: shade ?? "", lang: "" } : { tab: next })
+    if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
+  }
+  const onCommits = (from: string, to: string) => {
+    go({ tab: "History", from, to })
+    toast("Opened in History", `${from} to ${to}`)
+  }
   const [all, setAll] = useState<Timeline | null>(null)
   const where = useMemo(() => worked(stats.tree), [stats.tree])
 
@@ -608,7 +617,12 @@ export function Overview({
               to: "History",
             },
           ].map(({ shade, ...card }) => (
-            <Kpi key={card.label} {...card} opens={card.to} onClick={() => onTab(card.to, shade)} />
+            <Kpi
+              key={card.label}
+              {...card}
+              opens={card.to}
+              onClick={() => onCard(card.to, shade)}
+            />
           ))}
         </Kpis>
       </Section>
@@ -673,7 +687,11 @@ export function Overview({
                   faces={faces}
                   units={units}
                   stack={stats.stack}
-                  onPick={() => onTab("Modules")}
+                  chosen={holds(
+                    at.pick,
+                    units.map((u) => u.path),
+                  )}
+                  onPick={(path) => open(group(path, undefined))}
                 />
               ) : (
                 <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />
@@ -910,7 +928,7 @@ export function Overview({
         </Section>
       )}
 
-      <Onward stats={stats} current="Overview" onTab={onTab} />
+      <Onward stats={stats} current="Overview" />
     </div>
   )
 }

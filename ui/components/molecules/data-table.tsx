@@ -1,7 +1,7 @@
 // owner: finn
 // goal: one column spec drives render, sort and export
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "../atoms/card.tsx"
 import { CardHead } from "./card-head.tsx"
 import { CopyButton } from "./copy-button.tsx"
@@ -44,6 +44,9 @@ export interface DataTableProps<T> {
   saves?: Sheet[]
   /** what the reader typed into the search, for a total row that has to agree with it */
   onFind?: (said: string) => void
+  /** the row the reader came here to see: marked, unfolded and scrolled to, since
+   * arriving at a table of four hundred rows with nothing pointed out is arriving nowhere */
+  mark?: (row: T) => boolean
 }
 
 export function DataTable<T>({
@@ -62,9 +65,11 @@ export function DataTable<T>({
   saves,
   onSort,
   onFind,
+  mark,
 }: DataTableProps<T>) {
   const { scale, curve } = useDisplay()
   const sheet = useRef<HTMLDivElement>(null)
+  const spot = useRef<HTMLTableRowElement>(null)
   const [sort, setSort] = useState<Sort | null>(null)
   const [open, setOpen] = useState(false)
   const [hunt, setHunt] = useState("")
@@ -142,6 +147,15 @@ export function DataTable<T>({
   const foldable = fold !== undefined && sorted.length > fold
   const shown = foldable && !open ? sorted.slice(0, fold) : sorted
   const hidden = foldable ? sorted.length - fold : 0
+
+  const marked = mark ? sorted.find(mark) : undefined
+  const at = marked ? id(marked) : ""
+  useEffect(() => {
+    if (!marked) return
+    // a marked row behind the fold is a row nobody sees, so the fold gives way to it
+    if (!shown.includes(marked)) return setOpen(true)
+    spot.current?.scrollIntoView({ block: "center", behavior: "smooth" })
+  }, [at, open])
 
   const matrix = () => [
     columns.map((c) => c.label),
@@ -221,9 +235,14 @@ export function DataTable<T>({
               {shown.map((row) => (
                 <TR
                   key={id(row)}
+                  ref={row === marked ? spot : undefined}
                   onClick={() => onRowClick?.(row)}
                   style={rowStyle?.(row)}
-                  className={cn(onRowClick && "cursor-pointer")}
+                  className={cn(
+                    onRowClick && "cursor-pointer",
+                    // a tint, not a ring: a collapsed table paints no shadow on a row
+                    row === marked && "bg-sky-500/15 hover:bg-sky-500/20",
+                  )}
                 >
                   {columns.map((col) => {
                     const cell = scaled(col, row)

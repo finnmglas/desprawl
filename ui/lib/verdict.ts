@@ -123,6 +123,42 @@ export const spreadOf = (entries: number, folders?: number, roomy = false) => {
   return { ...band, tone: tone[band.label] }
 }
 
+/** the colour without the border, for a band said as words rather than worn as a badge */
+export const INK: Record<string, string> = {
+  bloated: "text-red-700 dark:text-red-300",
+  oversize: "text-amber-700 dark:text-amber-300",
+  healthy: "text-emerald-700 dark:text-emerald-300",
+  thin: "text-muted-foreground",
+}
+
+/**
+ * a file read on the same four bands a folder is, so one column says how big both are.
+ * Lines rather than bytes: what there is to read is what makes a file hard to work in
+ */
+export function lengthOf(code: number): { label: string; why: string; tone: string } {
+  const band =
+    code >= 800
+      ? {
+          label: "bloated",
+          why: `${code} lines of code in one file. Nobody holds this in their head, and every change to it meets everyone else's`,
+        }
+      : code >= 400
+        ? {
+            label: "oversize",
+            why: `${code} lines of code. Past what is read in one sitting, though still one thing you could split in an afternoon`,
+          }
+        : code >= 30
+          ? {
+              label: "healthy",
+              why: `${code} lines of code, a file you can open and take in at once`,
+            }
+          : {
+              label: "thin",
+              why: `${code} lines of code. Not a problem, but a file this small may belong inside its neighbour`,
+            }
+  return { ...band, tone: INK[band.label] }
+}
+
 /** an outlined badge, one colour per meaning, spelled once for every panel */
 export const OUTLINE = {
   bad: "border-red-500/60 text-red-700 dark:text-red-300",

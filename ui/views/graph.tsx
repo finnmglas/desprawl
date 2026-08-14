@@ -23,6 +23,8 @@ import { HINTS } from "../lib/hints.ts"
 import { useDisplay } from "../lib/display.tsx"
 import { backdrop, cycle, day, num, plural } from "../lib/format.ts"
 import { commitDetail, isLive, olderCommits, trueCount } from "../lib/live.ts"
+import { file as asFile, useGoing } from "../lib/going.tsx"
+import { useKept } from "../lib/kept.ts"
 import { ADDED, REMOVED } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Sort } from "../lib/format.ts"
@@ -76,8 +78,6 @@ export function Graph({
   from,
   to,
   onRange,
-  onTab,
-  onPath,
   faces,
 }: {
   stats: Stats
@@ -85,15 +85,15 @@ export function Graph({
   from: string
   to: string
   onRange: (from: string, to: string) => void
-  onTab: (tab: string) => void
-  onPath: (path: string[]) => void
   faces: Record<string, string>
 }) {
   const who = (c: Commit) => stats.contributors[c.who] ?? { name: "", email: "" }
+  const { open: ask } = useGoing()
   const { curve } = useDisplay()
-  const [sort, setSort] = useState<Sort | null>(null)
-  const [filter, setFilter] = useState("")
-  const [limit, setLimit] = useState(PAGE)
+  // the sort, the filter and how far down the log you walked, still there on the way back
+  const [sort, setSort] = useKept<Sort | null>("log.sort", null)
+  const [filter, setFilter] = useKept("log.filter", "")
+  const [limit, setLimit] = useKept("log.limit", PAGE)
   const [extra, setExtra] = useState<Commit[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState("")
@@ -180,7 +180,7 @@ export function Graph({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Back onTab={onTab} />
+        <Back />
         <Save
           className="ml-auto"
           name="history"
@@ -402,7 +402,7 @@ export function Graph({
                       <CommitDetail
                         commit={detail}
                         live={isLive()}
-                        onFile={(path) => onPath(path.split("/").slice(0, -1))}
+                        onFile={(path) => ask(asFile(path))}
                       />
                     )}
                   </div>
@@ -423,7 +423,7 @@ export function Graph({
         </Card>
       </Section>
 
-      <Onward stats={stats} current="History" onTab={onTab} />
+      <Onward stats={stats} current="History" />
     </div>
   )
 }

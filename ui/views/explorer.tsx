@@ -14,12 +14,12 @@ import { Input } from "../components/atoms/input.tsx"
 import { Kind } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
-import { toast } from "../components/atoms/toast.tsx"
-import { nest, num, pct } from "../lib/format.ts"
+import { num, pct } from "../lib/format.ts"
 import { filesIn, isLive } from "../lib/live.ts"
+import { useGoing } from "../lib/going.tsx"
 import type { Matrix } from "../lib/formats.ts"
 import { mainly } from "../lib/tint.ts"
-import { spreadOf } from "../lib/verdict.ts"
+import { lengthOf, spreadOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
@@ -40,18 +40,6 @@ const own = (n: Node, lang: string): number =>
 const walk = (root: Node, path: string[]): Node =>
   path.reduce<Node>((at, part) => at.children?.find((c) => c.name === part) ?? at, root)
 
-export interface ExplorerProps {
-  stats: Stats
-  onTab: (tab: string) => void
-  path: string[]
-  setPath: (path: string[]) => void
-  lang: string
-  setLang: (lang: string) => void
-  /** a line kind shades the rows the same way a language does, and only one at a time */
-  kind: string
-  setKind: (kind: string) => void
-}
-
 const flatten = (node: Node): Matrix => {
   const rows: Matrix = [["path", "code", "comment", "blank", "files", "commits", "last"]]
   const walk = (one: Node) => {
@@ -62,16 +50,13 @@ const flatten = (node: Node): Matrix => {
   return rows
 }
 
-export function Explorer({
-  stats,
-  onTab,
-  path,
-  setPath,
-  lang,
-  setLang,
-  kind,
-  setKind,
-}: ExplorerProps) {
+export function Explorer({ stats }: { stats: Stats }) {
+  const { at, go, open } = useGoing()
+  const { path, lang, kind, pick } = at
+  const setPath = (next: string[]) => go({ path: next, pick: "" })
+  const setLang = (next: string) => go({ lang: next, kind: "" })
+  const setKind = (next: string) => go({ kind: next, lang: "" })
+
   const [filter, setFilter] = useState("")
   // a served tree is directories only, files arrive on open
   const [fetched, setFetched] = useState<Record<string, Node[]>>({})
@@ -103,17 +88,18 @@ export function Explorer({
   // the root is allowed its config and docs, a folder inside it is not
   const standing = spreadOf(entries(here), undefined, !path.length)
 
+  // a folder descends, a file is read: the one thing clicking either can mean
   const enter = (node: Node) => {
     if (node.children) return setPath([...path, node.name])
     if (live) return setOpened(node)
-    toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
+    open({ kind: "file", id: node.path })
   }
 
   const columns: Column<Node>[] = [
     {
       key: "name",
       label: `${num(here.files)} files`,
-      hint: "everything under this folder, click one to descend",
+      hint: "click a folder to descend, a file to read it",
       get: (n) => (n.children ? `${n.name}/` : n.name),
       cell: (n) => (
         <span className="flex items-center gap-2">
@@ -129,10 +115,21 @@ export function Explorer({
       label: "spread",
       num: true,
       flat: true,
-      // a served tree carries directories only, and counts the files it left out
-      get: entries,
+      left: true,
+      // the label rather than the count behind it: sorting then groups the bands, and a
+      // folder's entries and a file's lines are two scales one number could not carry
+      get: (n) => (n.children ? spreadOf(entries(n)).label : lengthOf(n.code).label),
+      // a folder wears its band as a badge and a file says it in words, so the column
+      // itself tells the two apart before anyone reads it
       cell: (n) => {
-        if (!n.children) return null
+        if (!n.children) {
+          const band = lengthOf(n.code)
+          return (
+            <Tip text={band.why}>
+              <span className={cn("text-xs", band.tone)}>{band.label}</span>
+            </Tip>
+          )
+        }
         const band = spreadOf(entries(n))
         return (
           <Tip text={band.why}>
@@ -142,7 +139,7 @@ export function Explorer({
           </Tip>
         )
       },
-      hint: "what opening the folder would show: the files and subfolders directly inside it",
+      hint: "a folder by what is in it, a file by how long it is",
     },
     // prettier-ignore
     ...withShare({ key: "pct", label: "pct", num: true, get: (n) => n.code / (here.code || 1), cell: (n) => pct(n.code, here.code) }),
@@ -150,7 +147,7 @@ export function Explorer({
 
   return (
     <div className="flex flex-col gap-3">
-      <Back onTab={onTab} />
+      <Back />
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap items-center gap-1 text-sm">
           <Button variant="ghost" size="sm" onClick={() => setPath([])}>
@@ -194,7 +191,7 @@ export function Explorer({
                   ? `shaded by ${lang || kind.toLowerCase()} share`
                   : live
                     ? "click a folder to descend, a file to read it"
-                    : "click a folder to descend"
+                    : "click a folder to descend, a file to see where it leads"
             }
             columns={columns}
             rows={rows}
@@ -209,6 +206,7 @@ export function Explorer({
               },
             ]}
             onRowClick={enter}
+            mark={(n) => !!pick && n.path === pick}
             rowStyle={(n) =>
               lang || kind
                 ? {
@@ -219,6 +217,12 @@ export function Explorer({
                 : undefined
             }
           >
+            {/* what the reader came here to see, said rather than left to be spotted */}
+            {pick && (
+              <Button variant="outline" size="sm" onClick={() => go({ pick: "" })}>
+                {pick.split("/").pop()} ✕
+              </Button>
+            )}
             {/* the folder you are standing in, judged like the ones listed inside it */}
             <Tip text={standing.why}>
               <Badge variant="outline" className={standing.tone}>
@@ -251,9 +255,13 @@ export function Explorer({
         </Section>
       </div>
 
-      <FileView file={opened} onClose={() => setOpened(null)} />
+      <FileView
+        path={opened?.path ?? ""}
+        node={opened ?? undefined}
+        onClose={() => setOpened(null)}
+      />
 
-      <Onward stats={stats} current="Files" onTab={onTab} />
+      <Onward stats={stats} current="Files" />
     </div>
   )
 }

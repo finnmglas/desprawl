@@ -38,6 +38,7 @@ export function System({
   worked,
   moved,
   faces,
+  chosen,
   onPick,
 }: {
   /** the repo, since "this repo" says less than its own name does */
@@ -50,6 +51,8 @@ export function System({
   /** what moved inside a chosen window, and who moved it, by group */
   moved?: Map<string, Move>
   faces: Record<string, string>
+  /** the group the reader arrived holding, so coming back lands on the one they left from */
+  chosen?: string
   onPick?: (path: string) => void
 }) {
   const { curve } = useDisplay()
@@ -260,6 +263,7 @@ export function System({
                         // a loop is named in the tip already, so it stays out of a picture
                         // meant to be read at a glance
                         "bg-background hover:border-ring dark:bg-card relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                        unit.path === chosen && "border-ring ring-ring ring-1",
                       )}
                     >
                       {moved && (

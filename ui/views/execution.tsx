@@ -16,6 +16,9 @@ import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { callGraph } from "../lib/live.ts"
+import { symbol, useGoing } from "../lib/going.tsx"
+import { useKept } from "../lib/kept.ts"
+import { Button } from "../components/atoms/button.tsx"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { REACHES, reachOf, reached, rings, twins } from "../../src/reach.ts"
 import { deadOf } from "../lib/verdict.ts"
@@ -28,20 +31,14 @@ const KINDS = ["all", "function", "component", "class"]
 const named = (id: string) => id.split("#").pop() ?? id
 const fileOf = (id: string) => id.split("#")[0]
 
-export function Execution({
-  stats,
-  onTab,
-  onPath,
-}: {
-  stats: Stats
-  onTab: (tab: string) => void
-  onPath: (path: string[]) => void
-}) {
+export function Execution({ stats }: { stats: Stats }) {
+  const { at, go, open } = useGoing()
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
-  const [roots, setRoots] = useState(ROOTS[0])
-  const [kind, setKind] = useState(KINDS[0])
-  const [lang, setLang] = useState(KINDS[0])
-  const [find, setFind] = useState("")
+  // set up here and still set when the reader comes back from another tab
+  const [roots, setRoots] = useKept("calls.roots", ROOTS[0])
+  const [kind, setKind] = useKept("calls.kind", KINDS[0])
+  const [lang, setLang] = useKept("calls.lang", KINDS[0])
+  const [find, setFind] = useKept("calls.find", "")
 
   useEffect(() => {
     if (!calls) void callGraph().then(setCalls)
@@ -54,21 +51,20 @@ export function Execution({
   const repeated = useMemo(() => (calls ? twins(calls) : []), [calls])
   const loops = useMemo(() => (calls ? rings(calls) : []), [calls])
 
-  if (!calls)
-    return <Loading stats={stats} current="Execution" onTab={onTab} what="Reading every call," />
+  if (!calls) return <Loading stats={stats} current="Execution" what="Reading every call," />
 
   const all = Object.values(calls.symbols)
   const declared = all.filter((s) => s.kind !== "module")
   if (!declared.length)
     return (
       <div className="flex flex-col gap-4">
-        <Back onTab={onTab} />
+        <Back />
         <Card>
           <CardContent className="text-muted-foreground p-6 text-sm">
             Nothing declares a function or a class here, so there is no call graph to read.
           </CardContent>
         </Card>
-        <Onward stats={stats} current="Execution" onTab={onTab} />
+        <Onward stats={stats} current="Execution" />
       </div>
     )
 
@@ -93,13 +89,21 @@ export function Execution({
   // a repo of two languages is two pictures, and reading them apart is the only way to see either
   const langs = [...new Set(declared.map((s) => s.lang).filter(Boolean))].sort()
   const hunted = find.trim().toLowerCase()
+  // arriving with something picked keeps only what is under it, since a table of four
+  // thousand names is not an answer to having clicked one file. A folder scopes to
+  // everything inside it rather than to whichever file inside it happened to come first
+  const inFile = at.pick.split("#")[0].replace(/\/?\*$/, "")
+  const scoped = (file: string) => !inFile || file === inFile || file.startsWith(`${inFile}/`)
   const shown = declared.filter(
     (s) =>
+      scoped(s.file) &&
       (kind === KINDS[0] || s.kind === kind) &&
       (lang === KINDS[0] || s.lang === lang) &&
       (!hunted || s.name.toLowerCase().includes(hunted) || s.file.toLowerCase().includes(hunted)),
   )
-  const walk = (file: string) => onPath(file.split("/").slice(0, -1))
+  // the very declaration picked, when one was, rather than only the file holding it
+  const atName = at.pick.includes("#") ? at.pick : ""
+  const walk = (one: Symbol) => open(symbol(one.id, one.line, `${one.kind} in ${one.file}`))
 
   const columns: Column<Symbol>[] = [
     ...WHAT,
@@ -125,7 +129,7 @@ export function Execution({
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Back onTab={onTab} />
+        <Back />
         <Save
           className="ml-auto"
           name="calls"
@@ -251,14 +255,24 @@ export function Execution({
       <Section id="table_declarations">
         <DataTable
           title="Declarations"
-          hint="sort by callers for what everything leans on, by calls and lines for what does too much"
+          hint={
+            inFile
+              ? `every declaration in ${inFile}`
+              : "sort by callers for what everything leans on, by calls and lines for what does too much"
+          }
           rows={[...shown].sort((a, b) => b.callers.length - a.callers.length || b.lines - a.lines)}
           id={(s) => s.id}
           columns={columns}
-          onRowClick={(s) => walk(s.file)}
+          onRowClick={walk}
+          mark={(s) => s.id === atName}
           fold={12}
           file="declarations"
         >
+          {inFile && (
+            <Button variant="outline" size="sm" onClick={() => go({ pick: "" })}>
+              {inFile.split("/").pop()} ✕
+            </Button>
+          )}
           <Input
             value={find}
             onChange={(event) => setFind(event.target.value)}
@@ -280,7 +294,7 @@ export function Execution({
             rows={[...dead].sort((a, b) => b.lines - a.lines)}
             id={(s) => s.id}
             columns={DEAD}
-            onRowClick={(s) => walk(s.file)}
+            onRowClick={walk}
             fold={12}
             file="unreachable"
           />
@@ -295,7 +309,7 @@ export function Execution({
             rows={[...only].sort((a, b) => b.lines - a.lines)}
             id={(s) => s.id}
             columns={ONLY}
-            onRowClick={(s) => walk(s.file)}
+            onRowClick={walk}
             fold={12}
             file="only-exported"
           />
@@ -310,6 +324,16 @@ export function Execution({
             rows={lost}
             id={(row) => row.name}
             columns={LOST}
+            onRowClick={(row) =>
+              open({
+                kind: "file",
+                id: row.from[0],
+                name: row.name,
+                note: `used like a call in ${plural(row.sites, "place")}, resolving to nothing here`,
+                related: row.from,
+                relation: "where it is used",
+              })
+            }
             fold={8}
             file="unresolved"
           />
@@ -324,6 +348,16 @@ export function Execution({
             rows={repeated}
             id={(row) => row.name}
             columns={TWINS}
+            onRowClick={(row) =>
+              open({
+                kind: "file",
+                id: row.files[0],
+                name: row.name,
+                note: `declared in ${plural(row.files.length, "file")}, ${num(row.lines)} lines between them`,
+                related: row.files,
+                relation: "the files declaring it",
+              })
+            }
             fold={10}
             file="repeated-names"
           />
@@ -357,7 +391,7 @@ export function Execution({
                   {ring.map((id) => (
                     <Tip key={id} text={fileOf(id)}>
                       <button
-                        onClick={() => walk(fileOf(id))}
+                        onClick={() => open(symbol(id))}
                         className="cursor-pointer rounded-md border border-amber-500/60 px-2 py-0.5 font-mono text-xs"
                       >
                         {named(id)}
@@ -371,7 +405,7 @@ export function Execution({
         </Section>
       )}
 
-      <Onward stats={stats} current="Execution" onTab={onTab} />
+      <Onward stats={stats} current="Execution" />
     </div>
   )
 }

@@ -3,7 +3,7 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
-import { Blocks, Checks, Clock, Dots, FolderMark, NpmMark, Run } from "./components/atoms/icons.tsx"
+import { MARKS, NpmMark } from "./components/atoms/icons.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
 import { ThemeToggle } from "./components/molecules/theme-toggle.tsx"
@@ -30,6 +30,8 @@ import { canPrint, printed, printing as paperOnly } from "./lib/live.ts"
 import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
+import { GoingProvider, type Target } from "./lib/going.tsx"
+import { Picked } from "./components/molecules/picked.tsx"
 import { attach, isLive, onBusy, onConnection, token } from "./lib/live.ts"
 import { CopyButton } from "./components/molecules/copy-button.tsx"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
@@ -56,14 +58,11 @@ declare global {
 
 const TABS = ["Overview", "Modules", "Execution", "Files", "History", "Tasks", "Graph"]
 
-const MARKS: Record<string, React.ReactNode> = {
-  Modules: <Blocks />,
-  Execution: <Run />,
-  Files: <FolderMark />,
-  History: <Clock />,
-  Tasks: <Checks />,
-  Graph: <Dots />,
-}
+// one object, not a literal per render: useView listens for as long as this stays the same
+const START = { tab: TABS[0], path: [], lang: "", kind: "", from: "", to: "", pick: "" }
+
+// the summary wears its name alone up here, whatever it is known by elsewhere
+const BAR = { ...MARKS, Overview: undefined }
 
 function App({
   stats,
@@ -79,14 +78,10 @@ function App({
   reload?: () => void
 }) {
   // view state lives in the url, so back works and a link carries the place
-  const [{ tab, path, lang, kind, from, to }, go] = useView({
-    tab: TABS[0],
-    path: [],
-    lang: "",
-    kind: "",
-    from: "",
-    to: "",
-  })
+  const [at, go, was] = useView(START)
+  const { tab, from, to } = at
+  // what the reader pointed at, answered with everywhere it leads rather than one guess
+  const [target, setTarget] = useState<Target | null>(null)
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
   const slow = useSlow(busy > 0)
@@ -129,6 +124,8 @@ function App({
 
   useEffect(() => {
     scrollTo({ top: 0 })
+    // the panel is about where you were standing, so leaving that place closes it
+    setTarget(null)
   }, [tab])
   const [faces, setFaces] = useState<Record<string, string>>({})
   useEffect(() => {
@@ -141,22 +138,6 @@ function App({
     document.title = `${name} · desprawl`
   }, [stats.repo])
 
-  const explore = (picked: string) => {
-    go({ lang: picked, kind: "", path: [], tab: "Files" })
-    toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
-  }
-
-  // a kpi opens the tab that answers it, shading the tree by the very number that was clicked
-  const opened = (next: string, shade?: string) => {
-    go(next === "Files" ? { tab: next, kind: shade ?? "", lang: "" } : { tab: next })
-    if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
-  }
-
-  const openFiles = (path: string[]) => {
-    go({ tab: "Files", path })
-    toast("Opened in Files", path.join("/") || "the repo root")
-  }
-
   const view = (one: string) =>
     one === "History" ? (
       <Graph
@@ -164,8 +145,6 @@ function App({
         from={from}
         to={to}
         onRange={(a, b) => go({ from: a, to: b })}
-        onTab={(next) => go({ tab: next })}
-        onPath={openFiles}
         faces={faces}
       />
     ) : one === "Overview" ? (
@@ -173,179 +152,174 @@ function App({
         stats={stats}
         metadata={prefs.metadata || printing}
         onMetadata={(open) => change({ metadata: open })}
-        onLang={explore}
-        onTab={opened}
-        onCommits={(a, b) => {
-          go({ tab: "History", from: a, to: b })
-          toast("Opened in History", `${a} to ${b}`)
-        }}
         faces={faces}
       />
     ) : one === "Modules" ? (
-      <Modules stats={stats} faces={faces} onTab={(next) => go({ tab: next })} onPath={openFiles} />
+      <Modules stats={stats} faces={faces} />
     ) : one === "Tasks" ? (
-      <Tasks stats={stats} faces={faces} onTab={(next) => go({ tab: next })} onPath={openFiles} />
+      <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
-      <Network stats={stats} onTab={(next) => go({ tab: next })} onPath={openFiles} />
+      <Network stats={stats} />
     ) : one === "Execution" ? (
-      <Execution stats={stats} onTab={(next) => go({ tab: next })} onPath={openFiles} />
+      <Execution stats={stats} />
     ) : (
-      <Explorer
-        stats={stats}
-        onTab={(next) => go({ tab: next })}
-        path={path}
-        setPath={(next) => go({ path: next })}
-        lang={lang}
-        setLang={(next) => go({ lang: next, kind: "" })}
-        kind={kind}
-        setKind={(next) => go({ kind: next, lang: "" })}
-      />
+      <Explorer stats={stats} />
     )
 
   return (
     <DisplayProvider value={{ scale, curve, brands }}>
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
-        {/* a saved file is read by someone who did not run it, so it says what it is */}
-        {!isLive() && (
-          <div
-            data-print="hide"
-            className="bg-card flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-4"
-          >
-            <p className="min-w-0 flex-1 text-sm">
-              <span className="font-medium">
-                {name === "desprawl"
-                  ? "A static demo of desprawl on its own source."
-                  : `A static desprawl report for ${name}.`}
-              </span>{" "}
-              <span className="text-muted-foreground">Run it on your own project:</span>
-            </p>
-            {/* the command and the button stay one row, whatever the text above them does */}
-            <div className="flex shrink-0 items-center gap-2">
-              <code className="bg-muted flex-1 rounded-md px-3 py-1.5 font-mono text-sm select-all">
-                npx desprawl
-              </code>
-              <CopyButton
-                text={() => "npx desprawl"}
-                message="Copied npx desprawl"
-                note="Run it in any git repo"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Ctrl+C on the terminal it runs in kills this without a word to the tab */}
-        {!online && (
-          <div
-            data-print="hide"
-            className="border-destructive/50 bg-card flex flex-col gap-3 rounded-lg border p-3"
-          >
-            <p className="flex items-center gap-2 text-sm">
-              <span className="bg-destructive size-2 shrink-0 rounded-full" />
-              <span>
-                <span className="font-medium">Disconnected.</span>{" "}
-                <span className="text-muted-foreground">
-                  The desprawl server behind this tab stopped answering. This starts it again, on
-                  the same address, so the tab picks back up on its own:
-                </span>
-              </span>
-            </p>
-            <div className="flex items-center gap-2">
-              <code className="bg-muted min-w-0 flex-1 overflow-x-auto rounded-md px-3 py-1.5 font-mono text-sm text-nowrap select-all">
-                npx desprawl "{stats.repo}" --token={token()} --port={location.port}
-              </code>
-              <CopyButton
-                text={() =>
-                  `npx desprawl "${stats.repo}" --token=${token()} --port=${location.port}`
-                }
-                message="Copied the reconnect command"
-                note="This tab reconnects on its own once the server answers again"
-              />
-            </div>
-          </div>
-        )}
-
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          {/* min-w-0 lets a long path truncate */}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex min-w-0 items-center gap-2">
-              {/* folder name is the repo name */}
-              <button
-                onClick={() => go({ tab: TABS[0], path: [], lang: "" })}
-                className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
-              >
-                {name}
-              </button>
-              {stats.remotes.map((remote) => (
-                <RemoteLink key={remote.url} remote={remote} />
-              ))}
-              {/* a manifest that is not private is one npm would take, so its page exists */}
-              {stats.stack.name && !stats.stack.private && (
-                <a
-                  href={`https://www.npmjs.com/package/${stats.stack.name}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`${stats.stack.name} on npm, read off package.json rather than the registry`}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <NpmMark className="size-5" />
-                </a>
-              )}
-            </div>
-            <button
-              onClick={async () =>
-                toast(
-                  (await copy(stats.repo)) ? "Path copied" : "Copy blocked by the browser",
-                  stats.repo,
-                )
-              }
-              title="Copy the path"
-              className="text-muted-foreground hover:text-foreground w-fit max-w-full cursor-pointer truncate text-left font-mono text-xs"
+      <GoingProvider value={{ at, go, was, open: setTarget }}>
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
+          {/* a saved file is read by someone who did not run it, so it says what it is */}
+          {!isLive() && (
+            <div
+              data-print="hide"
+              className="bg-card flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-4"
             >
-              {stats.repo}
-            </button>
-            <p className="text-muted-foreground text-xs">
-              @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-              {num(stats.commits)} commits · desprawl {stats.version}
-              {stats.thin && (
-                <span
-                  className="text-amber-600 dark:text-amber-400"
-                  title="cloned with --filter=blob:none, so git holds no file contents to diff. Commits, authors, dates and renames are right, every added or removed line reads 0"
-                >
-                  {" "}
-                  · partial clone, no line counts
-                </span>
-              )}
-              {slow && <span className="text-foreground"> · working…</span>}
-            </p>
-          </div>
-          <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
-            <Tabs
-              grow
-              icons={MARKS}
-              className="sm:w-auto"
-              tabs={TABS}
-              value={tab}
-              onChange={(next) => go({ tab: next })}
-            />
-            <ThemeToggle {...themed} />
-            <Settings stats={stats} prefs={prefs} change={change} reload={reload} onPaper={paper} />
-          </div>
-        </header>
-
-        {(printing ? TABS : [tab]).map((one, i) => (
-          <section
-            key={one}
-            className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
-          >
-            {printing && (
-              <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
-            )}
-            <div data-shot={one} className={cn("flex flex-col gap-4", printing && "p-6")}>
-              {view(one)}
+              <p className="min-w-0 flex-1 text-sm">
+                <span className="font-medium">
+                  {name === "desprawl"
+                    ? "A static demo of desprawl on its own source."
+                    : `A static desprawl report for ${name}.`}
+                </span>{" "}
+                <span className="text-muted-foreground">Run it on your own project:</span>
+              </p>
+              {/* the command and the button stay one row, whatever the text above them does */}
+              <div className="flex shrink-0 items-center gap-2">
+                <code className="bg-muted flex-1 rounded-md px-3 py-1.5 font-mono text-sm select-all">
+                  npx desprawl
+                </code>
+                <CopyButton
+                  text={() => "npx desprawl"}
+                  message="Copied npx desprawl"
+                  note="Run it in any git repo"
+                />
+              </div>
             </div>
-          </section>
-        ))}
-      </div>
+          )}
+
+          {/* Ctrl+C on the terminal it runs in kills this without a word to the tab */}
+          {!online && (
+            <div
+              data-print="hide"
+              className="border-destructive/50 bg-card flex flex-col gap-3 rounded-lg border p-3"
+            >
+              <p className="flex items-center gap-2 text-sm">
+                <span className="bg-destructive size-2 shrink-0 rounded-full" />
+                <span>
+                  <span className="font-medium">Disconnected.</span>{" "}
+                  <span className="text-muted-foreground">
+                    The desprawl server behind this tab stopped answering. This starts it again, on
+                    the same address, so the tab picks back up on its own:
+                  </span>
+                </span>
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="bg-muted min-w-0 flex-1 overflow-x-auto rounded-md px-3 py-1.5 font-mono text-sm text-nowrap select-all">
+                  npx desprawl "{stats.repo}" --token={token()} --port={location.port}
+                </code>
+                <CopyButton
+                  text={() =>
+                    `npx desprawl "${stats.repo}" --token=${token()} --port=${location.port}`
+                  }
+                  message="Copied the reconnect command"
+                  note="This tab reconnects on its own once the server answers again"
+                />
+              </div>
+            </div>
+          )}
+
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            {/* min-w-0 lets a long path truncate */}
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <div className="flex min-w-0 items-center gap-2">
+                {/* folder name is the repo name */}
+                <button
+                  onClick={() => go({ tab: TABS[0], path: [], lang: "", kind: "", pick: "" })}
+                  className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
+                >
+                  {name}
+                </button>
+                {stats.remotes.map((remote) => (
+                  <RemoteLink key={remote.url} remote={remote} />
+                ))}
+                {/* a manifest that is not private is one npm would take, so its page exists */}
+                {stats.stack.name && !stats.stack.private && (
+                  <a
+                    href={`https://www.npmjs.com/package/${stats.stack.name}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`${stats.stack.name} on npm, read off package.json rather than the registry`}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <NpmMark className="size-5" />
+                  </a>
+                )}
+              </div>
+              <button
+                onClick={async () =>
+                  toast(
+                    (await copy(stats.repo)) ? "Path copied" : "Copy blocked by the browser",
+                    stats.repo,
+                  )
+                }
+                title="Copy the path"
+                className="text-muted-foreground hover:text-foreground w-fit max-w-full cursor-pointer truncate text-left font-mono text-xs"
+              >
+                {stats.repo}
+              </button>
+              <p className="text-muted-foreground text-xs">
+                @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
+                {num(stats.commits)} commits · desprawl {stats.version}
+                {stats.thin && (
+                  <span
+                    className="text-amber-600 dark:text-amber-400"
+                    title="cloned with --filter=blob:none, so git holds no file contents to diff. Commits, authors, dates and renames are right, every added or removed line reads 0"
+                  >
+                    {" "}
+                    · partial clone, no line counts
+                  </span>
+                )}
+                {slow && <span className="text-foreground"> · working…</span>}
+              </p>
+            </div>
+            <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+              <Tabs
+                grow
+                icons={BAR}
+                className="sm:w-auto"
+                tabs={TABS}
+                value={tab}
+                onChange={(next) => go({ tab: next })}
+              />
+              <ThemeToggle {...themed} />
+              <Settings
+                stats={stats}
+                prefs={prefs}
+                change={change}
+                reload={reload}
+                onPaper={paper}
+              />
+            </div>
+          </header>
+
+          {(printing ? TABS : [tab]).map((one, i) => (
+            <section
+              key={one}
+              className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
+            >
+              {printing && (
+                <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
+              )}
+              <div data-shot={one} className={cn("flex flex-col gap-4", printing && "p-6")}>
+                {view(one)}
+              </div>
+            </section>
+          ))}
+
+          <Picked target={target} stats={stats} onClose={() => setTarget(null)} />
+        </div>
+      </GoingProvider>
     </DisplayProvider>
   )
 }
