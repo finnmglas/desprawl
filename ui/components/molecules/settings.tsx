@@ -6,6 +6,7 @@ import { Menu, MenuItem, MenuSection } from "./menu.tsx"
 import { Tabs } from "../atoms/tabs.tsx"
 import { toast } from "../atoms/toast.tsx"
 import { copy, download, named } from "../../lib/export.ts"
+import { resetSections, useCustomized } from "../../lib/sections.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../../lib/locale.ts"
 import {
   BRANDINGS,
@@ -90,6 +91,7 @@ export function Settings({
   onPaper?: (kind: "pdf" | "pptx") => void
 }) {
   const { scale, curve, region, brands } = prefs
+  const customized = useCustomized()
 
   const share = async () =>
     toast(
@@ -109,6 +111,17 @@ export function Settings({
         <Copy />
         copy link to this page
       </MenuItem>
+      {customized && (
+        <MenuItem
+          onClick={() => {
+            resetSections()
+            toast("Panels reset", "every tab back to its default panels, in order")
+          }}
+        >
+          <Refresh />
+          reset panel layout
+        </MenuItem>
+      )}
       <div className="bg-border my-1 h-px" />
       <MenuItem
         onClick={() => {

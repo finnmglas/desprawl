@@ -18,6 +18,8 @@ export interface Prefs {
   agent: { install: string; model: string; mode: string; trust: string }
   /** section ids folded away by the eye toggle, reactivated from the tab's footer */
   hidden: string[]
+  /** each tab's sections, in the order the move arrows left them */
+  order: Record<string, string[]>
 }
 
 export const FALLBACK: Prefs = {
@@ -29,6 +31,7 @@ export const FALLBACK: Prefs = {
   metadata: true,
   agent: { install: "", model: "", mode: "local", trust: "auto" },
   hidden: [],
+  order: {},
 }
 
 const KEY = "desprawl-prefs"

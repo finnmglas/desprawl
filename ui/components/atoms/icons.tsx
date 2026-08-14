@@ -93,6 +93,24 @@ export const Eye = ({ className }: { className?: string }) => (
     d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z M12 9.7a2.3 2.3 0 1 0 0 4.6 2.3 2.3 0 0 0 0-4.6Z"
   />
 )
+export const EyeOff = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M4 4l16 16M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 3.9M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 3.4-.6M14.1 14.1a2.3 2.3 0 0 1-3.2-3.2"
+  />
+)
+export const Grip = ({ className }: { className?: string }) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden
+    fill="currentColor"
+    className={cn("size-3.5 shrink-0", className)}
+  >
+    {[8, 16].flatMap((cx) =>
+      [6, 12, 18].map((cy) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.6" />),
+    )}
+  </svg>
+)
 export const Refresh = ({ className }: { className?: string }) => (
   <Line
     className={className}

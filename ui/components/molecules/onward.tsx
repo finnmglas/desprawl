@@ -89,10 +89,14 @@ export function Onward({
     },
   ].filter((link) => link.to !== current)
 
+  // contents makes these the flex parent's own items, each defaulting to order 0
+  // and outranked by any reordered section, so they are pinned past every section id
+  const last = { order: 999 }
+
   return (
     <div data-print="hide" className="contents">
       {revealable.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div style={last} className="flex flex-wrap items-center gap-2">
           <span className="text-muted-foreground text-xs">Hidden on this tab:</span>
           {revealable.map((id) => (
             <button
@@ -107,7 +111,7 @@ export function Onward({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div style={last} className="grid gap-3 sm:grid-cols-2">
         {links.map((link) => (
           <Card
             key={link.to}
@@ -123,7 +127,7 @@ export function Onward({
         ))}
       </div>
 
-      <p className="text-muted-foreground text-center text-xs">
+      <p style={last} className="text-muted-foreground text-center text-xs">
         desprawl {stats.version} ·{" "}
         <a
           className="hover:text-foreground underline"
