@@ -53,7 +53,9 @@ export function System({
   faces: Record<string, string>
   /** the group the reader arrived holding, so coming back lands on the one they left from */
   chosen?: string
-  onPick?: (path: string) => void
+  /** the second argument is everything the hover bubble would have said, for a panel to
+   * show instead: a tap has no hover, and a tap is what opens one */
+  onPick?: (path: string, about: React.ReactNode) => void
 }) {
   const { curve } = useDisplay()
   const peak = Math.max(1, ...units.map((u) => u.lines))
@@ -85,6 +87,33 @@ export function System({
   }
 
   const called = namesOf(units)
+
+  /** named only for the bubble: the panel a tap opens says the name and path itself */
+  const about = (unit: Unit, named = true) => {
+    const shape = read(unit)
+    return (
+      <>
+        {named && (
+          <>
+            <span className="font-medium">{called.get(unit.path)}</span>
+            <br />
+            <span className="font-mono">{unit.path}</span>
+            <br />
+          </>
+        )}
+        {shape.sure ? shape.label : `~${shape.label}`} · {plural(unit.files, "file")} ·{" "}
+        {num(unit.lines)} lines · {plural(unit.packages, "package")}
+        {unit.tangle >= 0 && <> · in a loop</>}
+        {rests(unit, shape) && (
+          <>
+            <br />
+            reads that way because of <span className="font-mono">{unit.loudest}</span>
+          </>
+        )}
+        <Hands of={crew(unit)} faces={faces} />
+      </>
+    )
+  }
   const rows = BANDS.map((band) => ({
     ...band,
     // deepest first, and a folder named after a uuid says nothing, so it goes last
@@ -222,35 +251,11 @@ export function System({
               }
             >
               {row.held.map((unit) => {
-                const shape = read(unit)
                 return (
                   // the wrapper is the grid cell, so it is the one that has to fill it
-                  <Tip
-                    key={unit.path}
-                    className="min-w-0"
-                    text={
-                      <>
-                        <span className="font-medium">{called.get(unit.path)}</span>
-                        <br />
-                        <span className="font-mono">{unit.path}</span>
-                        <br />
-                        {shape.sure ? shape.label : `~${shape.label}`} ·{" "}
-                        {plural(unit.files, "file")} · {num(unit.lines)} lines ·{" "}
-                        {plural(unit.packages, "package")}
-                        {unit.tangle >= 0 && <> · in a loop</>}
-                        {rests(unit, shape) && (
-                          <>
-                            <br />
-                            reads that way because of{" "}
-                            <span className="font-mono">{unit.loudest}</span>
-                          </>
-                        )}
-                        <Hands of={crew(unit)} faces={faces} />
-                      </>
-                    }
-                  >
+                  <Tip key={unit.path} className="min-w-0" hoverOnly text={about(unit)}>
                     <button
-                      onClick={() => onPick?.(unit.path)}
+                      onClick={() => onPick?.(unit.path, about(unit, false))}
                       style={
                         moved
                           ? undefined

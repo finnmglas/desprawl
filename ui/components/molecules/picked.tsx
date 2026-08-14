@@ -114,15 +114,18 @@ export function Picked({
           ? [inFiles, inModules, inGraph]
           : [inModules, inGraph, inFiles]
 
-  const facts =
-    target.note ??
-    (node ? (
-      <>
-        {node.children
-          ? `${plural(node.files, "file")} · ${num(node.code)} loc`
-          : `${num(node.code)} loc · ${num(node.commits)} commits`}
-      </>
-    ) : null)
+  // the detail below says all of this and more, so the one line above it would only
+  // repeat itself with a second count of the same thing
+  const facts = target.detail
+    ? null
+    : (target.note ??
+      (node ? (
+        <>
+          {node.children
+            ? `${plural(node.files, "file")} · ${num(node.code)} loc`
+            : `${num(node.code)} loc · ${num(node.commits)} commits`}
+        </>
+      ) : null))
 
   return (
     <>
@@ -173,6 +176,12 @@ export function Picked({
             <Note className="self-center px-1">no source in a saved page</Note>
           )}
         </div>
+
+        {target.detail && (
+          <div className="text-muted-foreground border-t pt-3 text-xs leading-relaxed">
+            {target.detail}
+          </div>
+        )}
 
         {target.related && target.related.length > 0 && (
           <div className="flex flex-col gap-1 border-t pt-3">

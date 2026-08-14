@@ -8,6 +8,15 @@ export const PAINT = {
   quiet: "128, 128, 128", // itself, and the lines between levels
 }
 
+/**
+ * a node no colouring has an opinion about: near black on a light page, near white on a
+ * dark one, so it is the most visible dot rather than the least. Neutral on purpose: the
+ * blue grey it used to be drawn in is C's own brand colour, and beside a C file it read
+ * as one
+ */
+export const plain = (): string =>
+  document.documentElement.classList.contains("dark") ? "235, 235, 238" : "24, 24, 27"
+
 /** sized for the screen, capped at two: flat shapes gain nothing above it */
 export function fit(board: HTMLCanvasElement, wide: number, tall: number) {
   const scale = Math.min(devicePixelRatio || 1, 2)

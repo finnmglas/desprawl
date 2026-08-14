@@ -16,6 +16,8 @@ export interface Target {
   line?: number
   /** what is already known about it, since a list of links on its own explains nothing */
   note?: React.ReactNode
+  /** everything else worth saying, under the moves: shape, size, who works in it */
+  detail?: React.ReactNode
   /** what it leads to, each openable in turn without closing */
   related?: string[]
   /** what that list is */

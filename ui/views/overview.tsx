@@ -691,7 +691,7 @@ export function Overview({
                     at.pick,
                     units.map((u) => u.path),
                   )}
-                  onPick={(path) => open(group(path, undefined))}
+                  onPick={(path, about) => open({ ...group(path), detail: about })}
                 />
               ) : (
                 <Waiting what="Reading all imports," slow="Large repo takes a few seconds." />

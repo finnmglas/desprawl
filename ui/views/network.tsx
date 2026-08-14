@@ -15,7 +15,7 @@ import { Menu, MenuSection } from "../components/molecules/menu.tsx"
 import { BRANDS } from "../lib/brands.ts"
 import { LANGS } from "../../src/langs.ts"
 import { onlyIn } from "../../src/dialects.ts"
-import { PAINT, fit } from "../lib/canvas.ts"
+import { PAINT, fit, plain } from "../lib/canvas.ts"
 import { callGraph, importGraph } from "../lib/live.ts"
 import { file as asFile, group as asGroup, holds, isFile, symbol, useGoing } from "../lib/going.tsx"
 import { keep, recall, useKept } from "../lib/kept.ts"
@@ -90,6 +90,9 @@ export function Network({ stats }: { stats: Stats }) {
     recall<{ scale: number; x: number; y: number }>("net.camera") ?? { scale: 1, x: 0, y: 0 },
   )
   const drag = useRef<{ x: number; y: number } | null>(null)
+  // one finger drags, two pinch: the canvas takes the touch itself, so without these a
+  // phone can only look at the picture
+  const fingers = useRef<{ x: number; y: number; away: number } | null>(null)
   const [wide, setWide] = useState(900)
   const [tall, setTall] = useState(640)
 
@@ -115,7 +118,9 @@ export function Network({ stats }: { stats: Stats }) {
   useEffect(() => {
     const measure = () => {
       setWide(frame.current?.clientWidth ?? 900)
-      setTall(Math.max(420, Math.round(innerHeight * TALLEST)))
+      // the layout viewport, not innerHeight: a phone reports the taller visual one and
+      // the picture ends up longer than the screen it is being read on
+      setTall(Math.max(420, Math.round(document.documentElement.clientHeight * TALLEST)))
     }
     measure()
     addEventListener("resize", measure)
@@ -612,8 +617,8 @@ export function Network({ stats }: { stats: Stats }) {
           !chosen(spot.id)
         const own = colourOf(spot)
         const now = seat(spot)
-        pen.globalAlpha = quiet ? 0.16 : lit?.has(spot.id) ? 1 : own ? 0.9 : 0.6
-        pen.fillStyle = hit ? `rgba(${PAINT.cut}, 0.95)` : (own ?? `rgb(${PAINT.quiet})`)
+        pen.globalAlpha = quiet ? 0.16 : lit?.has(spot.id) ? 1 : 0.9
+        pen.fillStyle = hit ? `rgba(${PAINT.cut}, 0.95)` : (own ?? `rgb(${plain()})`)
         pen.beginPath()
         pen.arc(now.x, now.y, spot.r + (lit?.has(spot.id) ? 2 : 0), 0, Math.PI * 2)
         pen.fill()
@@ -662,6 +667,19 @@ export function Network({ stats }: { stats: Stats }) {
         )
         .sort((a, b) => a.w * a.h - b.w * b.h)[0] ?? null
     )
+  }
+
+  /** the midpoint of whatever is touching, and how far apart two fingers are */
+  const touching = (event: React.TouchEvent) => {
+    const box = board.current!.getBoundingClientRect()
+    const [a, b] = [event.touches[0], event.touches[1]]
+    if (!a) return null
+    if (!b) return { x: a.clientX - box.left, y: a.clientY - box.top, away: 0 }
+    return {
+      x: (a.clientX + b.clientX) / 2 - box.left,
+      y: (a.clientY + b.clientY) / 2 - box.top,
+      away: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+    }
   }
 
   const spotAt = (px: number, py: number) => {
@@ -881,6 +899,40 @@ export function Network({ stats }: { stats: Stats }) {
                   onMouseDown={(event) => {
                     drag.current = { x: event.clientX, y: event.clientY }
                   }}
+                  onTouchStart={(event) => {
+                    const now = touching(event)
+                    fingers.current = now
+                    // a tap has no hover before it, and the caption and the click both
+                    // read what is under the cursor
+                    if (now && event.touches.length === 1) setNear(spotAt(now.x, now.y))
+                  }}
+                  onTouchMove={(event) => {
+                    const now = touching(event)
+                    const was = fingers.current
+                    fingers.current = now
+                    if (!now || !was) return
+                    // both fingers still down: the gap between them is the zoom, and the
+                    // point between them is what stays put while it changes
+                    if (now.away && was.away) {
+                      const next = Math.min(
+                        8,
+                        Math.max(0.2, (view.current.scale * now.away) / was.away),
+                      )
+                      const ratio = next / view.current.scale
+                      view.current = {
+                        scale: next,
+                        x: now.x - (now.x - view.current.x) * ratio,
+                        y: now.y - (now.y - view.current.y) * ratio,
+                      }
+                    }
+                    view.current.x += now.x - was.x
+                    view.current.y += now.y - was.y
+                    rushed()
+                  }}
+                  onTouchEnd={(event) => {
+                    // lifting one of two leaves the other mid gesture, so it starts again
+                    fingers.current = event.touches.length ? touching(event) : null
+                  }}
                   onMouseUp={() => {
                     drag.current = null
                   }}
@@ -935,9 +987,9 @@ export function Network({ stats }: { stats: Stats }) {
               {bounds
                 ? "each inside the module holding it, click a module name to keep only it"
                 : "arranged loose, since bounds are off"}
-              . Drag to move, wheel to zoom, hover to keep only what one touches. An import bows one
-              way and a call the other, so a pair with both shows both. A faint line is a type only
-              import, and{" "}
+              . Drag or one finger to move, wheel or pinch to zoom, hover to keep only what one
+              touches. An import bows one way and a call the other, so a pair with both shows both.
+              A faint line is a type only import, and{" "}
               {drawn.wires.length > HEADS
                 ? "arrows are drawn on hover only at this size"
                 : "the arrow sits at the end it arrives at"}

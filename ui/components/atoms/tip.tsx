@@ -33,12 +33,16 @@ export function Tip({
   text,
   side = "top",
   className,
+  hoverOnly,
   children,
 }: {
   text: React.ReactNode
   /** the side it prefers, which it gives up when that side has no room */
   side?: "top" | "bottom"
   className?: string
+  /** drop it entirely where there is no pointer to hover with, for a bubble whose
+   * contents a tap already opens somewhere it can be read properly */
+  hoverOnly?: boolean
   children: React.ReactNode
 }) {
   const host = useRef<HTMLSpanElement>(null)
@@ -88,6 +92,7 @@ export function Tip({
         style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
         className={cn(
           "bg-secondary text-secondary-foreground pointer-events-none absolute left-1/2 z-50 hidden w-max max-w-72 rounded-md border px-2.5 py-1.5 text-left text-xs font-normal whitespace-normal shadow-md group-focus-within/tip:block group-hover/tip:block",
+          hoverOnly && "[@media(hover:none)]:!hidden",
           spot === "top" ? "bottom-full mb-2" : "top-full mt-2",
         )}
       >

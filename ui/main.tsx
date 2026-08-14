@@ -283,11 +283,13 @@ function App({
                 {slow && <span className="text-foreground"> · working…</span>}
               </p>
             </div>
-            <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+            {/* seven tabs, a theme switch and a menu need most of a laptop, so they keep a
+                row of their own until there is room for the repo name beside them */}
+            <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 xl:w-auto">
               <Tabs
                 grow
                 icons={BAR}
-                className="sm:w-auto"
+                className="xl:w-auto"
                 tabs={TABS}
                 value={tab}
                 onChange={(next) => go({ tab: next })}

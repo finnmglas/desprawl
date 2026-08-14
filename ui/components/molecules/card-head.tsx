@@ -17,8 +17,12 @@ export function CardHead({
   children?: React.ReactNode
 }) {
   return (
-    <CardHeader className={cn("relative flex-row items-center gap-2", wrap && "flex-wrap")}>
-      <div className="flex min-w-0 flex-col gap-0.5">
+    <CardHeader
+      className={cn("relative flex-row flex-wrap items-center gap-2", wrap && "flex-wrap")}
+    >
+      {/* the controls drop under the name on a narrow screen rather than squeezing it into
+          a column two words wide */}
+      <div className="flex min-w-0 flex-1 basis-full flex-col gap-0.5 sm:basis-auto">
         <CardTitle>{title}</CardTitle>
         {hint && <Note>{hint}</Note>}
       </div>

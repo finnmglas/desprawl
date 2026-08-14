@@ -2,6 +2,7 @@
 // goal: one view at a time
 // inspo: shadcn
 
+import { useEffect, useRef } from "react"
 import { cn } from "../../lib/ui.ts"
 
 export interface TabsProps {
@@ -17,8 +18,24 @@ export interface TabsProps {
 }
 
 export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProps) {
+  const strip = useRef<HTMLDivElement>(null)
+  const here = useRef<HTMLButtonElement>(null)
+
+  // a narrow screen shows three of seven, and the one you are on has to be one of them.
+  // scrollLeft rather than scrollIntoView, which would drag the page up as well
+  useEffect(() => {
+    const box = strip.current
+    const button = here.current
+    if (!box || !button || box.scrollWidth <= box.clientWidth) return
+    box.scrollTo({
+      left: Math.max(0, button.offsetLeft - (box.clientWidth - button.clientWidth) / 2),
+      behavior: "smooth",
+    })
+  }, [value])
+
   return (
     <div
+      ref={strip}
       className={cn(
         // scrolls rather than overflowing: four tabs and their marks do not fit a phone
         "bg-muted text-muted-foreground inline-flex max-w-full gap-1 overflow-x-auto rounded-lg p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
@@ -29,6 +46,7 @@ export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProp
       {tabs.map((tab) => (
         <button
           key={tab}
+          ref={tab === value ? here : undefined}
           onClick={() => onChange(tab)}
           className={cn(
             "flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium whitespace-nowrap transition-colors",
