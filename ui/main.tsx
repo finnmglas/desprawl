@@ -30,7 +30,7 @@ import { canPrint, printed, printing as paperOnly } from "./lib/live.ts"
 import { DisplayProvider } from "./lib/display.tsx"
 import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
-import { attach, isLive, onBusy, token } from "./lib/live.ts"
+import { attach, isLive, onBusy, onConnection, token } from "./lib/live.ts"
 import { CopyButton } from "./components/molecules/copy-button.tsx"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
@@ -90,6 +90,8 @@ function App({
   const [busy, setBusy] = useState(0)
   useEffect(() => onBusy(setBusy), [])
   const slow = useSlow(busy > 0)
+  const [online, setOnline] = useState(true)
+  useEffect(() => onConnection(setOnline), [])
 
   // every tab at once while a file is being made
   const [printing, setPrinting] = useState(paperOnly)
@@ -226,6 +228,37 @@ function App({
                 text={() => "npx desprawl"}
                 message="Copied npx desprawl"
                 note="Run it in any git repo"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Ctrl+C on the terminal it runs in kills this without a word to the tab */}
+        {!online && (
+          <div
+            data-print="hide"
+            className="border-destructive/50 bg-card flex flex-col gap-3 rounded-lg border p-3"
+          >
+            <p className="flex items-center gap-2 text-sm">
+              <span className="bg-destructive size-2 shrink-0 rounded-full" />
+              <span>
+                <span className="font-medium">Disconnected.</span>{" "}
+                <span className="text-muted-foreground">
+                  The desprawl server behind this tab stopped answering. This starts it again, on
+                  the same address, so the tab picks back up on its own:
+                </span>
+              </span>
+            </p>
+            <div className="flex items-center gap-2">
+              <code className="bg-muted min-w-0 flex-1 overflow-x-auto rounded-md px-3 py-1.5 font-mono text-sm text-nowrap select-all">
+                npx desprawl "{stats.repo}" --token={token()} --port={location.port}
+              </code>
+              <CopyButton
+                text={() =>
+                  `npx desprawl "${stats.repo}" --token=${token()} --port=${location.port}`
+                }
+                message="Copied the reconnect command"
+                note="This tab reconnects on its own once the server answers again"
               />
             </div>
           </div>

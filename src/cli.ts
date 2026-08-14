@@ -38,6 +38,9 @@ const { values, positionals } = (() => {
         anon: { type: "boolean", default: false },
         out: { type: "string" },
         keep: { type: "boolean", default: false },
+        // set by a disconnected tab's own copied reconnect command, never typed by hand
+        token: { type: "string" },
+        port: { type: "string" },
         kind: { type: "string" },
         impact: { type: "string" },
         limit: { type: "string" },
@@ -231,9 +234,14 @@ try {
 
   // analyses live not static
   else if (viewing && !values.static) {
-    const live = await serve(target, cap, values.keep)
-    open(live)
-    console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
+    const port = Number(values.port) >= 1 ? Math.floor(Number(values.port)) : undefined
+    const live = await serve(target, cap, values.keep, port, undefined, values.token)
+    // a reconnect command names the tab already waiting for it, so it opens nothing new
+    if (values.token) console.log("Reconnected. The tab that was open picks this up on its own.")
+    else {
+      open(live)
+      console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
+    }
   } else {
     const stats = analyze(target, cap)
     // licences in disk, advisories network saved in page

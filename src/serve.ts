@@ -80,6 +80,9 @@ export function serve(
   keep = false,
   port = PORT,
   viewer?: string,
+  // localhost is reachable by any page, so the token is the real barrier, not the port.
+  // kept stable across a restart, so a dead tab's reconnect command still gets in
+  token = randomBytes(16).toString("hex"),
 ): Promise<string> {
   const tabs = new Set<ServerResponse>()
   let farewell: NodeJS.Timeout | undefined
@@ -101,8 +104,6 @@ export function serve(
     cache = { head, stats: analyze(repo, cap) }
     return cache.stats
   }
-  // every page in the browser can reach localhost, so the port alone is not a secret
-  const token = randomBytes(16).toString("hex")
   // the api answers without a built viewer, only the page itself needs one
   const html =
     viewer ??
@@ -479,7 +480,7 @@ export function serve(
     // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && port === PORT)
-        serve(repo, cap, keep, 0, viewer).then(resolve, reject)
+        serve(repo, cap, keep, 0, viewer, token).then(resolve, reject)
       else reject(err)
     })
     server.listen(port, HOST, () => {

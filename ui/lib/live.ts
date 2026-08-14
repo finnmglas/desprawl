@@ -38,6 +38,20 @@ const busy = (step: number) => {
   watching.forEach((fn) => fn(inflight))
 }
 
+// whether the session stream is currently open, so a dead server reads as
+// dead rather than as a tab that quietly stopped updating
+let online = true
+const watchingConn = new Set<(ok: boolean) => void>()
+export const onConnection = (fn: (ok: boolean) => void): (() => void) => {
+  watchingConn.add(fn)
+  return () => void watchingConn.delete(fn)
+}
+const connected = (ok: boolean) => {
+  if (online === ok) return
+  online = ok
+  watchingConn.forEach((fn) => fn(ok))
+}
+
 async function ask<T>(path: string, fallback: T, sent?: RequestInit): Promise<T> {
   const t = token()
   if (!t) return fallback
@@ -55,14 +69,17 @@ async function ask<T>(path: string, fallback: T, sent?: RequestInit): Promise<T>
   return fallback
 }
 
-/** held open, so the server sees the tab close */
+/** held open, so the server sees the tab close, and the tab sees the server go */
 export function attach(): void {
   // a static file has no server to tell, and must never try to reach one
   if (!isLive()) return
   // a headless printer waits on a stream that never ends
   if (printing()) return
   // the browser drops this the moment the tab goes, and reopens it after a sleep
-  new EventSource(`/api/session?t=${token()}`)
+  const source = new EventSource(`/api/session?t=${token()}`)
+  source.onopen = () => connected(true)
+  // fires on the first failed reconnect too, so a dead server shows within seconds
+  source.onerror = () => connected(false)
 }
 
 /** opened to be printed, not read */
