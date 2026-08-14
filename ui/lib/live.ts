@@ -11,6 +11,7 @@ import type { Agent } from "../../src/agent.ts"
 import type { Talk } from "../../src/talk.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Detail, Moved, Timeline } from "../../src/history.ts"
+import type { Source } from "../../src/serve.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
 export const token = (): string | null => new URLSearchParams(location.search).get("t")
@@ -87,6 +88,10 @@ export const printing = (): boolean => new URLSearchParams(location.search).has(
 
 export const filesIn = (path: string): Promise<Node[]> =>
   ask(`/api/files?path=${encodeURIComponent(path)}`, [])
+
+/** the file itself, which a static page cannot carry and never asks for */
+export const sourceOf = (path: string): Promise<Source | null> =>
+  ask<Source | null>(`/api/source?path=${encodeURIComponent(path)}`, null)
 
 export const commitDetail = (hash: string): Promise<Detail | null> =>
   ask<Detail | null>(`/api/commit?hash=${hash}`, null)

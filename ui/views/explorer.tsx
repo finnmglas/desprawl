@@ -8,6 +8,7 @@ import { Button } from "../components/atoms/button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
 import { Distribution } from "../components/molecules/distribution.tsx"
+import { FileView } from "../components/molecules/file-view.tsx"
 import { Section } from "../components/atoms/section.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kind } from "../components/molecules/mark.tsx"
@@ -15,7 +16,7 @@ import { Onward } from "../components/molecules/onward.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
 import { toast } from "../components/atoms/toast.tsx"
 import { nest, num, pct } from "../lib/format.ts"
-import { filesIn } from "../lib/live.ts"
+import { filesIn, isLive } from "../lib/live.ts"
 import type { Matrix } from "../lib/formats.ts"
 import { mainly } from "../lib/tint.ts"
 import { spreadOf } from "../lib/verdict.ts"
@@ -74,6 +75,9 @@ export function Explorer({
   const [filter, setFilter] = useState("")
   // a served tree is directories only, files arrive on open
   const [fetched, setFetched] = useState<Record<string, Node[]>>({})
+  // only a served run has the file itself, a saved page has the counts of it
+  const [opened, setOpened] = useState<Node | null>(null)
+  const live = isLive()
 
   const here = useMemo(() => walk(stats.tree, path), [stats.tree, path])
   const key = path.join("/")
@@ -101,6 +105,7 @@ export function Explorer({
 
   const enter = (node: Node) => {
     if (node.children) return setPath([...path, node.name])
+    if (live) return setOpened(node)
     toast(node.path, `${num(node.code)} loc · ${node.commits} commits · nest ${nest(node)}`)
   }
 
@@ -187,7 +192,9 @@ export function Explorer({
                 ? `loading ${num(here.leaves)} files`
                 : lang || kind
                   ? `shaded by ${lang || kind.toLowerCase()} share`
-                  : "click a folder to descend"
+                  : live
+                    ? "click a folder to descend, a file to read it"
+                    : "click a folder to descend"
             }
             columns={columns}
             rows={rows}
@@ -243,6 +250,8 @@ export function Explorer({
           />
         </Section>
       </div>
+
+      <FileView file={opened} onClose={() => setOpened(null)} />
 
       <Onward stats={stats} current="Files" onTab={onTab} />
     </div>

@@ -4,7 +4,15 @@
 import { randomBytes } from "node:crypto"
 import { createServer } from "node:http"
 import type { ServerResponse } from "node:http"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import {
+  closeSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
@@ -73,6 +81,50 @@ function prune(node: Node): Node {
 
 const find = (node: Node, path: string[]): Node | undefined =>
   path.reduce<Node | undefined>((at, part) => at?.children?.find((c) => c.name === part), node)
+
+// enough to read a file by, and a minified bundle never reaches the tab whole
+const MOST = 512_000
+
+export interface Source {
+  text: string
+  bytes: number
+  /** cut at a line, so the end is not half a character */
+  clipped: boolean
+  binary: boolean
+}
+
+/** one tracked file, read for looking at */
+function source(repo: string, at: string): Source | null {
+  // git decides what is inside the repo, so ../etc/passwd never gets this far
+  try {
+    git(repo, "ls-files", "--error-unmatch", "--", at)
+  } catch {
+    return null
+  }
+  const full = join(repo, at)
+  // lstat, or a tracked symlink would be followed straight out of the repo
+  const stat = lstatSync(full)
+  if (!stat.isFile()) return null
+
+  const fd = openSync(full, "r")
+  try {
+    const buf = Buffer.alloc(Math.min(stat.size, MOST))
+    const seen = buf.subarray(0, readSync(fd, buf, 0, buf.length, 0))
+    if (seen.includes(0)) return { text: "", bytes: stat.size, clipped: false, binary: true }
+    const text = seen.toString("utf8")
+    const clipped = stat.size > seen.length
+    // a minified bundle is one line, and cutting that at a newline would show nothing
+    const line = text.lastIndexOf("\n")
+    return {
+      text: clipped && line > 0 ? text.slice(0, line + 1) : text,
+      bytes: stat.size,
+      clipped,
+      binary: false,
+    }
+  } finally {
+    closeSync(fd)
+  }
+}
 
 export function serve(
   repo: string,
@@ -230,6 +282,14 @@ export function serve(
           if (!node) return json({ error: `no folder at ${at}` }, 404)
           const files = (node.children ?? []).filter((c) => !c.children)
           return json(files)
+        }
+
+        // the contents behind a row, which only a served run has to hand
+        if (url.pathname === "/api/source") {
+          const at = url.searchParams.get("path") ?? ""
+          const found = source(repo, at)
+          if (!found) return json({ error: `no file this repo tracks at ${at}` }, 404)
+          return json(found)
         }
 
         if (url.pathname === "/api/commit") {

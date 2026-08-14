@@ -63,6 +63,42 @@ test("a folder that is there lists its files", async () => {
   )
 })
 
+test("a tracked file comes back to be read", async () => {
+  const one = await (await get(`/api/source?t=${token}&path=src/b.ts`)).json()
+  assert.equal(one.text, "const b = 2\n")
+  assert.equal(one.binary, false)
+  assert.equal(one.clipped, false)
+})
+
+test("only what git tracks can be read, whatever the path says", async () => {
+  for (const path of ["../../etc/passwd", "/etc/passwd", "src/../../etc/passwd", "nope.ts"]) {
+    const res = await get(`/api/source?t=${token}&path=${encodeURIComponent(path)}`)
+    assert.equal(res.status, 404, path)
+    assert.match((await res.json()).error, /no file this repo tracks/)
+  }
+})
+
+test("a tracked symlink is not a way out of the repo", async () => {
+  const out = repo({ "escape.txt": "symlink:/etc/passwd", "a.ts": "const a = 1\n" })
+  const url = await serve(out, undefined, true, 0, "")
+  const at = url.slice(0, url.indexOf("/?"))
+  const key = url.slice(url.indexOf("t=") + 2)
+  const res = await fetch(`${at}/api/source?t=${key}&path=escape.txt`, { headers: { origin: at } })
+  assert.equal(res.status, 404)
+})
+
+test("a binary file says so rather than arriving as mojibake", async () => {
+  const pics = repo({ "logo.png": "\0PNG", "a.ts": "const a = 1\n" })
+  const url = await serve(pics, undefined, true, 0, "")
+  const at = url.slice(0, url.indexOf("/?"))
+  const key = url.slice(url.indexOf("t=") + 2)
+  const one = await (
+    await fetch(`${at}/api/source?t=${key}&path=logo.png`, { headers: { origin: at } })
+  ).json()
+  assert.equal(one.binary, true)
+  assert.equal(one.text, "")
+})
+
 test("a failure explains itself in the body", async () => {
   const res = await get(`/api/commit?t=${token}&hash=abcdef`)
   assert.equal(res.status, 500)
