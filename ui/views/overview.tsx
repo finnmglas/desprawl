@@ -14,6 +14,7 @@ import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/atoms/moved.tsx"
 import { Mark } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
+import { Commits } from "./commits.tsx"
 import { Explorer } from "./explorer.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/molecules/stack-card.tsx"
@@ -483,8 +484,8 @@ export function Overview({
     if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
   const onCommits = (from: string, to: string) => {
-    go({ tab: "History", from, to })
-    toast("Opened in History", `${from} to ${to}`)
+    go({ tab: "Overview", panel: "history_commits", from, to })
+    if (from || to) toast("Showing those commits", `${from} to ${to}`)
   }
   const [all, setAll] = useState<Timeline | null>(null)
   const where = useMemo(() => worked(stats.tree), [stats.tree])
@@ -790,6 +791,8 @@ export function Overview({
           )}
         </DataTable>
       </Section>
+
+      <Commits stats={stats} from={at.from} to={at.to} onRange={onCommits} faces={faces} />
 
       {/* an empty card saying no assistant touched this repo is a row of nothing */}
       {traced(stats.stack.ai) && (

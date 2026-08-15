@@ -47,6 +47,8 @@ export interface DataTableProps<T> {
   saves?: Sheet[]
   /** what the reader typed into the search, for a total row that has to agree with it */
   onFind?: (said: string) => void
+  /** scrolled to the end of what is loaded, for a list that has more behind it */
+  onEnd?: () => void
   /** the row the reader came here to see: marked, unfolded and scrolled to, since
    * arriving at a table of four hundred rows with nothing pointed out is arriving nowhere */
   mark?: (row: T) => boolean
@@ -67,6 +69,7 @@ export function DataTable<T>({
   saves,
   onSort,
   onFind,
+  onEnd,
   mark,
 }: DataTableProps<T>) {
   const { scale, curve, rows: shown_ } = useDisplay()
@@ -87,6 +90,10 @@ export function DataTable<T>({
   const [unit, setUnit] = useState(0)
   const [tall, setTall] = useState(0)
   const [scrolled, setScrolled] = useState(0)
+  // a table sizes its columns from the rows it can see, and a windowed table can only
+  // see a slice, so scrolling would resize them under the reader. Measured once off a
+  // full paint and then held, so a column is the same width at the top and the bottom
+  const [widths, setWidths] = useState<number[]>([])
 
   // a table nobody has to scroll is a table nobody searches, so the search appears once
   // there is more than a screenful of it, whichever way this one is being shown
@@ -181,6 +188,18 @@ export function DataTable<T>({
     setTall(Math.round(head.getBoundingClientRect().height + HOLDS.virtual * one))
   }, [pinned, sorted.length, columns.length, open])
 
+  // measured while every row is still in the dom, which is the first paint of any table,
+  // and left alone after that: reading them again once they are set only reads back what
+  // was set, and re-fitting on scroll is the jump this exists to stop
+  useEffect(() => {
+    const head = sheet.current?.querySelector("thead tr")
+    if (!head || widths.length === columns.length) return
+    const found = [...head.children].map(
+      (th, i) => columns[i]?.width ?? Math.round(th.getBoundingClientRect().width),
+    )
+    if (found.every((n) => n > 0)) setWidths(found)
+  }, [columns.length, widths.length, rows])
+
   // a scroll box with every row in it is a scroll box the browser lays out every row of,
   // so past a point only what is on screen is built, with blank space standing in for
   // the rest. Under that point the whole list is cheaper than the arithmetic
@@ -201,6 +220,8 @@ export function DataTable<T>({
       queued = requestAnimationFrame(() => {
         queued = 0
         setScrolled(box.scrollTop)
+        // within a few rows of the floor, so more arrives before the reader hits it
+        if (box.scrollTop + box.clientHeight >= box.scrollHeight - unit * 3) onEnd?.()
       })
     }
     box.addEventListener("scroll", onScroll, { passive: true })
@@ -208,7 +229,7 @@ export function DataTable<T>({
       cancelAnimationFrame(queued)
       box.removeEventListener("scroll", onScroll)
     }
-  }, [windowed])
+  }, [windowed, unit, onEnd])
 
   // a new list is a new place, so it starts at the top rather than mid way down the old
   // one. Keyed on what the reader changed, never on the rows array: callers rebuild that
@@ -279,10 +300,18 @@ export function DataTable<T>({
         {/* a picture of it holds the rows on screen, so the fold decides what is in one */}
         <div ref={sheet}>
           <Table
+            className={cn(widths.length === columns.length && "table-fixed")}
             boxRef={scroller}
             box={cn(pinned && "overflow-y-auto")}
             boxStyle={pinned && tall ? { height: tall } : undefined}
           >
+            {widths.length === columns.length && (
+              <colgroup>
+                {widths.map((w, i) => (
+                  <col key={columns[i].key} style={{ width: w }} />
+                ))}
+              </colgroup>
+            )}
             <THead className={cn(pinned && "bg-card sticky top-0 z-20")}>
               <TR>
                 {columns.map((col) => (
@@ -339,6 +368,7 @@ export function DataTable<T>({
                       <TD
                         key={col.key}
                         num={col.num && !col.left}
+                        className={cn(col.behind && "relative")}
                         style={
                           typeof cell === "number"
                             ? backdrop(cell, peaks[col.key], "var(--chart-2)", curve)

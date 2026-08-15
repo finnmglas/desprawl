@@ -13,7 +13,6 @@ import { Toaster, toast } from "./components/atoms/toast.tsx"
 import { Execution } from "./views/execution.tsx"
 import { Network } from "./views/network.tsx"
 import { Tasks } from "./views/tasks.tsx"
-import { Graph } from "./views/graph.tsx"
 import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
@@ -54,7 +53,7 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Modules", "Execution", "History", "Tasks", "Graph"]
+const TABS = ["Overview", "Modules", "Execution", "Tasks", "Graph"]
 
 // one object, not a literal per render: useView listens for as long as this stays the same
 const START = {
@@ -86,7 +85,7 @@ function App({
 }) {
   // view state lives in the url, so back works and a link carries the place
   const [at, go, was] = useView(START)
-  const { tab, from, to, panel, pick } = at
+  const { tab, panel, pick } = at
   // what the reader pointed at, answered with everywhere it leads rather than one guess
   const [target, setTarget] = useState<Target | null>(null)
   const [busy, setBusy] = useState(0)
@@ -172,15 +171,7 @@ function App({
   }, [stats.repo])
 
   const view = (one: string) =>
-    one === "History" ? (
-      <Graph
-        stats={stats}
-        from={from}
-        to={to}
-        onRange={(a, b) => go({ from: a, to: b })}
-        faces={faces}
-      />
-    ) : one === "Modules" ? (
+    one === "Modules" ? (
       <Modules stats={stats} faces={faces} />
     ) : one === "Tasks" ? (
       <Tasks stats={stats} faces={faces} />

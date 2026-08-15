@@ -22,6 +22,11 @@ export interface Column<T> {
   left?: boolean
   /** a column where all zeros is the good answer, so it is never flagged as unread */
   good?: boolean
+  /** the cell becomes the containing block, so a drawing in it can fill the row without
+   * being what decides how tall the row is */
+  behind?: boolean
+  /** pixels, when the column has a size of its own rather than one read off its content */
+  width?: number
 }
 
 /** a row's own lines, the denominator when reading shares within a row */

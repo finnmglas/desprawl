@@ -43,10 +43,9 @@ export function Onward({ stats, current }: { stats: Stats; current: string }) {
 
   // the tab is the title, and what it holds is a handful of words under it
   const links = Object.entries({
-    Overview: "size, languages, the file tree, who wrote them",
+    Overview: "size, languages, the file tree, the log, who wrote them",
     Modules: "what depends on what, and the loops",
     Execution: "what is leaned on, what nothing reaches",
-    History: "commits as a branch graph",
     Tasks: "what to do, with a size on each",
     Graph: "every file a dot, every import a line",
   }).filter(([to]) => to !== current)

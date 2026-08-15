@@ -13,6 +13,7 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "tree_files",
     "table_languages",
     "table_contributors",
+    "history_commits",
     "ai_overview",
     "table_deps",
     // what you do to the repo rather than what it is, so both sit at the bottom
@@ -39,7 +40,6 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "table_repeated_names",
     "card_recursion",
   ],
-  History: ["history_commits"],
   Graph: ["network_graph"],
   Tasks: ["kpis_tasks", "card_agents", "table_tasks"],
 }
