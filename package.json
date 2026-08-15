@@ -1,7 +1,7 @@
 {
   "name": "desprawl",
   "version": "0.5.0",
-  "description": "Permanently unfuck large ai-touched typescript projects by scoping and delivering cleanup work.",
+  "description": "npx desprawl: visually browse any codebase. Scope and deliver cleanup work on legacy projects, tech debt and agentic-coding sprawl. Understand unfamiliar repos faster.",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@10.28.2",
@@ -46,7 +46,7 @@
     "vite-plugin-singlefile": "2.3.3"
   },
   "author": "Finn Glas <desprawl@finnmglas.com>",
-  "homepage": "https://github.com/finnmglas/desprawl#readme",
+  "homepage": "https://finnmglas.github.io/desprawl/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/finnmglas/desprawl.git"
@@ -58,10 +58,21 @@
     "loc",
     "cloc",
     "code-analysis",
+    "static-analysis",
+    "brownfield-software",
     "codebase",
+    "code-quality",
     "metrics",
     "churn",
     "complexity",
+    "technical-debt",
+    "refactoring",
+    "dependency-graph",
+    "call-graph",
+    "circular-dependencies",
+    "dead-code",
+    "monorepo",
+    "visualization",
     "git",
     "typescript",
     "cli"
