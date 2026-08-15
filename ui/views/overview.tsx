@@ -558,6 +558,16 @@ export function Overview({
   const [identity, setIdentity] = useState(IDENTITY[0])
   // moot once a time frame is picked below: that list is already one row per person
   const contributors = identity === IDENTITY[1] ? stats.identities : stats.contributors
+  // nobody committed under two addresses, so the two lists are the same list and the
+  // switch between them is a control that does nothing
+  const folded = useMemo(() => {
+    const key = (one: Contributor) => (one.email || one.name).toLowerCase()
+    const people = stats.contributors.map(key).sort()
+    const seats = (stats.identities ?? []).map(key).sort()
+    return (
+      !seats.length || (people.length === seats.length && people.every((k, i) => k === seats[i]))
+    )
+  }, [stats.contributors, stats.identities])
   const [hunt, setHunt] = useState("")
   // the scope decides which rows there are and the table searches within them: the totals
   // row is a prop rather than a row, so it has to be told what the search left
@@ -565,6 +575,8 @@ export function Overview({
     () => (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct),
     [kit, scope],
   )
+  // nothing is installed that the manifest did not ask for, so both scopes are one list
+  const shallow = useMemo(() => (kit?.list ?? []).every((one) => one.direct), [kit])
   // one registry needs no column saying so on every row, several do
   const columns = useMemo(() => {
     const many = new Set((kit?.list ?? []).map((one) => one.ecosystem)).size > 1
@@ -773,7 +785,7 @@ export function Overview({
           id={(p) => p.email || p.name}
           fold={8}
         >
-          {!did && (
+          {!did && !folded && (
             <div className="ml-auto flex items-center gap-2">
               <Tabs tabs={IDENTITY} value={identity} onChange={setIdentity} />
             </div>
@@ -909,6 +921,26 @@ export function Overview({
         </Section>
       )}
 
+      {/* the registry read is the slowest thing on this tab, and a panel that is missing
+          until it lands reads as a repo with no dependencies */}
+      {!kit && (
+        <Section id="table_deps">
+          <Card>
+            <CardHead
+              title="External dependencies"
+              hint="licences off disk, advisories from osv.dev"
+            />
+            <CardContent>
+              <Waiting
+                what="Reading every installed package,"
+                slow="osv.dev is being asked about each one."
+                rows={5}
+              />
+            </CardContent>
+          </Card>
+        </Section>
+      )}
+
       {kit && kit.list.length > 0 && (
         <Section id="table_deps">
           <DataTable
@@ -934,9 +966,11 @@ export function Overview({
             total={{ ...kit.list[0], name: "", every: picked }}
             fold={8}
           >
-            <div className="ml-auto flex items-center gap-2">
-              <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
-            </div>
+            {!shallow && (
+              <div className="ml-auto flex items-center gap-2">
+                <Tabs tabs={SCOPE} value={scope} onChange={setScope} />
+              </div>
+            )}
           </DataTable>
         </Section>
       )}
