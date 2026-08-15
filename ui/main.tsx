@@ -6,7 +6,6 @@ import { useEffect, useState } from "react"
 import { MARKS, NpmMark } from "./components/atoms/icons.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
-import { ThemeToggle } from "./components/molecules/theme-toggle.tsx"
 import { Waiting } from "./components/atoms/waiting.tsx"
 import { useSlow } from "./components/atoms/working.tsx"
 import { Tabs } from "./components/atoms/tabs.tsx"
@@ -329,13 +328,13 @@ function App({
                 // is dropped: no landing on someone else's panel, no marked row scrolled to
                 onChange={(next) => go({ tab: next, panel: "", pick: "" })}
               />
-              <ThemeToggle {...themed} />
               <Settings
                 stats={stats}
                 prefs={prefs}
                 change={change}
                 reload={reload}
                 onPaper={paper}
+                themed={themed}
               />
             </div>
           </header>
