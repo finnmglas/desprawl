@@ -153,6 +153,18 @@ export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
 export const hourCurve = (from: string, to: string): Promise<Hours | null> =>
   ask<Hours | null>(`/api/hours?from=${from}&to=${to}`, null)
 
+/** every face this machine has already paid github for, on any repo */
+export const knownFaces = (): Promise<Record<string, string>> =>
+  ask<Record<string, string>>("/api/faces", {})
+
+/** merged into that store, so the next run of any repo starts knowing them */
+export const keepFaces = (faces: Record<string, string>): Promise<Record<string, string>> =>
+  ask<Record<string, string>>("/api/faces", faces, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(faces),
+  })
+
 export const trueCount = (): Promise<number> =>
   ask<{ commits: number }>("/api/count", { commits: 0 }).then((r) => r.commits)
 

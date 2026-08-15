@@ -2,6 +2,7 @@
 // goal: ask github once which email belongs to which face
 
 import { toast } from "./toast.ts"
+import { knownFaces, keepFaces } from "./live.ts"
 import type { Stats } from "../../src/model.ts"
 
 const PAGES = 3 // 300 commits is enough to name everyone who still shows in the table
@@ -24,7 +25,10 @@ const recall = (): Faces => JSON.parse(localStorage.getItem(KEY) ?? "{}") as Fac
 
 // commits names emails on public repos, search covers the rest, empty means asked and missing
 export async function loadFaces(stats: Stats): Promise<Faces> {
-  const faces = recall()
+  // this browser knows some, the machine knows what every earlier run learned, on any
+  // repo. A saved page has no server to ask and simply gets nothing back
+  const faces = { ...(await knownFaces()), ...recall() }
+  const before = Object.keys(faces).length
   const remote = stats.remotes.find((r) => r.host === "github")
   // an email may only be sent to github if github already published this repo's commits
   let published = false
@@ -75,5 +79,7 @@ export async function loadFaces(stats: Stats): Promise<Faces> {
   }
 
   remember(faces)
+  // asking is what costs, so only a run that learned something writes
+  if (Object.keys(faces).length !== before) void keepFaces(faces)
   return faces
 }

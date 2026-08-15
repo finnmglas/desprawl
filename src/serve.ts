@@ -68,6 +68,26 @@ const writePrefs = (body: string): void => {
   writeFileSync(store, body)
 }
 
+// an email owns the same face in every repo, so this is machine wide rather than per
+// repo, and it sits beside the prefs for the same reason: it outlives any one clone
+const mugs = join(config, "desprawl", "faces.json")
+
+const readFaces = (): Record<string, string> => {
+  try {
+    return JSON.parse(readFileSync(mugs, "utf8")) as Record<string, string>
+  } catch {
+    return {}
+  }
+}
+
+/** merged, never replaced: two tabs on two repos each know faces the other does not */
+const writeFaces = (found: Record<string, string>): Record<string, string> => {
+  const all = { ...readFaces(), ...found }
+  mkdirSync(dirname(mugs), { recursive: true })
+  writeFileSync(mugs, JSON.stringify(all))
+  return all
+}
+
 // directories only, the leaves are 20 MB of a linux kernel
 function prune(node: Node): Node {
   if (!node.children) return node
@@ -239,6 +259,31 @@ export function serve(
       }
 
       // on disk, so a new port keeps them
+      // github allows sixty unauthenticated calls an hour to an address, and a face
+      // does not change, so what one run learned every later run already knows
+      if (url.pathname === "/api/faces") {
+        if (req.method === "GET") return json(readFaces())
+        if (req.method === "PUT") {
+          let body = ""
+          req.on("data", (chunk) => {
+            body += chunk
+            if (body.length > 256_000) {
+              send(413, "more faces than anyone has", "text/plain")
+              req.destroy()
+            }
+          })
+          req.on("end", () => {
+            try {
+              // a cache nobody can write is a cache, not an error
+              return json(writeFaces(JSON.parse(body) as Record<string, string>))
+            } catch {
+              return json(readFaces())
+            }
+          })
+          return
+        }
+      }
+
       if (url.pathname === "/api/prefs") {
         if (req.method === "GET") return send(200, readPrefs(), "application/json")
         if (req.method === "PUT") {
