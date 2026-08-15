@@ -7,30 +7,33 @@ export type View = {
   tab: string
   path: string[]
   lang: string
-  /** which line kind the files tree is shaded by, mutually exclusive with lang */
-  kind: string
+  kind: string // code, comment or blank
   from: string
   to: string
-  /** what the reader picked to get here: a file, a folder, a group or a file#name.
-   * Every tab that can say something about it highlights it rather than opening blank */
-  pick: string
-  /** the section to land on, since a tab holds more panels than fit a screen */
-  panel: string
+  pick: string // file, folder, group or file#name
+  panel: string // section to land on
+}
+
+const MOVED: Record<string, [string, string]> = {
+  Files: ["Overview", "tree_files"],
+  History: ["Overview", "history_commits"],
+  Modules: ["Graph", "table_modules"],
+  Execution: ["Graph", "table_declarations"],
 }
 
 const read = (fallback: View): View => {
   const q = new URLSearchParams(location.hash.slice(1))
-  // Files became a panel on Overview, so a link written before that still lands on the tree
   const asked = q.get("tab") || fallback.tab
+  const moved = MOVED[asked]
   return {
-    tab: asked === "Files" ? "Overview" : asked,
+    tab: moved ? moved[0] : asked,
     path: (q.get("path") || "").split("/").filter(Boolean),
     lang: q.get("lang") || "",
     kind: q.get("kind") || "",
     from: q.get("from") || "",
     to: q.get("to") || "",
     pick: q.get("pick") || "",
-    panel: q.get("panel") || (asked === "Files" ? "tree_files" : ""),
+    panel: q.get("panel") || (moved ? moved[1] : ""),
   }
 }
 

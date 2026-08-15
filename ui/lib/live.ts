@@ -149,15 +149,14 @@ export interface Sample {
 
 export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
 
-/** a month or less by the hour, read fresh: too fine to carry in the payload */
+/** too fine to carry in the payload */
 export const hourCurve = (from: string, to: string): Promise<Hours | null> =>
   ask<Hours | null>(`/api/hours?from=${from}&to=${to}`, null)
 
-/** every face this machine has already paid github for, on any repo */
+/** faces this machine already asked github for */
 export const knownFaces = (): Promise<Record<string, string>> =>
   ask<Record<string, string>>("/api/faces", {})
 
-/** merged into that store, so the next run of any repo starts knowing them */
 export const keepFaces = (faces: Record<string, string>): Promise<Record<string, string>> =>
   ask<Record<string, string>>("/api/faces", faces, {
     method: "PUT",

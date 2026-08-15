@@ -1,5 +1,5 @@
 // owner: finn
-// goal: the commit log as a panel, branch rails drawn per row so a windowed table keeps them
+// goal: the commit log, with branch rails
 
 import { useEffect, useMemo, useState } from "react"
 import { Avatar } from "../components/atoms/avatar.tsx"
@@ -40,15 +40,11 @@ const PAGE = 400
 
 type Numbered = Commit & { n: number }
 
-/**
- * One row's worth of rail. Heights are percentages of whatever the row turned out to be,
- * so nothing here depends on a row height anyone had to write down, and a row that was
- * never built costs nothing: its neighbours still meet at the boundary.
- */
+/** one row's rail, sized in percentages of the row */
 function Rail({ row, width }: { row: ReturnType<typeof place>[number]; width: number }) {
   const dot = row.commit.parents.length > 1 ? 4.5 : 3.5
   return (
-    // absolute, so the drawing fills the row instead of deciding how tall it is
+    // absolute, so it fills rather than sizes
     <svg data-print="hide" width={width} height="100%" className="absolute inset-y-0 left-0">
       <g strokeWidth={2} fill="none">
         {/* lanes waiting on something further down pass straight through */}
@@ -109,8 +105,7 @@ export function Commits({
   const [loading, setLoading] = useState(false)
   const [reading, setReading] = useState<Numbered | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
-  // the table sorts and searches itself, and either one breaks the order the rails
-  // were laid out in, so it says when it has
+  // either one breaks the order the rails need
   const [sort, setSort] = useState<Sort | null>(null)
   const [hunt, setHunt] = useState("")
   const [total, setTotal] = useState(stats.commits)
@@ -143,7 +138,7 @@ export function Commits({
     )
   }, [log, total, from, to])
 
-  // rails only mean anything while the rows are in the order the log put them in
+  // rails need log order
   const railed = !sort && !hunt && !from && !to
   const placed = useMemo(() => (railed ? place(rows) : []), [rows, railed])
   const byHash = useMemo(() => new Map(placed.map((one) => [one.commit.hash, one])), [placed])
@@ -165,14 +160,14 @@ export function Commits({
             flat: true,
             left: true,
             behind: true,
-            width: width + 16, // its own size, padding included, never the leftover
+            width: width + 16, // padding included
             get: () => "",
             cell: (c: Numbered) => {
               const row = byHash.get(c.hash)
               if (!row) return null
               return (
                 <>
-                  {/* holds the column open, since the drawing itself is out of flow */}
+                  {/* holds the column open */}
                   <span className="block" style={{ width }} />
                   <Rail row={row} width={width} />
                 </>
@@ -194,8 +189,7 @@ export function Commits({
       key: "subject",
       label: "subject",
       get: (c) => c.subject,
-      // capped, or the longest subject in the whole log decides the width every other
-      // column then has to share what is left of
+      // capped, or the longest subject sets the width
       cell: (c) => (
         <span className="flex min-w-0 max-w-[34rem] items-center gap-2">
           <span className="truncate">{c.subject}</span>

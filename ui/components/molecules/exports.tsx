@@ -1,5 +1,5 @@
 // owner: finn
-// goal: every file this page can hand you, in one dialog rather than a menu of downloads
+// goal: every file this page can hand you
 
 import { useState } from "react"
 import { Button } from "../atoms/button.tsx"
@@ -14,7 +14,7 @@ import { notes } from "../../lib/paper.ts"
 import { slides } from "../../lib/slides.ts"
 import type { Stats } from "../../../src/model.ts"
 
-/** one file on offer: what it is, what is in it, and the button that writes it */
+/** one file on offer */
 function Row({
   label,
   what,
@@ -68,7 +68,7 @@ export function Exports({
   onPaper?: (kind: "pdf" | "pptx") => void
 }) {
   const live = isLive()
-  // a static page carries both graphs, so it can offer them with nothing to ask
+  // a static page carries both graphs
   const heldGraph = window.__DESPRAWL_GRAPH__
   const heldCalls = window.__DESPRAWL_CALLS__
 

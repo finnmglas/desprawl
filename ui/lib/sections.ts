@@ -16,11 +16,9 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "history_commits",
     "ai_overview",
     "table_deps",
-    // what you do to the repo rather than what it is, so both sit at the bottom
     "card_tests",
     "actions_overview",
   ],
-  // the picture first, then what the imports say, then what actually runs
   Graph: [
     "network_graph",
     "kpis_modules_imports",
@@ -112,13 +110,13 @@ const draggedStore = liveStore<string | null>(null)
 const dropStore = liveStore<{ before: string; after: boolean } | null>(null)
 const landedStore = liveStore<string | null>(null)
 
-/** the id a link just scrolled to, so it can say so before it settles into the page */
+/** the id a link just scrolled to */
 export const useLanded = (): string | null => landedStore.use()
 
 const LANDED_MS = 2000
 let clearing: ReturnType<typeof setTimeout> | undefined
 
-/** ring the panel a link aimed at, then let it go */
+/** ring a panel, briefly */
 export function land(id: string | null): void {
   clearTimeout(clearing)
   landedStore.set(id)

@@ -266,7 +266,7 @@ export function Execution({ stats }: { stats: Stats }) {
               {inFile.split("/").pop()} ✕
             </Button>
           )}
-          {/* these shape this table and nothing else, so they live on it */}
+          {/* these shape this table only */}
           <Tabs tabs={KINDS} value={kind} onChange={setKind} />
           {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
           <Input
@@ -293,7 +293,7 @@ export function Execution({ stats }: { stats: Stats }) {
             onRowClick={walk}
             file="unreachable"
           >
-            {/* what counts as a starting point is the whole question this panel answers */}
+            {/* what counts as a starting point */}
             <Tabs tabs={ROOTS} value={roots} onChange={setRoots} />
           </DataTable>
         </Section>

@@ -20,9 +20,9 @@ import { cn } from "../../lib/ui.ts"
 
 export type { Column }
 
-/** past this many rows the browser is laying out more than anyone will ever look at */
+/** above this many rows, only what is on screen is built */
 const WINDOW_FROM = 60
-/** rows built either side of the view, so a fast scroll does not show blank */
+/** rows built either side of the view */
 const OVERSCAN = 6
 
 export interface DataTableProps<T> {
@@ -47,8 +47,7 @@ export interface DataTableProps<T> {
   saves?: Sheet[]
   /** what the reader typed into the search, for a total row that has to agree with it */
   onFind?: (said: string) => void
-  /** scrolled to the end of what is loaded, for a list that has more behind it */
-  onEnd?: () => void
+  onEnd?: () => void // scrolled to the end
   /** the row the reader came here to see: marked, unfolded and scrolled to, since
    * arriving at a table of four hundred rows with nothing pointed out is arriving nowhere */
   mark?: (row: T) => boolean
@@ -76,7 +75,6 @@ export function DataTable<T>({
   const holds = HOLDS[shown_]
   // 5 and 10 fold, virtual and all do not
   const limit = shown_ === "5" || shown_ === "10" ? holds : undefined
-  // only the scrolling mode has a floor to pin anything to
   const pinned = shown_ === "virtual"
   const sheet = useRef<HTMLDivElement>(null)
   const spot = useRef<HTMLTableRowElement>(null)
@@ -84,19 +82,14 @@ export function DataTable<T>({
   const [open, setOpen] = useState(false)
   const [hunt, setHunt] = useState("")
   const scroller = useRef<HTMLDivElement>(null)
-  // rows carry avatars and badges, so a row height is not a number anyone can write
-  // down: it is measured off a real row once the table has painted, and ten of it is
-  // how tall the box stands
+  // rows vary, so a row height is measured rather than written down
   const [unit, setUnit] = useState(0)
   const [tall, setTall] = useState(0)
   const [scrolled, setScrolled] = useState(0)
-  // a table sizes its columns from the rows it can see, and a windowed table can only
-  // see a slice, so scrolling would resize them under the reader. Measured once off a
-  // full paint and then held, so a column is the same width at the top and the bottom
+  // held, or a windowed table would resize its columns on every scroll
   const [widths, setWidths] = useState<number[]>([])
 
-  // a table nobody has to scroll is a table nobody searches, so the search appears once
-  // there is more than a screenful of it, whichever way this one is being shown
+  // a table nobody has to scroll is a table nobody searches
   const searchable = rows.length > (holds || 10)
   const rows_ = useMemo(() => {
     const said = hunt.trim().toLowerCase()
@@ -168,11 +161,10 @@ export function DataTable<T>({
   const foldable = limit !== undefined && sorted.length > limit
   const shown = foldable && !open ? sorted.slice(0, limit) : sorted
   const hidden = foldable ? sorted.length - limit : 0
-  // a table is never shorter than the height it was asked for, so a panel holding two
-  // rows sits as calmly as one holding ten: the difference is space, not size
+  // never shorter than the height it was asked for
   const padding = Math.max(0, holds - shown.length)
 
-  // measured after paint: one real row is the unit, and ten of it plus the head is the box
+  // one row is the unit, ten of it the box
   useEffect(() => {
     const box = scroller.current
     if (!pinned || !box) {
@@ -188,9 +180,7 @@ export function DataTable<T>({
     setTall(Math.round(head.getBoundingClientRect().height + HOLDS.virtual * one))
   }, [pinned, sorted.length, columns.length, open])
 
-  // measured while every row is still in the dom, which is the first paint of any table,
-  // and left alone after that: reading them again once they are set only reads back what
-  // was set, and re-fitting on scroll is the jump this exists to stop
+  // read on the first paint, then left alone
   useEffect(() => {
     const head = sheet.current?.querySelector("thead tr")
     if (!head || widths.length === columns.length) return
@@ -200,9 +190,6 @@ export function DataTable<T>({
     if (found.every((n) => n > 0)) setWidths(found)
   }, [columns.length, widths.length, rows])
 
-  // a scroll box with every row in it is a scroll box the browser lays out every row of,
-  // so past a point only what is on screen is built, with blank space standing in for
-  // the rest. Under that point the whole list is cheaper than the arithmetic
   const windowed = pinned && unit > 0 && shown.length > WINDOW_FROM
   const first = windowed ? Math.max(0, Math.floor(scrolled / unit) - OVERSCAN) : 0
   const last_ = windowed
@@ -210,7 +197,7 @@ export function DataTable<T>({
     : shown.length
   const slice = windowed ? shown.slice(first, last_) : shown
 
-  // the scroll position drives which rows exist, read once a frame rather than per event
+  // read once a frame rather than per event
   useEffect(() => {
     const box = scroller.current
     if (!windowed || !box) return
@@ -220,7 +207,6 @@ export function DataTable<T>({
       queued = requestAnimationFrame(() => {
         queued = 0
         setScrolled(box.scrollTop)
-        // within a few rows of the floor, so more arrives before the reader hits it
         if (box.scrollTop + box.clientHeight >= box.scrollHeight - unit * 3) onEnd?.()
       })
     }
@@ -231,9 +217,7 @@ export function DataTable<T>({
     }
   }, [windowed, unit, onEnd])
 
-  // a new list is a new place, so it starts at the top rather than mid way down the old
-  // one. Keyed on what the reader changed, never on the rows array: callers rebuild that
-  // every render, and depending on it would scroll every table back to the top forever
+  // never keyed on the rows array: callers rebuild it every render
   useEffect(() => {
     if (!windowed) return
     if (scroller.current) scroller.current.scrollTop = 0
@@ -246,7 +230,7 @@ export function DataTable<T>({
     if (!marked) return
     // a marked row behind the fold is a row nobody sees, so the fold gives way to it
     if (!shown.includes(marked)) return setOpen(true)
-    // and one that was never built cannot be scrolled to, so its place is worked out
+    // a row that was never built cannot be scrolled to
     if (windowed) {
       const i = shown.indexOf(marked)
       const box = scroller.current

@@ -88,16 +88,14 @@ export const GRAINS: Grain[] = ["hour", "day", "week", "month", "year"]
 
 /** the shortest span each grain can say anything with, in days */
 const NEEDS: Record<Grain, number> = { hour: 0, day: 0, week: 7, month: 31, year: 365 }
-/** and the longest: a decade by the hour is ninety thousand bars and one live read */
+/** and the longest */
 const HOLDS: Partial<Record<Grain, number>> = { hour: 31 }
 
-/** the grains a span of this many days can honestly carry: one year of a week old repo
- * is one bar, which is not a shape, and one year by the hour is not one either.
- * Day survives every span, so there is always a choice */
+/** grains this span can draw. Day always survives */
 export const grainsFor = (days: number): Grain[] =>
   GRAINS.filter((g) => days >= NEEDS[g] && days <= (HOLDS[g] ?? Infinity))
 
-/** the grain nearest the one asked for that this span can carry, coarser or finer */
+/** nearest grain this span can carry */
 export function nearestGrain(want: Grain, offered: Grain[]): Grain {
   if (offered.includes(want)) return want
   const from = GRAINS.indexOf(want)

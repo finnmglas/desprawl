@@ -112,17 +112,13 @@ function daily(stats: Stats, key: string): number[] {
 const DAY = 86_400_000
 const HOUR = 3_600_000
 
-/** the buckets and their numbers, whatever grain built them */
+/** the buckets and their numbers */
 interface Built {
   groups: { day: string; days: number[] }[]
   raw: Record<string, (number | undefined)[]>
 }
 
-/**
- * By the hour, from a window read live rather than from the payload. One source point
- * per bucket, and every series comes off the same log, so nothing here is windowed
- * differently from anything else beside it.
- */
+/** by the hour, one point per bucket */
 function byHour(hours: Hours, picked: string[], sizes?: { date: string; bytes: number }[]): Built {
   const start = Date.parse(`${hours.first}:00:00Z`)
   const length = hours.commits.length
@@ -136,7 +132,7 @@ function byHour(hours: Hours, picked: string[], sizes?: { date: string; bytes: n
   const raw: Record<string, (number | undefined)[]> = {}
   for (const key of picked) {
     if (key === "size") {
-      // the size readings are daily, so each lands on its midnight and holds until the next
+      // daily readings, each held from its midnight
       const filled: (number | undefined)[] = new Array(length).fill(undefined)
       for (const one of sizes ?? []) {
         const i = Math.round((Date.parse(`${one.date}T00:00:00Z`) - start) / HOUR)
@@ -175,7 +171,6 @@ export function rows(
   if (!commits || !picked.length) return []
   // magnitudes differ, so each group is drawn against its own peak
   const shares = new Set(picked.map((k) => SERIES[k].group)).size > 1
-  // by the hour the window is read live and every series comes from that one read
   if (grain === "hour")
     return hours ? finish(byHour(hours, picked, sizes), picked, curve, shares) : []
 

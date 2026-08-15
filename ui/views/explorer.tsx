@@ -52,7 +52,7 @@ export function Explorer({ stats }: { stats: Stats }) {
   const { at, go, open } = useGoing()
   const { path, lang, kind, pick } = at
   const setPath = (next: string[]) => go({ path: next, pick: "" })
-  // the panel's own name is the way back to nothing chosen: no folder, no shading
+  // back to nothing chosen
   const reset = () => go({ path: [], pick: "", lang: "", kind: "" })
   const setLang = (next: string) => go({ lang: next, kind: "" })
   const setKind = (next: string) => go({ kind: next, lang: "" })
@@ -71,7 +71,7 @@ export function Explorer({ stats }: { stats: Stats }) {
     void filesIn(key).then((files) => setFetched((prev) => ({ ...prev, [key]: files })))
   }, [key, here.leaves])
 
-  // the table folds and searches these itself, so nothing is filtered on the way in
+  // the table folds and searches these itself
   const rows = useMemo(
     () => [...(here.children ?? []), ...(fetched[key] ?? [])],
     [here, fetched, key],
@@ -143,13 +143,12 @@ export function Explorer({ stats }: { stats: Stats }) {
   ]
 
   return (
-    // contents, so both sections are Overview's own items and reorder against its panels
+    // contents, so the sections are the tab's own items
     <div className="contents">
       <Section id="tree_files" className="flex min-w-0 flex-col gap-3">
         <DataTable
           className="min-w-0"
-          // the panel is called Files, and the path only joins it once there is one:
-          // every segment walks back to itself, so no crumb bar and no up button beside it
+          // every segment walks back to itself
           title={
             <span className="flex flex-wrap items-center gap-1">
               <button onClick={reset} className="hover:text-foreground cursor-pointer">
@@ -211,7 +210,7 @@ export function Explorer({ stats }: { stats: Stats }) {
           rowStyle={(n) =>
             lang || kind
               ? {
-                  // washed rather than solid: the bar is behind the numbers, not over them
+                  // washed, so the numbers stay readable
                   backgroundImage:
                     "linear-gradient(color-mix(in oklch, var(--chart-2) var(--wash), transparent), color-mix(in oklch, var(--chart-2) var(--wash), transparent))",
                   backgroundRepeat: "no-repeat",

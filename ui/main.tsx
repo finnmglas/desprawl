@@ -54,7 +54,6 @@ declare global {
   }
 }
 
-// what to do about the repo comes after everything that says what it is
 const TABS = ["Overview", "Graph", "Tasks"]
 
 // one object, not a literal per render: useView listens for as long as this stays the same
@@ -130,9 +129,7 @@ function App({
   const { scale, curve, brands } = prefs
   setSimple(scale === "simple") // before the tree below renders
 
-  // a tab holds more than a screen, so a link can name the panel it means. The panels above
-  // it load on their own clock and grow after the first paint, which would leave the target
-  // stranded halfway down, so the scroll is repeated until it stops moving
+  // panels above load late and push it down
   useEffect(() => {
     if (!panel) {
       land(null)
@@ -145,8 +142,7 @@ function App({
       const spot = document.querySelector<HTMLElement>(`[data-section="${panel}"]`)
       if (!spot) return
       land(panel)
-      // a pick is a row, and the table scrolls to its own marked row: two scrolls would
-      // fight, and the row is the more exact answer, so only the ring is ours
+      // the table scrolls to its own row
       if (pick) return clearInterval(settle)
       const top = Math.round(spot.getBoundingClientRect().top)
       if (Math.abs(top - last) < 2) return clearInterval(settle)
@@ -176,7 +172,6 @@ function App({
     one === "Tasks" ? (
       <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
-      // the picture, then what the imports say, then what actually runs
       <>
         <Network stats={stats} />
         <Modules stats={stats} faces={faces} />
@@ -184,7 +179,6 @@ function App({
         <Onward stats={stats} current="Graph" />
       </>
     ) : (
-      // Overview last, so a tab nobody knows any more lands somewhere readable
       <Overview
         stats={stats}
         metadata={prefs.metadata || printing}
@@ -318,9 +312,8 @@ function App({
                 icons={BAR}
                 className="xl:w-auto"
                 tabs={TABS}
-                value={tab}
-                // reaching for a tab by hand means the whole tab, so what a link aimed at
-                // is dropped: no landing on someone else's panel, no marked row scrolled to
+                value={TABS.includes(tab) ? tab : TABS[0]}
+                // by hand means the whole tab
                 onChange={(next) => go({ tab: next, panel: "", pick: "" })}
               />
               <Settings

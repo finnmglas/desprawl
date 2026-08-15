@@ -37,9 +37,7 @@ export const Bars = () => <Line d="M3 20h18M6 20v-6M11 20V6M16 20v-9" />
 export const FolderMark = () => (
   <Line d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
 )
-export const Clock = () => <Line circle d="M12 7v5l3 2" />
 export const Run = () => <Line d="M5 4h4l6 8-6 8H5l6-8-6-8ZM15 4h4" />
-export const Checks = () => <Line d="M4 7l2.5 2.5L11 5M4 17l2.5 2.5L11 15M14 8h6M14 18h6" />
 export const Sparkle = ({ className }: { className?: string }) => (
   <Line
     className={className}
@@ -51,32 +49,18 @@ export const Dots = () => (
 )
 
 // the theme switch
-export const Sun = () => (
-  <Line
-    className="size-4"
-    d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
-  />
-)
-export const Moon = () => (
-  <Line className="size-4" d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-)
-
-// a row in the tree, drawn the same way the tab above it is: outlined, so a folder and a
-// file read apart by shape at a glance rather than by two silhouettes of the same weight
-export const Folder = ({ className }: { className?: string }) => (
-  <Line
-    className={className}
-    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
-  />
-)
 export const File = ({ className }: { className?: string }) => (
   <Line
     className={className}
     d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6"
   />
 )
-
-// the actions, drawn from lucide's own paths
+export const Folder = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"
+  />
+)
 export const Search = ({ className }: { className?: string }) => (
   <Line className={className} d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12ZM14.5 14.5 20 20" />
 )
@@ -156,10 +140,6 @@ export const HostMark = ({ host, className }: { host: string; className?: string
 /** the mark each tab is known by, so the tab bar and every link to one agree */
 export const MARKS: Record<string, React.ReactNode> = {
   Overview: <Bars />,
-  Modules: <Blocks />,
-  Execution: <Run />,
-  Files: <FolderMark />,
-  History: <Clock />,
-  Tasks: <Check />,
   Graph: <Dots />,
+  Tasks: <Check />,
 }

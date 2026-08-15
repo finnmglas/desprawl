@@ -78,12 +78,6 @@ export const file = (path: string, note?: React.ReactNode): Target => ({
   note,
 })
 
-export const folder = (path: string, note?: React.ReactNode): Target => ({
-  kind: "folder",
-  id: path,
-  note,
-})
-
 /** a module group, which may be a folder, a remainder or one file standing alone */
 export const group = (path: string, name?: string, note?: React.ReactNode): Target => ({
   kind: isFile(path.replace(/\/?\*$/, "")) ? "file" : "module",

@@ -20,12 +20,10 @@ export const EXPLAIN: Record<Scale, string> = {
 export type Brands = "focus" | "flashy" | "off"
 export const BRANDINGS: Brands[] = ["focus", "flashy", "off"]
 
-/** how much of every table is on screen at once: a count folds the rest behind a row,
- * virtual scrolls all of them inside ten rows of height, all just prints the lot */
 export type Shown = "5" | "10" | "virtual" | "all"
 export const SHOWN: Shown[] = ["5", "10", "virtual", "all"]
 
-/** the height every table holds, in rows, whichever mode it is in */
+/** rows tall */
 export const HOLDS: Record<Shown, number> = { "5": 5, "10": 10, virtual: 10, all: 0 }
 
 export interface Display {

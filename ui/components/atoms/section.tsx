@@ -1,5 +1,5 @@
 // owner: finn
-// goal: delineate a panel: an id to hide, reorder or drag by later
+// goal: delineate a panel, by an id
 
 import { Caret, EyeOff, Grip } from "./icons.tsx"
 import {
@@ -38,8 +38,6 @@ export function Section({
     <div
       data-section={id}
       style={{ order: order.indexOf(id) }}
-      // scrolled to by a link, so it stops clear of the window edge rather than against it,
-      // and wears a ring for a moment so the panel that was meant is the one you look at
       className={cn(
         "relative scroll-mt-1.5 transition-[opacity,box-shadow] duration-500",
         dragging === id && "opacity-40",

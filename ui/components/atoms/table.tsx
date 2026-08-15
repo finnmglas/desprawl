@@ -5,8 +5,7 @@
 import * as React from "react"
 import { cn } from "../../lib/ui.ts"
 
-/** the box around the table is the scrolling ancestor, so anything sticky inside sticks
- * to it: a second box outside this one would swallow the stick instead */
+/** this box is the scrolling ancestor, so sticky children stick to it */
 type Sheet = React.HTMLAttributes<HTMLTableElement> & {
   box?: string
   boxStyle?: React.CSSProperties

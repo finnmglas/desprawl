@@ -90,11 +90,13 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 
 Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses, or uses the copy it already has.
 
-Graph view draws it. Every file is a dot inside the module holding it, and a module sits on the level its imports put it on, so nothing drifts across the picture with the force. Switch the grain to modules, or down to declarations, where a file becomes a box of its own. Imports and calls are separate edges on separate bows, either can be turned off, and a pair carrying both shows both.
+Three tabs. **Overview** is what the repo is: size, languages, the file tree, the timeline, the commit log, who wrote it, its dependencies and its tests. **Graph** is how it is wired. **Tasks** is what to do about it.
 
-Execution view analyzes the call graph rather than the import graph. Reach is followed from what actually runs: every file's top level, and every export unless you switch that off. What nothing arrives at is named, with the lines deleting it would take out.
+Graph draws the picture first. Every file is a dot inside the module holding it, and a module sits on the level its imports put it on, so nothing drifts across the picture with the force. Switch the grain to modules, or down to declarations, where a file becomes a box of its own. Imports and calls are separate edges on separate bows, either can be turned off, and a pair carrying both shows both.
 
-Modules view analyzes the import-graph rather than file tree. Files grouped into folders, `auto` picks module order and depth for you. Cycles are detected and organized visually.
+Below it, the import graph: files grouped into folders, `auto` picks module order and depth for you, and cycles are detected and organized visually. Then the call graph, which follows reach from what actually runs, every file's top level and every export unless you switch that off, and names what nothing arrives at with the lines deleting it would take out.
+
+Every panel can be dragged, hidden and reordered, and how many rows each holds is one setting: five, ten, ten scrolled, or all of them.
 
 `desprawl --static` writes static html file with stats inlined and opens that instead. No server and no network, so it keeps working offline and can be sent to someone, or served as a website.
 

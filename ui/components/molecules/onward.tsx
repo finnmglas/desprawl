@@ -23,7 +23,7 @@ export function Loading({
   what: string
   slow?: string
   rows?: number
-  /** off for a view stacked with others, where one footer answers for the whole tab */
+  /** off for a stacked view */
   onward?: boolean
 }) {
   return (

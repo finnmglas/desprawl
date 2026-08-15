@@ -68,8 +68,7 @@ const writePrefs = (body: string): void => {
   writeFileSync(store, body)
 }
 
-// an email owns the same face in every repo, so this is machine wide rather than per
-// repo, and it sits beside the prefs for the same reason: it outlives any one clone
+// machine wide: an email owns one face everywhere
 const mugs = join(config, "desprawl", "faces.json")
 
 const readFaces = (): Record<string, string> => {
@@ -80,7 +79,7 @@ const readFaces = (): Record<string, string> => {
   }
 }
 
-/** merged, never replaced: two tabs on two repos each know faces the other does not */
+/** merged, never replaced */
 const writeFaces = (found: Record<string, string>): Record<string, string> => {
   const all = { ...readFaces(), ...found }
   mkdirSync(dirname(mugs), { recursive: true })
@@ -259,8 +258,7 @@ export function serve(
       }
 
       // on disk, so a new port keeps them
-      // github allows sixty unauthenticated calls an hour to an address, and a face
-      // does not change, so what one run learned every later run already knows
+      // github allows sixty calls an hour
       if (url.pathname === "/api/faces") {
         if (req.method === "GET") return json(readFaces())
         if (req.method === "PUT") {
@@ -274,7 +272,6 @@ export function serve(
           })
           req.on("end", () => {
             try {
-              // a cache nobody can write is a cache, not an error
               return json(writeFaces(JSON.parse(body) as Record<string, string>))
             } catch {
               return json(readFaces())
@@ -571,7 +568,7 @@ export function serve(
         }
 
         // dates and authors only, so the chart spans everything
-        // a month or less, by the hour, read fresh: too fine to carry in the payload
+        // too fine for the payload
         if (url.pathname === "/api/hours") {
           const from = url.searchParams.get("from") ?? ""
           const to = url.searchParams.get("to") ?? ""

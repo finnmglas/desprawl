@@ -185,22 +185,16 @@ const HOUR = 3_600_000
 const hourOf = (ms: number): string => new Date(ms).toISOString().slice(0, 13)
 
 export interface Hours {
-  /** the first bucket, as `2026-08-15T13`, and one entry per hour from it */
-  first: string
+  first: string // as 2026-08-15T13
   commits: number[]
   insertions: number[]
   deletions: number[]
   devs: number[]
 }
 
-/**
- * Every hour between two days, read with the diff, so an hour view carries the same
- * series a day view does. Windowed on purpose: a whole history by the hour is mostly
- * zeroes, and this only ever answers for a month or less.
- */
+/** every hour between two days, read with the diff */
 export function hourly(repo: string, from: string, to: string): Hours {
-  // git reads the window in local time and %at is an instant, so ask a day wide on each
-  // side and let the buckets below decide: an extra commit lands in a key nobody reads
+  // git windows in local time, %at is an instant
   const edge = (day: string, by: number) =>
     new Date(Date.parse(day) + by * DAY).toISOString().slice(0, 10)
   const log = git(

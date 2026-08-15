@@ -25,8 +25,7 @@ const recall = (): Faces => JSON.parse(localStorage.getItem(KEY) ?? "{}") as Fac
 
 // commits names emails on public repos, search covers the rest, empty means asked and missing
 export async function loadFaces(stats: Stats): Promise<Faces> {
-  // this browser knows some, the machine knows what every earlier run learned, on any
-  // repo. A saved page has no server to ask and simply gets nothing back
+  // a saved page has no server to ask, and gets nothing back
   const faces = { ...(await knownFaces()), ...recall() }
   const before = Object.keys(faces).length
   const remote = stats.remotes.find((r) => r.host === "github")
@@ -79,7 +78,6 @@ export async function loadFaces(stats: Stats): Promise<Faces> {
   }
 
   remember(faces)
-  // asking is what costs, so only a run that learned something writes
   if (Object.keys(faces).length !== before) void keepFaces(faces)
   return faces
 }
