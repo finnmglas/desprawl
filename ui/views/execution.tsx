@@ -11,8 +11,7 @@ import { Section } from "../components/atoms/section.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
-import { Loading, Onward } from "../components/molecules/onward.tsx"
-import { Save } from "../components/molecules/save.tsx"
+import { Loading } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { callGraph } from "../lib/live.ts"
@@ -51,7 +50,8 @@ export function Execution({ stats }: { stats: Stats }) {
   const repeated = useMemo(() => (calls ? twins(calls) : []), [calls])
   const loops = useMemo(() => (calls ? rings(calls) : []), [calls])
 
-  if (!calls) return <Loading stats={stats} current="Execution" what="Reading every call," />
+  if (!calls)
+    return <Loading stats={stats} current="Graph" what="Reading every call," onward={false} />
 
   const all = Object.values(calls.symbols)
   const declared = all.filter((s) => s.kind !== "module")
@@ -64,7 +64,6 @@ export function Execution({ stats }: { stats: Stats }) {
             Nothing declares a function or a class here, so there is no call graph to read.
           </CardContent>
         </Card>
-        <Onward stats={stats} current="Execution" />
       </div>
     )
 
@@ -127,20 +126,8 @@ export function Execution({ stats }: { stats: Stats }) {
   ]
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Back />
-        <Save
-          className="ml-auto"
-          name="calls"
-          rows={() => [
-            ["from", "from file", "to", "to file"],
-            ...all.flatMap((s) => s.calls.map((to) => [s.name, s.file, named(to), fileOf(to)])),
-          ]}
-          note={`${num(calls.stats.edges)} calls between ${num(calls.stats.symbols)} declarations, as`}
-        />
-      </div>
-
+    // contents, so every panel here is an item of the tab that holds it
+    <div className="contents">
       <Section id="kpis_execution_general">
         <Kpis>
           <Kpi
@@ -194,13 +181,7 @@ export function Execution({ stats }: { stats: Stats }) {
         </Kpis>
       </Section>
 
-      <Section id="kpis_execution_reach" className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-1">
-          <Tabs tabs={KINDS} value={kind} onChange={setKind} />
-          {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
-          <Tabs className="ml-auto" tabs={ROOTS} value={roots} onChange={setRoots} />
-        </div>
-
+      <Section id="kpis_execution_reach">
         <Kpis>
           <Kpi
             label="Only exported"
@@ -263,6 +244,19 @@ export function Execution({ stats }: { stats: Stats }) {
           rows={[...shown].sort((a, b) => b.callers.length - a.callers.length || b.lines - a.lines)}
           id={(s) => s.id}
           columns={columns}
+          saves={[
+            {
+              name: "calls",
+              label: "Every call",
+              note: `${num(calls.stats.edges)} calls between ${num(calls.stats.symbols)} declarations, as`,
+              rows: () => [
+                ["from", "from file", "to", "to file"],
+                ...all.flatMap((one) =>
+                  one.calls.map((to) => [one.name, one.file, named(to), fileOf(to)]),
+                ),
+              ],
+            },
+          ]}
           onRowClick={walk}
           mark={(s) => s.id === atName}
           file="declarations"
@@ -272,11 +266,14 @@ export function Execution({ stats }: { stats: Stats }) {
               {inFile.split("/").pop()} ✕
             </Button>
           )}
+          {/* these shape this table and nothing else, so they live on it */}
+          <Tabs tabs={KINDS} value={kind} onChange={setKind} />
+          {langs.length > 1 && <Tabs tabs={[KINDS[0], ...langs]} value={lang} onChange={setLang} />}
           <Input
             value={find}
             onChange={(event) => setFind(event.target.value)}
             placeholder={`Search ${num(declared.length)} names`}
-            className="ml-auto w-44"
+            className="w-44"
           />
         </DataTable>
       </Section>
@@ -295,7 +292,10 @@ export function Execution({ stats }: { stats: Stats }) {
             columns={DEAD}
             onRowClick={walk}
             file="unreachable"
-          />
+          >
+            {/* what counts as a starting point is the whole question this panel answers */}
+            <Tabs tabs={ROOTS} value={roots} onChange={setRoots} />
+          </DataTable>
         </Section>
       )}
 
@@ -399,8 +399,6 @@ export function Execution({ stats }: { stats: Stats }) {
           </Card>
         </Section>
       )}
-
-      <Onward stats={stats} current="Execution" />
     </div>
   )
 }

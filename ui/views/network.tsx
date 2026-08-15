@@ -8,7 +8,7 @@ import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { Section } from "../components/atoms/section.tsx"
 import { Input } from "../components/atoms/input.tsx"
-import { Loading, Onward } from "../components/molecules/onward.tsx"
+import { Loading } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Menu, MenuSection } from "../components/molecules/menu.tsx"
@@ -699,7 +699,10 @@ export function Network({ stats }: { stats: Stats }) {
     return best
   }
 
-  if (!graph) return <Loading stats={stats} current="Graph" what="Reading every import," rows={5} />
+  if (!graph)
+    return (
+      <Loading stats={stats} current="Graph" what="Reading every import," rows={5} onward={false} />
+    )
 
   // a dot is a file, a declaration or a whole group depending on the grain, and each of
   // those is worth reading, framing and opening: the click says which rather than picking
@@ -730,7 +733,8 @@ export function Network({ stats }: { stats: Stats }) {
   )
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    // contents, so every panel here is an item of the tab that holds it
+    <div className="contents">
       <div className="flex flex-wrap items-center gap-2">
         <Back />
         <Save
@@ -1002,8 +1006,6 @@ export function Network({ stats }: { stats: Stats }) {
           )}
         </p>
       </Section>
-
-      <Onward stats={stats} current="Graph" />
     </div>
   )
 }

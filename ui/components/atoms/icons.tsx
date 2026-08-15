@@ -160,6 +160,6 @@ export const MARKS: Record<string, React.ReactNode> = {
   Execution: <Run />,
   Files: <FolderMark />,
   History: <Clock />,
-  Tasks: <Checks />,
+  Tasks: <Check />,
   Graph: <Dots />,
 }

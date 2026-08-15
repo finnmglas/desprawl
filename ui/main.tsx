@@ -4,6 +4,7 @@
 import { createRoot } from "react-dom/client"
 import { useEffect, useState } from "react"
 import { MARKS, NpmMark } from "./components/atoms/icons.tsx"
+import { Onward } from "./components/molecules/onward.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
 import { RemoteLink } from "./components/molecules/remote-link.tsx"
 import { Waiting } from "./components/atoms/waiting.tsx"
@@ -53,7 +54,8 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Modules", "Execution", "Tasks", "Graph"]
+// what to do about the repo comes after everything that says what it is
+const TABS = ["Overview", "Graph", "Tasks"]
 
 // one object, not a literal per render: useView listens for as long as this stays the same
 const START = {
@@ -171,14 +173,16 @@ function App({
   }, [stats.repo])
 
   const view = (one: string) =>
-    one === "Modules" ? (
-      <Modules stats={stats} faces={faces} />
-    ) : one === "Tasks" ? (
+    one === "Tasks" ? (
       <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
-      <Network stats={stats} />
-    ) : one === "Execution" ? (
-      <Execution stats={stats} />
+      // the picture, then what the imports say, then what actually runs
+      <>
+        <Network stats={stats} />
+        <Modules stats={stats} faces={faces} />
+        <Execution stats={stats} />
+        <Onward stats={stats} current="Graph" />
+      </>
     ) : (
       // Overview last, so a tab nobody knows any more lands somewhere readable
       <Overview

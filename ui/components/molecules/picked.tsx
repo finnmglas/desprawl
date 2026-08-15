@@ -86,7 +86,7 @@ export function Picked({
     label: "Modules",
     icon: <Blocks />,
     why: "the group holding it",
-    run: () => leave({ tab: "Modules", panel: "table_modules", pick: target.id }),
+    run: () => leave({ tab: "Graph", panel: "table_modules", pick: target.id }),
   }
   const inGraph: Deed = {
     label: "Graph",
@@ -98,7 +98,7 @@ export function Picked({
     label: "Execution",
     icon: <Run />,
     why: "what it declares",
-    run: () => leave({ tab: "Execution", panel: "table_declarations", pick: target.id }),
+    run: () => leave({ tab: "Graph", panel: "table_declarations", pick: target.id }),
   }
   const readIt: Deed = {
     label: "Read",

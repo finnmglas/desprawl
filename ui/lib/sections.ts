@@ -20,7 +20,9 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "card_tests",
     "actions_overview",
   ],
-  Modules: [
+  // the picture first, then what the imports say, then what actually runs
+  Graph: [
+    "network_graph",
     "kpis_modules_imports",
     "kpis_modules_groups",
     "table_modules",
@@ -29,8 +31,6 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "table_cycles",
     "card_loops",
     "table_loop_cuts",
-  ],
-  Execution: [
     "kpis_execution_general",
     "kpis_execution_reach",
     "table_declarations",
@@ -40,7 +40,6 @@ export const TAB_SECTIONS: Record<string, string[]> = {
     "table_repeated_names",
     "card_recursion",
   ],
-  Graph: ["network_graph"],
   Tasks: ["kpis_tasks", "card_agents", "table_tasks"],
 }
 

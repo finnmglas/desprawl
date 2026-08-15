@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Button } from "../components/atoms/button.tsx"
+import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
 
@@ -165,6 +166,16 @@ export function Explorer({ stats }: { stats: Stats }) {
                   </button>
                 </span>
               ))}
+              {/* the path itself is what a reader wants to paste somewhere */}
+              {path.length > 0 && (
+                <CopyButton
+                  label="Copy this path"
+                  text={() => path.join("/")}
+                  message={`Copied ${path.join("/")}`}
+                  note="The path inside the repo"
+                  className="ml-0.5 [&_button]:size-5 [&_button]:px-0 [&_svg]:size-3"
+                />
+              )}
               {/* the folder you are standing in, judged like the ones listed inside it,
                   beside its own name rather than lost among the controls */}
               <Tip text={standing.why}>

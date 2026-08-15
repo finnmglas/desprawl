@@ -2,7 +2,6 @@
 // goal: import modules analyzed
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Back } from "../components/atoms/back.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Button } from "../components/atoms/button.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
@@ -17,7 +16,7 @@ import { Input } from "../components/atoms/input.tsx"
 import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
 import { Matrix } from "../components/molecules/matrix.tsx"
 import { Save } from "../components/molecules/save.tsx"
-import { Loading, Onward } from "../components/molecules/onward.tsx"
+import { Loading } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
 import { num, plural, shortPath } from "../lib/format.ts"
@@ -85,14 +84,13 @@ const glued = (loop: Tangle) => {
   return glue > 0 && glue / Math.max(1, imports) >= 0.5
 }
 
-function Empty({ stats, children }: { stats: Stats; children: React.ReactNode }) {
+function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <Back />
+    // contents, so every panel here is an item of the tab that holds it
+    <div className="contents">
       <Card>
         <CardContent className="text-muted-foreground p-6 text-sm">{children}</CardContent>
       </Card>
-      <Onward stats={stats} current="Modules" />
     </div>
   )
 }
@@ -161,10 +159,10 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
     [layout, keep],
   )
 
-  if (!graph) return <Loading stats={stats} current="Modules" what="Reading all imports," />
+  if (!graph)
+    return <Loading stats={stats} current="Graph" what="Reading all imports," onward={false} />
 
-  if (!layout || !units.length)
-    return <Empty stats={stats}>No imports, possibly no TS/JS here.</Empty>
+  if (!layout || !units.length) return <Empty>No imports, possibly no TS/JS here.</Empty>
 
   const kept = new Set(units.map((u) => u.path))
   const links = units.reduce(
@@ -247,22 +245,8 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
   )
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Back />
-        <Save
-          className="ml-auto"
-          name="imports"
-          rows={() => [
-            ["from", "to", "type only", "lazy"],
-            ...Object.values(graph.modules).flatMap((m) =>
-              m.out.map((e) => [m.path, e.to, String(e.type), String(e.lazy)]),
-            ),
-          ]}
-          note={`${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files, as`}
-        />
-      </div>
-
+    // contents, so every panel here is an item of the tab that holds it
+    <div className="contents">
       <Section id="kpis_modules_imports">
         <Kpis>
           <Kpi
@@ -378,6 +362,19 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
           hint={at === AUTO ? "auto-detected structure" : `groups by ${at}`}
           rows={[...shown].sort((a, b) => b.files - a.files)}
           id={(u) => u.path}
+          saves={[
+            {
+              name: "imports",
+              label: "Every import",
+              note: `${num(graph.stats.edges)} imports between ${num(graph.stats.files)} files, as`,
+              rows: () => [
+                ["from", "to", "type only", "lazy"],
+                ...Object.values(graph.modules).flatMap((m) =>
+                  m.out.map((e) => [m.path, e.to, String(e.type), String(e.lazy)]),
+                ),
+              ],
+            },
+          ]}
           columns={[
             ...columns,
             {
@@ -717,8 +714,6 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
           />
         </Section>
       )}
-
-      <Onward stats={stats} current="Modules" />
     </div>
   )
 }

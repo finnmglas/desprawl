@@ -16,22 +16,25 @@ export function Loading({
   what,
   slow = "Large repo takes a few seconds.",
   rows = 4,
+  onward = true,
 }: {
   stats: Stats
   current: string
   what: string
   slow?: string
   rows?: number
+  /** off for a view stacked with others, where one footer answers for the whole tab */
+  onward?: boolean
 }) {
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
-      <Back />
+    <div className={onward ? "flex flex-col gap-4 sm:gap-6" : "contents"}>
+      {onward && <Back />}
       <Card>
         <CardContent className="p-4">
           <Waiting what={what} slow={slow} rows={rows} />
         </CardContent>
       </Card>
-      <Onward stats={stats} current={current} />
+      {onward && <Onward stats={stats} current={current} />}
     </div>
   )
 }
@@ -44,10 +47,8 @@ export function Onward({ stats, current }: { stats: Stats; current: string }) {
   // the tab is the title, and what it holds is a handful of words under it
   const links = Object.entries({
     Overview: "size, languages, the file tree, the log, who wrote them",
-    Modules: "what depends on what, and the loops",
-    Execution: "what is leaned on, what nothing reaches",
     Tasks: "what to do, with a size on each",
-    Graph: "every file a dot, every import a line",
+    Graph: "the picture, what depends on what, and what nothing reaches",
   }).filter(([to]) => to !== current)
 
   // contents makes these the flex parent's own items, each defaulting to order 0
