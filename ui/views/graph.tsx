@@ -178,7 +178,7 @@ export function Graph({
   const width = railed ? PAD * 2 + lanes * GAP : 0
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex flex-wrap items-center gap-2">
         <Back />
         <Save

@@ -87,7 +87,7 @@ const glued = (loop: Tangle) => {
 
 function Empty({ stats, children }: { stats: Stats; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <Back />
       <Card>
         <CardContent className="text-muted-foreground p-6 text-sm">{children}</CardContent>
@@ -247,7 +247,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <div className="flex flex-wrap items-center gap-2">
         <Back />
         <Save

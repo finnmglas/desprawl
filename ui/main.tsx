@@ -201,7 +201,7 @@ function App({
   return (
     <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows }}>
       <GoingProvider value={{ at, go, was, open: setTarget }}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6">
           {/* a saved file is read by someone who did not run it, so it says what it is */}
           {!isLive() && (
             <div
@@ -347,7 +347,10 @@ function App({
               {printing && (
                 <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
               )}
-              <div data-shot={one} className={cn("flex flex-col gap-4", printing && "p-6")}>
+              <div
+                data-shot={one}
+                className={cn("flex flex-col gap-4 sm:gap-6", printing && "p-6")}
+              >
                 {view(one)}
               </div>
             </section>

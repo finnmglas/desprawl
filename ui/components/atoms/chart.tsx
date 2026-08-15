@@ -35,7 +35,7 @@ export function ChartContainer({
   return (
     <div
       className={cn(
-        "h-56 w-full [&_.recharts-cartesian-grid_line]:stroke-border/60 [&_text]:fill-muted-foreground [&_text]:text-[11px]",
+        "h-80 w-full [&_.recharts-cartesian-grid_line]:stroke-border/60 [&_text]:fill-muted-foreground [&_text]:text-[11px]",
         className,
       )}
       data-chart-keys={Object.keys(config).join(",")}

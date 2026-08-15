@@ -24,7 +24,7 @@ export function Loading({
   rows?: number
 }) {
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 sm:gap-6">
       <Back />
       <Card>
         <CardContent className="p-4">
@@ -73,7 +73,7 @@ export function Onward({ stats, current }: { stats: Stats; current: string }) {
         </div>
       )}
 
-      <div style={last} className="grid gap-3 sm:grid-cols-2">
+      <div style={last} className="grid gap-4 sm:grid-cols-2 sm:gap-6">
         {links.map(([to, why]) => (
           <Card
             key={to}
