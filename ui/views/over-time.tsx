@@ -27,13 +27,21 @@ import { Tabs } from "../components/atoms/tabs.tsx"
 import { Working, useSlow } from "../components/atoms/working.tsx"
 import { untransform } from "../lib/curve.ts"
 import { useDisplay } from "../lib/display.tsx"
-import { GRAINS, defaultGrain, endsAt, num, stamp, startsAt } from "../lib/format.ts"
+import {
+  defaultGrain,
+  endsAt,
+  grainsFor,
+  nearestGrain,
+  num,
+  stamp,
+  startsAt,
+} from "../lib/format.ts"
 
-import { isLive, sizeCurve, type Sample } from "../lib/live.ts"
+import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/live.ts"
 import { GROUPS, SERIES, expand, rows } from "../lib/series.ts"
 import { cn } from "../lib/ui.ts"
 import type { Grain } from "../lib/format.ts"
-import type { Timeline } from "../../src/history.ts"
+import type { Hours, Timeline } from "../../src/history.ts"
 import type { Stats } from "../../src/model.ts"
 
 export function OverTime({
@@ -55,9 +63,11 @@ export function OverTime({
   const [grained, setGrained] = useState(false)
   const [sizes, setSizes] = useState<Sample[]>([])
   const [sizing, setSizing] = useState(false)
+  // the hour window, keyed by the days it covers so the same window is read once
+  const [hours, setHours] = useState<{ at: string; got: Hours | null }>({ at: "", got: null })
   const slow = useSlow(sizing)
-  // how a repo grew, and who was there while it did
-  const [picked, setPicked] = useState<string[]>(["changes", "lines", "devs"])
+  // how a repo grew, how often, and who was there while it did
+  const [picked, setPicked] = useState<string[]>(["commits", "changes", "lines", "devs"])
   const series = expand(picked)
   // the old default is too fine once the span is known
   useEffect(() => {
@@ -78,8 +88,8 @@ export function OverTime({
   }, [picked])
 
   const days = useMemo(
-    () => rows(stats, series, grain, curve, all, sizes),
-    [stats, picked, grain, curve, all, sizes],
+    () => rows(stats, series, grain, curve, all, sizes, hours.got),
+    [stats, picked, grain, curve, all, sizes, hours],
   )
 
   // dragging across the chart zooms the chart, every other view stays where it was.
@@ -91,6 +101,37 @@ export function OverTime({
     onZoom?.(zoom ? stamp(new Date(zoom[0])) : "", zoom ? stamp(new Date(zoom[1])) : "")
   }, [zoom])
   const [drag, setDrag] = useState<[string, string] | null>(null)
+
+  // what the axis covers right now, zoomed or whole, and the grains that span can carry.
+  // zooming in drops the coarse ones, and resetting the zoom hands them back
+  const span = useMemo(() => {
+    const first = (all?.first ?? stats.first).slice(0, 10)
+    const last = (all?.last ?? stats.last).slice(0, 10)
+    const [from, to] = zoom ?? [startsAt(first), endsAt(last, "day")]
+    return (to - from) / 86_400_000
+  }, [zoom, all, stats.first, stats.last])
+  // by the hour needs a live read, so a saved page never offers it
+  const offered = useMemo(() => grainsFor(span).filter((g) => g !== "hour" || isLive()), [span])
+  // a window can outgrow a grain (hour past a month) or undercut one (year inside a
+  // month), so land on the nearest one it can carry rather than always the coarsest
+  useEffect(() => {
+    if (!offered.includes(grain)) setGrain(nearestGrain(grain, offered))
+  }, [offered, grain])
+
+  // by the hour is read live, for the window on screen and no wider
+  const hourSpan = useMemo(() => {
+    const first = (all?.first ?? stats.first).slice(0, 10)
+    const last = (all?.last ?? stats.last).slice(0, 10)
+    const from = stamp(new Date(zoom ? zoom[0] : startsAt(first)))
+    const to = stamp(new Date(zoom ? zoom[1] : endsAt(last, "day")))
+    return `${from}:${to}`
+  }, [zoom, all, stats.first, stats.last])
+  useEffect(() => {
+    if (grain !== "hour" || hours.at === hourSpan) return
+    const [from, to] = hourSpan.split(":")
+    setHours({ at: hourSpan, got: null })
+    void hourCurve(from, to).then((got) => setHours({ at: hourSpan, got }))
+  }, [grain, hourSpan, hours.at])
 
   const shown = useMemo(() => {
     if (!zoom) return days
@@ -147,8 +188,10 @@ export function OverTime({
   const mixed =
     picked.some((k) => k === "commits" || k === "devs") &&
     picked.some((k) => k !== "commits" && k !== "devs")
-  const hint =
-    !all && stats.truncated
+  const reading = grain === "hour" && !hours.got
+  const hint = reading
+    ? "reading every commit in this window by the hour…"
+    : !all && stats.truncated
       ? "reading every commit date, so the chart can span the whole history…"
       : zoom
         ? `zoomed to ${shown[0]?.day} - ${shown.at(-1)?.day}, ${num(shown.length)} of ${num(days.length)} buckets. Double click to reset`
@@ -162,7 +205,7 @@ export function OverTime({
 
   return (
     <Card>
-      <CardHead title="Over time" hint={hint} wrap>
+      <CardHead title="Timeline" hint={hint} wrap>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {zoom && (
             <Button variant="outline" size="sm" onClick={() => setZoom(null)}>
@@ -179,14 +222,14 @@ export function OverTime({
             </Button>
           )}
           <Working on={sizing} />
-          <Tabs tabs={GRAINS} value={grain} onChange={(next) => setGrain(next as Grain)} />
+          <Tabs tabs={offered} value={grain} onChange={(next) => setGrain(next as Grain)} />
           <CopyButton
             text={records}
             message={`Copied ${shown.length} buckets`}
             note="As json, one object per bucket"
           />
           <Save
-            name="over-time"
+            name="timeline"
             picture={() => chart.current}
             rows={matrix}
             note={`${shown.length} buckets, ${series.length} series, as`}
@@ -262,8 +305,8 @@ export function OverTime({
           </ChartContainer>
         </div>
 
-        {/* the legend is the control */}
-        <div className="mt-3 flex flex-wrap gap-1.5">
+        {/* the legend is the control, and it sits under its own chart on the right */}
+        <div className="mt-3 flex flex-wrap justify-end gap-1.5">
           {/* the size curve is eighty tree walks on the repo, which a saved page cannot do */}
           {GROUPS.filter((group) => group.key !== "size" || isLive()).map((group) => {
             const on = picked.includes(group.key)

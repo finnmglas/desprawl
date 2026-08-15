@@ -4,7 +4,7 @@
 import { transform } from "./curve.ts"
 import type { Curve } from "./display.tsx"
 import { spans, type Grain } from "./format.ts"
-import type { Timeline } from "../../src/history.ts"
+import type { Hours, Timeline } from "../../src/history.ts"
 import type { Stats } from "../../src/model.ts"
 
 export interface Spec {
@@ -110,6 +110,56 @@ function daily(stats: Stats, key: string): number[] {
 }
 
 const DAY = 86_400_000
+const HOUR = 3_600_000
+
+/** the buckets and their numbers, whatever grain built them */
+interface Built {
+  groups: { day: string; days: number[] }[]
+  raw: Record<string, (number | undefined)[]>
+}
+
+/**
+ * By the hour, from a window read live rather than from the payload. One source point
+ * per bucket, and every series comes off the same log, so nothing here is windowed
+ * differently from anything else beside it.
+ */
+function byHour(hours: Hours, picked: string[], sizes?: { date: string; bytes: number }[]): Built {
+  const start = Date.parse(`${hours.first}:00:00Z`)
+  const length = hours.commits.length
+  const groups = Array.from({ length }, (_, i) => ({
+    day: new Date(start + i * HOUR).toISOString().slice(0, 13),
+    days: [i],
+  }))
+  let running = 0
+  const net = hours.insertions.map((v, i) => (running += v - (hours.deletions[i] ?? 0)))
+
+  const raw: Record<string, (number | undefined)[]> = {}
+  for (const key of picked) {
+    if (key === "size") {
+      // the size readings are daily, so each lands on its midnight and holds until the next
+      const filled: (number | undefined)[] = new Array(length).fill(undefined)
+      for (const one of sizes ?? []) {
+        const i = Math.round((Date.parse(`${one.date}T00:00:00Z`) - start) / HOUR)
+        if (i >= 0 && i < length) filled[i] = one.bytes
+      }
+      let carried: number | undefined
+      for (let i = 0; i < length; i++) filled[i] = carried = filled[i] ?? carried
+      raw[key] = filled
+      continue
+    }
+    raw[key] =
+      key === "added"
+        ? hours.insertions
+        : key === "removed"
+          ? hours.deletions
+          : key === "lines"
+            ? net
+            : key === "devs"
+              ? hours.devs
+              : hours.commits
+  }
+  return { groups, raw }
+}
 
 // windowed series stay undefined outside their window, a gap rather than a false zero
 export function rows(
@@ -119,9 +169,15 @@ export function rows(
   curve: Curve,
   all?: Timeline | null,
   sizes?: { date: string; bytes: number }[],
+  hours?: Hours | null,
 ): Row[] {
   const commits = stats.series.find((s) => s.metric === "commits")
   if (!commits || !picked.length) return []
+  // magnitudes differ, so each group is drawn against its own peak
+  const shares = new Set(picked.map((k) => SERIES[k].group)).size > 1
+  // by the hour the window is read live and every series comes from that one read
+  if (grain === "hour")
+    return hours ? finish(byHour(hours, picked, sizes), picked, curve, shares) : []
 
   // span all history only when something shown covers it
   const wide = picked.some((k) => k === "commits" || k === "devs" || k === "size")
@@ -131,8 +187,6 @@ export function rows(
   // where the analysed window begins on the axis
   const offset = Math.round((Date.parse(commits.start) - Date.parse(first)) / DAY)
   const groups = spans(length, first, grain)
-  // magnitudes differ, so each group is drawn against its own peak
-  const share = new Set(picked.map((k) => SERIES[k].group)).size > 1
 
   const raw: Record<string, (number | undefined)[]> = {}
   for (const key of picked) {
@@ -170,6 +224,12 @@ export function rows(
     })
   }
 
+  return finish({ groups, raw }, picked, curve, shares)
+}
+
+// magnitudes differ across groups, so each is drawn against its own peak
+function finish(built: Built, picked: string[], curve: Curve, share: boolean): Row[] {
+  const { groups, raw } = built
   const peaks: Record<string, number> = {}
   for (const key of picked) {
     const group = SERIES[key].group

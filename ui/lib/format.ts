@@ -83,13 +83,33 @@ export interface Sort {
 export const cycle = (sort: Sort | null, key: string): Sort | null =>
   sort?.key !== key ? { key, asc: false } : sort.asc ? null : { key, asc: true }
 
-export type Grain = "day" | "week" | "month" | "year"
-export const GRAINS: Grain[] = ["day", "week", "month", "year"]
+export type Grain = "hour" | "day" | "week" | "month" | "year"
+export const GRAINS: Grain[] = ["hour", "day", "week", "month", "year"]
+
+/** the shortest span each grain can say anything with, in days */
+const NEEDS: Record<Grain, number> = { hour: 0, day: 0, week: 7, month: 31, year: 365 }
+/** and the longest: a decade by the hour is ninety thousand bars and one live read */
+const HOLDS: Partial<Record<Grain, number>> = { hour: 31 }
+
+/** the grains a span of this many days can honestly carry: one year of a week old repo
+ * is one bar, which is not a shape, and one year by the hour is not one either.
+ * Day survives every span, so there is always a choice */
+export const grainsFor = (days: number): Grain[] =>
+  GRAINS.filter((g) => days >= NEEDS[g] && days <= (HOLDS[g] ?? Infinity))
+
+/** the grain nearest the one asked for that this span can carry, coarser or finer */
+export function nearestGrain(want: Grain, offered: Grain[]): Grain {
+  if (offered.includes(want)) return want
+  const from = GRAINS.indexOf(want)
+  const away = (g: Grain) => Math.abs(GRAINS.indexOf(g) - from)
+  return offered.reduce((best, g) => (away(g) < away(best) ? g : best), offered[0] ?? "day")
+}
 
 const DAY_MS = 86_400_000
 
 /** Label a date with the bucket it falls in. Weeks start Monday, in UTC. */
 function label(date: Date, grain: Grain): string {
+  if (grain === "hour") return date.toISOString().slice(0, 13)
   const iso = date.toISOString().slice(0, 10)
   if (grain === "day") return iso
   if (grain === "year") return iso.slice(0, 4)
@@ -131,13 +151,22 @@ export function spans(
 
 /** the instant a bucket label starts, whatever granularity wrote it */
 export const startsAt = (label: string): number =>
-  Date.parse(label.length === 4 ? `${label}-01-01` : label.length === 7 ? `${label}-01` : label)
+  Date.parse(
+    label.length === 4
+      ? `${label}-01-01`
+      : label.length === 7
+        ? `${label}-01`
+        : label.length === 13
+          ? `${label}:00:00Z`
+          : label,
+  )
 
 /** and the instant it ends, so two granularities can be compared */
 export function endsAt(label: string, grain: Grain): number {
   const from = new Date(startsAt(label))
   if (grain === "year") from.setUTCFullYear(from.getUTCFullYear() + 1)
   else if (grain === "month") from.setUTCMonth(from.getUTCMonth() + 1)
+  else if (grain === "hour") from.setUTCHours(from.getUTCHours() + 1)
   else from.setUTCDate(from.getUTCDate() + (grain === "week" ? 7 : 1))
   return from.getTime() - 1
 }

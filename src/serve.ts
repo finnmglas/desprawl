@@ -29,7 +29,7 @@ import { close, hush, say, startTalk, talks } from "./talk.ts"
 import type { Suite } from "./tests.ts"
 import type { Deps } from "./deps.ts"
 import type { Graph } from "./graph.ts"
-import { bytesAt, count, detail, moved, page, timeline } from "./history.ts"
+import { bytesAt, count, detail, hourly, moved, page, timeline } from "./history.ts"
 import type { Timeline } from "./history.ts"
 import type { Node, Stats } from "./model.ts"
 import { git } from "./model.ts"
@@ -526,6 +526,15 @@ export function serve(
         }
 
         // dates and authors only, so the chart spans everything
+        // a month or less, by the hour, read fresh: too fine to carry in the payload
+        if (url.pathname === "/api/hours") {
+          const from = url.searchParams.get("from") ?? ""
+          const to = url.searchParams.get("to") ?? ""
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
+            return send(400, "bad dates", "text/plain")
+          return json(hourly(repo, from, to))
+        }
+
         if (url.pathname === "/api/timeline") {
           allTime ||= timeline(repo)
           return json(allTime)

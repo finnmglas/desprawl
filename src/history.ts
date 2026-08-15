@@ -181,6 +181,76 @@ export interface Timeline {
 
 const SAMPLES = 80
 
+const HOUR = 3_600_000
+const hourOf = (ms: number): string => new Date(ms).toISOString().slice(0, 13)
+
+export interface Hours {
+  /** the first bucket, as `2026-08-15T13`, and one entry per hour from it */
+  first: string
+  commits: number[]
+  insertions: number[]
+  deletions: number[]
+  devs: number[]
+}
+
+/**
+ * Every hour between two days, read with the diff, so an hour view carries the same
+ * series a day view does. Windowed on purpose: a whole history by the hour is mostly
+ * zeroes, and this only ever answers for a month or less.
+ */
+export function hourly(repo: string, from: string, to: string): Hours {
+  // git reads the window in local time and %at is an instant, so ask a day wide on each
+  // side and let the buckets below decide: an extra commit lands in a key nobody reads
+  const edge = (day: string, by: number) =>
+    new Date(Date.parse(day) + by * DAY).toISOString().slice(0, 10)
+  const log = git(
+    repo,
+    "log",
+    `--since=${edge(from, -1)}`,
+    `--until=${edge(to, 1)}`,
+    "--numstat",
+    "--pretty=format:%x01%at%x1f%aE",
+  )
+  const counts = new Map<string, number>()
+  const adds = new Map<string, number>()
+  const dels = new Map<string, number>()
+  const who = new Map<string, Set<string>>()
+  let at = ""
+  for (const line of log.split("\n")) {
+    if (line.startsWith("\x01")) {
+      const [seconds, email] = line.slice(1).split("\x1f")
+      const when = Number(seconds)
+      at = when && believable(when) ? hourOf(when * 1000) : ""
+      if (!at) continue
+      counts.set(at, (counts.get(at) ?? 0) + 1)
+      const seen = who.get(at) ?? new Set<string>()
+      seen.add((email ?? "").toLowerCase())
+      who.set(at, seen)
+      continue
+    }
+    if (!at) continue
+    const [added, deleted, raw] = line.split("\t")
+    if (raw === undefined) continue
+    adds.set(at, (adds.get(at) ?? 0) + (Number(added) || 0))
+    dels.set(at, (dels.get(at) ?? 0) + (Number(deleted) || 0))
+  }
+
+  const start = Date.parse(`${from}T00:00:00Z`)
+  const end = Date.parse(`${to}T23:00:00Z`)
+  const commits: number[] = []
+  const insertions: number[] = []
+  const deletions: number[] = []
+  const devs: number[] = []
+  for (let t = start; t <= end; t += HOUR) {
+    const key = hourOf(t)
+    commits.push(counts.get(key) ?? 0)
+    insertions.push(adds.get(key) ?? 0)
+    deletions.push(dels.get(key) ?? 0)
+    devs.push(who.get(key)?.size ?? 0)
+  }
+  return { first: hourOf(start), commits, insertions, deletions, devs }
+}
+
 // dates and authors only, no diff: fifteen seconds not twenty minutes
 export function timeline(repo: string): Timeline {
   const log = git(repo, "log", "--format=%at%x1f%aE%x1f%h")

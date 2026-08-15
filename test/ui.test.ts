@@ -7,7 +7,7 @@ import { analyze } from "../src/analyze.ts"
 import { human } from "../src/human.ts"
 import { place } from "../ui/lib/lanes.ts"
 import { effective, shares } from "../ui/lib/scale.ts"
-import { bucket, defaultGrain } from "../ui/lib/format.ts"
+import { bucket, defaultGrain, grainsFor, nearestGrain } from "../ui/lib/format.ts"
 import { expand, rows } from "../ui/lib/series.ts"
 import { isId, nameOf, namesOf } from "../src/naming.ts"
 import { FORMATS } from "../ui/lib/formats.ts"
@@ -84,6 +84,33 @@ test("days become weeks and months as a repo ages", () => {
   // prettier-ignore
   const spans: [string, string][] = [["2026-01-05", "day"], ["2026-06-01", "week"], ["2046-01-01", "month"]]
   for (const [last, grain] of spans) assert.equal(defaultGrain("2026-01-01", last), grain, last)
+})
+
+test("a span only offers the grains it could draw a shape with", () => {
+  assert.deepEqual(grainsFor(3), ["hour", "day"])
+  assert.deepEqual(grainsFor(8), ["hour", "day", "week"])
+  assert.deepEqual(grainsFor(60), ["day", "week", "month"])
+  assert.deepEqual(grainsFor(400), ["day", "week", "month", "year"])
+  // the boundaries themselves, since a year of a year old repo is one bar
+  assert.ok(!grainsFor(364).includes("year"))
+  assert.ok(grainsFor(365).includes("year"))
+  assert.ok(!grainsFor(30).includes("month"))
+  assert.ok(grainsFor(31).includes("month"))
+  // and by the hour is capped rather than floored: a decade of hours is not a shape
+  assert.ok(grainsFor(31).includes("hour"))
+  assert.ok(!grainsFor(32).includes("hour"))
+  // day survives everything, so a chart is never left without a grain to pick
+  assert.deepEqual(grainsFor(0), ["hour", "day"])
+})
+
+test("a grain a window cannot carry lands on the nearest one it can", () => {
+  // zooming out past a month drops hours, and day is next door, not year
+  assert.equal(nearestGrain("hour", ["day", "week", "month", "year"]), "day")
+  // zooming into a month drops years, and month is next door
+  assert.equal(nearestGrain("year", ["hour", "day", "week", "month"]), "month")
+  assert.equal(nearestGrain("month", ["hour", "day", "week"]), "week")
+  // one it can carry is left alone
+  assert.equal(nearestGrain("week", ["hour", "day", "week"]), "week")
 })
 
 test("bucketing keeps every value, it only regroups them", () => {

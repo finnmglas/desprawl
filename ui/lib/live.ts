@@ -10,7 +10,7 @@ import type { Action, Alive } from "../../src/actions.ts"
 import type { Agent } from "../../src/agent.ts"
 import type { Talk } from "../../src/talk.ts"
 import type { Graph } from "../../src/graph.ts"
-import type { Detail, Moved, Timeline } from "../../src/history.ts"
+import type { Detail, Hours, Moved, Timeline } from "../../src/history.ts"
 import type { Source } from "../../src/serve.ts"
 import type { Commit, Node } from "../../src/model.ts"
 
@@ -148,6 +148,10 @@ export interface Sample {
 }
 
 export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
+
+/** a month or less by the hour, read fresh: too fine to carry in the payload */
+export const hourCurve = (from: string, to: string): Promise<Hours | null> =>
+  ask<Hours | null>(`/api/hours?from=${from}&to=${to}`, null)
 
 export const trueCount = (): Promise<number> =>
   ask<{ commits: number }>("/api/count", { commits: 0 }).then((r) => r.commits)
