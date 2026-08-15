@@ -102,6 +102,25 @@ A saved file carries both graphs, the dependency table and what the test suite h
 
 Every panel saves as CSV, TSV, JSON, TOML, Markdown or Excel, every drawing as PNG, JPEG, WebP or SVG, and the whole report as a PDF printed by your own browser, so the text in it stays text.
 
+## Library
+
+Importable types. `desprawl --json` covers everything else.
+
+```ts
+import { analyze, build, calls, cycles, fold, knowledge } from "desprawl"
+
+const stats = analyze(repo) // loc, languages, history, contributors, stack
+const graph = build(repo) // imports, per file
+const reach = calls(repo, graph) // declarations and what calls what
+const loops = cycles(graph) // file cycles, nothing invented or lost
+const layout = fold(graph, 1) // files grouped into modules and levels
+const found = knowledge(repo, graph, reach, layout, "file", 1)
+```
+
+`knowledge()` returns the whole picture as typed things & relations.
+
+One entry point, everything else internal & free to move, so `desprawl/dist/*` is not importable.
+
 ## Related
 
 - Uses: [npm-packaging](https://www.npmjs.com/), [pnpm-cli](https://pnpm.io/), [ts](https://www.typescriptlang.org/), [git](https://git-scm.com/), [claude](https://claude.ai/new)
