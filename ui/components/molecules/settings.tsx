@@ -15,9 +15,11 @@ import {
   CURVES,
   EXPLAIN,
   SCALES,
+  SHOWN,
   type Brands,
   type Curve,
   type Scale,
+  type Shown,
 } from "../../lib/display.tsx"
 import { num } from "../../lib/format.ts"
 import { THEMES, type ThemeState } from "../../lib/theme.tsx"
@@ -61,7 +63,7 @@ export function Settings({
   onPaper?: (kind: "pdf" | "pptx") => void
   themed: ThemeState
 }) {
-  const { scale, curve, region, brands } = prefs
+  const { scale, curve, region, brands, rows } = prefs
   const customized = useCustomized()
   const [exporting, setExporting] = useState(false)
 
@@ -116,6 +118,19 @@ export function Settings({
           tabs={[...THEMES]}
           value={themed.theme}
           onChange={(next) => themed.setTheme(next as ThemeState["theme"])}
+        />
+        <Choice
+          label="Show rows"
+          hint={
+            rows === "virtual"
+              ? "ten rows tall, scrolled, all of them in there"
+              : rows === "all"
+                ? "every row printed, however many that is"
+                : `${rows} rows, the rest behind a row that opens them`
+          }
+          tabs={SHOWN}
+          value={rows}
+          onChange={(next) => change({ rows: next as Shown })}
         />
         <Choice
           label="Number relation"

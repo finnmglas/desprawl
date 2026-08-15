@@ -27,9 +27,6 @@ const SPLIT: Record<string, (n: Node) => number> = {
   Blank: (n) => n.blank,
 }
 
-// rows past this fold sit behind the table's own "show more"
-const FOLD = 12
-
 // what opening it would show. A served tree carries directories only, and counts the rest
 const entries = (n: Node) => (n.children ? n.children.length + (n.leaves ?? 0) : 0)
 
@@ -190,7 +187,6 @@ export function Explorer({ stats }: { stats: Stats }) {
           columns={columns}
           rows={rows}
           id={(n) => n.path}
-          fold={FOLD}
           saves={[
             {
               name: `${path.join("-") || "root"}-tree`,

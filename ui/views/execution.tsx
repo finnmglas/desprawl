@@ -265,7 +265,6 @@ export function Execution({ stats }: { stats: Stats }) {
           columns={columns}
           onRowClick={walk}
           mark={(s) => s.id === atName}
-          fold={12}
           file="declarations"
         >
           {inFile && (
@@ -295,7 +294,6 @@ export function Execution({ stats }: { stats: Stats }) {
             id={(s) => s.id}
             columns={DEAD}
             onRowClick={walk}
-            fold={12}
             file="unreachable"
           />
         </Section>
@@ -310,7 +308,6 @@ export function Execution({ stats }: { stats: Stats }) {
             id={(s) => s.id}
             columns={ONLY}
             onRowClick={walk}
-            fold={12}
             file="only-exported"
           />
         </Section>
@@ -334,7 +331,6 @@ export function Execution({ stats }: { stats: Stats }) {
                 relation: "where it is used",
               })
             }
-            fold={8}
             file="unresolved"
           />
         </Section>
@@ -358,7 +354,6 @@ export function Execution({ stats }: { stats: Stats }) {
                 relation: "the files declaring it",
               })
             }
-            fold={10}
             file="repeated-names"
           />
         </Section>

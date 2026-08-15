@@ -403,7 +403,6 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
           onRowClick={(u) => choose(u.path)}
           onSort={setSort}
           mark={(u) => !!focus && u.path === focus}
-          fold={12}
         >
           {focus && (
             <Button variant="outline" size="sm" onClick={() => going.go({ pick: "" })}>
@@ -616,7 +615,6 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
                 relation: "the ring, file by file",
               })
             }
-            fold={8}
           />
         </Section>
       )}
@@ -716,7 +714,6 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
             id={(edge) => `${edge.from} ${edge.to}`}
             columns={CUTS}
             onRowClick={(edge) => going.open(asGroup(edge.from, label?.(edge.from)))}
-            fold={12}
           />
         </Section>
       )}

@@ -1,7 +1,7 @@
 // owner: finn
 // goal: settings
 
-import type { Brands, Curve, Scale } from "./display.tsx"
+import type { Brands, Curve, Scale, Shown } from "./display.tsx"
 import type { Choice } from "./locale.ts"
 import type { Theme } from "./theme.tsx"
 
@@ -11,6 +11,8 @@ export interface Prefs {
   curve: Curve
   region: Choice
   brands: Brands
+  /** how many rows every table shows before it folds, scrolls or prints the lot */
+  rows: Shown
   /** whether the metadata under the architecture card stays open. Open by default: it is
    * the answer to what is this repo, and folding it hides that behind a click */
   metadata: boolean
@@ -28,6 +30,7 @@ export const FALLBACK: Prefs = {
   curve: "linear",
   region: "auto",
   brands: "flashy",
+  rows: "virtual",
   metadata: true,
   agent: { install: "", model: "", mode: "local", trust: "auto" },
   hidden: [],

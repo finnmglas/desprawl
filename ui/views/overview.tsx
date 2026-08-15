@@ -2,7 +2,7 @@
 // goal: show data
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { AiCard } from "../components/molecules/ai-card.tsx"
+import { AiCard, traced } from "../components/molecules/ai-card.tsx"
 import { Avatar } from "../components/atoms/avatar.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
@@ -751,7 +751,6 @@ export function Overview({
           columns={LANGS}
           rows={stats.languages}
           id={(l) => l.name}
-          fold={8}
           onRowClick={(l) => onLang(l.name)}
           total={{ ...stats.tree, name: "total" }}
         />
@@ -783,7 +782,6 @@ export function Overview({
           )}
           rows={did ?? contributors}
           id={(p) => p.email || p.name}
-          fold={8}
         >
           {!did && !folded && (
             <div className="ml-auto flex items-center gap-2">
@@ -793,9 +791,12 @@ export function Overview({
         </DataTable>
       </Section>
 
-      <Section id="ai_overview">
-        <AiCard ai={stats.stack.ai} />
-      </Section>
+      {/* an empty card saying no assistant touched this repo is a row of nothing */}
+      {traced(stats.stack.ai) && (
+        <Section id="ai_overview">
+          <AiCard ai={stats.stack.ai} />
+        </Section>
+      )}
 
       {suite && (suite.files > 0 || suite.script) && (
         <Section id="card_tests">
@@ -964,7 +965,6 @@ export function Overview({
             id={(one) => `${one.name}@${one.version}`}
             columns={columns}
             total={{ ...kit.list[0], name: "", every: picked }}
-            fold={8}
           >
             {!shallow && (
               <div className="ml-auto flex items-center gap-2">

@@ -199,7 +199,7 @@ function App({
     )
 
   return (
-    <DisplayProvider value={{ scale, curve, brands }}>
+    <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows }}>
       <GoingProvider value={{ at, go, was, open: setTarget }}>
         <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:p-6">
           {/* a saved file is read by someone who did not run it, so it says what it is */}

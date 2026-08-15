@@ -5,8 +5,16 @@
 import * as React from "react"
 import { cn } from "../../lib/ui.ts"
 
-export const Table = ({ className, ...props }: React.HTMLAttributes<HTMLTableElement>) => (
-  <div className="w-full overflow-x-auto">
+/** the box around the table is the scrolling ancestor, so anything sticky inside sticks
+ * to it: a second box outside this one would swallow the stick instead */
+type Sheet = React.HTMLAttributes<HTMLTableElement> & {
+  box?: string
+  boxStyle?: React.CSSProperties
+  boxRef?: React.Ref<HTMLDivElement>
+}
+
+export const Table = ({ className, box, boxStyle, boxRef, ...props }: Sheet) => (
+  <div ref={boxRef} className={cn("w-full overflow-x-auto", box)} style={boxStyle}>
     <table className={cn("w-full caption-bottom text-sm", className)} {...props} />
   </div>
 )

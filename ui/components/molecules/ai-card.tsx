@@ -25,6 +25,9 @@ function describe(ai: Ai): [string, string[]][] {
   return rows.filter(([, items]) => items.length)
 }
 
+/** whether any assistant left anything at all, so an empty card can be left out */
+export const traced = (ai: Ai): boolean => describe(ai).length > 0
+
 export function AiCard({ ai }: { ai: Ai }) {
   const rows = describe(ai)
   const share = ai.scanned

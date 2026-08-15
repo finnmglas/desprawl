@@ -366,7 +366,6 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
           id={(one) => one.id}
           columns={columns}
           onRowClick={setOpened}
-          fold={14}
           file="tasks"
         />
       </Section>

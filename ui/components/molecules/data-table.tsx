@@ -14,11 +14,16 @@ import { delimit } from "../../lib/export.ts"
 import { HINTS } from "../../lib/hints.ts"
 import { backdrop, cycle, pct } from "../../lib/format.ts"
 import { effective, shares } from "../../lib/scale.ts"
-import { useDisplay } from "../../lib/display.tsx"
+import { HOLDS, useDisplay } from "../../lib/display.tsx"
 import type { Sort } from "../../lib/format.ts"
 import { cn } from "../../lib/ui.ts"
 
 export type { Column }
+
+/** past this many rows the browser is laying out more than anyone will ever look at */
+const WINDOW_FROM = 60
+/** rows built either side of the view, so a fast scroll does not show blank */
+const OVERSCAN = 6
 
 export interface DataTableProps<T> {
   title: React.ReactNode
@@ -34,8 +39,6 @@ export interface DataTableProps<T> {
   className?: string
   /** Total row pinned to the bottom. */
   total?: T
-  /** Rows shown, the rest behind a toggle */
-  fold?: number
   /** the order the reader chose, for anything drawing the same rows elsewhere */
   onSort?: (sort: Sort | null) => void
   /** what an export is called, when the title is not plain words */
@@ -60,23 +63,34 @@ export function DataTable<T>({
   children,
   className,
   total,
-  fold,
   file,
   saves,
   onSort,
   onFind,
   mark,
 }: DataTableProps<T>) {
-  const { scale, curve } = useDisplay()
+  const { scale, curve, rows: shown_ } = useDisplay()
+  const holds = HOLDS[shown_]
+  // 5 and 10 fold, virtual and all do not
+  const limit = shown_ === "5" || shown_ === "10" ? holds : undefined
+  // only the scrolling mode has a floor to pin anything to
+  const pinned = shown_ === "virtual"
   const sheet = useRef<HTMLDivElement>(null)
   const spot = useRef<HTMLTableRowElement>(null)
   const [sort, setSort] = useState<Sort | null>(null)
   const [open, setOpen] = useState(false)
   const [hunt, setHunt] = useState("")
+  const scroller = useRef<HTMLDivElement>(null)
+  // rows carry avatars and badges, so a row height is not a number anyone can write
+  // down: it is measured off a real row once the table has painted, and ten of it is
+  // how tall the box stands
+  const [unit, setUnit] = useState(0)
+  const [tall, setTall] = useState(0)
+  const [scrolled, setScrolled] = useState(0)
 
-  // a table nobody has to scroll is a table nobody searches, so the search appears with
-  // the fold that hid something in the first place
-  const searchable = fold !== undefined && rows.length > fold
+  // a table nobody has to scroll is a table nobody searches, so the search appears once
+  // there is more than a screenful of it, whichever way this one is being shown
+  const searchable = rows.length > (holds || 10)
   const rows_ = useMemo(() => {
     const said = hunt.trim().toLowerCase()
     if (!said || !searchable) return rows
@@ -144,9 +158,66 @@ export function DataTable<T>({
   }, [columns, rows_, scale])
 
   // the fold hides rows, peaks and export still see them all
-  const foldable = fold !== undefined && sorted.length > fold
-  const shown = foldable && !open ? sorted.slice(0, fold) : sorted
-  const hidden = foldable ? sorted.length - fold : 0
+  const foldable = limit !== undefined && sorted.length > limit
+  const shown = foldable && !open ? sorted.slice(0, limit) : sorted
+  const hidden = foldable ? sorted.length - limit : 0
+  // a table is never shorter than the height it was asked for, so a panel holding two
+  // rows sits as calmly as one holding ten: the difference is space, not size
+  const padding = Math.max(0, holds - shown.length)
+
+  // measured after paint: one real row is the unit, and ten of it plus the head is the box
+  useEffect(() => {
+    const box = scroller.current
+    if (!pinned || !box) {
+      setTall(0)
+      return setUnit(0)
+    }
+    const head = box.querySelector("thead")
+    const row = box.querySelector("tbody > tr[data-row]")
+    if (!head || !row) return
+    const one = row.getBoundingClientRect().height
+    if (!one) return
+    setUnit(one)
+    setTall(Math.round(head.getBoundingClientRect().height + HOLDS.virtual * one))
+  }, [pinned, sorted.length, columns.length, open])
+
+  // a scroll box with every row in it is a scroll box the browser lays out every row of,
+  // so past a point only what is on screen is built, with blank space standing in for
+  // the rest. Under that point the whole list is cheaper than the arithmetic
+  const windowed = pinned && unit > 0 && shown.length > WINDOW_FROM
+  const first = windowed ? Math.max(0, Math.floor(scrolled / unit) - OVERSCAN) : 0
+  const last_ = windowed
+    ? Math.min(shown.length, Math.ceil((scrolled + tall) / unit) + OVERSCAN)
+    : shown.length
+  const slice = windowed ? shown.slice(first, last_) : shown
+
+  // the scroll position drives which rows exist, read once a frame rather than per event
+  useEffect(() => {
+    const box = scroller.current
+    if (!windowed || !box) return
+    let queued = 0
+    const onScroll = () => {
+      if (queued) return
+      queued = requestAnimationFrame(() => {
+        queued = 0
+        setScrolled(box.scrollTop)
+      })
+    }
+    box.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      cancelAnimationFrame(queued)
+      box.removeEventListener("scroll", onScroll)
+    }
+  }, [windowed])
+
+  // a new list is a new place, so it starts at the top rather than mid way down the old
+  // one. Keyed on what the reader changed, never on the rows array: callers rebuild that
+  // every render, and depending on it would scroll every table back to the top forever
+  useEffect(() => {
+    if (!windowed) return
+    if (scroller.current) scroller.current.scrollTop = 0
+    setScrolled(0)
+  }, [hunt, sort?.key, sort?.asc, rows.length])
 
   const marked = mark ? sorted.find(mark) : undefined
   const at = marked ? id(marked) : ""
@@ -154,8 +225,18 @@ export function DataTable<T>({
     if (!marked) return
     // a marked row behind the fold is a row nobody sees, so the fold gives way to it
     if (!shown.includes(marked)) return setOpen(true)
+    // and one that was never built cannot be scrolled to, so its place is worked out
+    if (windowed) {
+      const i = shown.indexOf(marked)
+      const box = scroller.current
+      if (i >= 0 && box) {
+        box.scrollTop = Math.max(0, i * unit - tall / 2)
+        setScrolled(box.scrollTop)
+      }
+      return
+    }
     spot.current?.scrollIntoView({ block: "center", behavior: "smooth" })
-  }, [at, open])
+  }, [at, open, windowed])
 
   const matrix = () => [
     columns.map((c) => c.label),
@@ -197,8 +278,12 @@ export function DataTable<T>({
       <CardContent className="p-0 pt-2">
         {/* a picture of it holds the rows on screen, so the fold decides what is in one */}
         <div ref={sheet}>
-          <Table>
-            <THead>
+          <Table
+            boxRef={scroller}
+            box={cn(pinned && "overflow-y-auto")}
+            boxStyle={pinned && tall ? { height: tall } : undefined}
+          >
+            <THead className={cn(pinned && "bg-card sticky top-0 z-20")}>
               <TR>
                 {columns.map((col) => (
                   <TH
@@ -232,9 +317,13 @@ export function DataTable<T>({
               </TR>
             </THead>
             <TBody>
-              {shown.map((row) => (
+              {windowed && first > 0 && (
+                <tr aria-hidden style={{ height: Math.round(first * unit) }} />
+              )}
+              {slice.map((row) => (
                 <TR
                   key={id(row)}
+                  data-row
                   ref={row === marked ? spot : undefined}
                   onClick={() => onRowClick?.(row)}
                   style={rowStyle?.(row)}
@@ -266,6 +355,9 @@ export function DataTable<T>({
                   })}
                 </TR>
               ))}
+              {windowed && last_ < shown.length && (
+                <tr aria-hidden style={{ height: Math.round((shown.length - last_) * unit) }} />
+              )}
               {foldable && (
                 <TR className="hover:bg-muted/50" onClick={() => setOpen(!open)}>
                   <TD colSpan={columns.length} className="text-muted-foreground cursor-pointer">
@@ -273,10 +365,24 @@ export function DataTable<T>({
                   </TD>
                 </TR>
               )}
+              {/* the height it was asked for, whatever it actually holds. Before the
+                    total, so the total is the last row either way */}
+              {Array.from({ length: padding }, (_, i) => (
+                <TR key={`pad-${i}`} className="border-0 hover:bg-transparent">
+                  <TD colSpan={columns.length}>&nbsp;</TD>
+                </TR>
+              ))}
               {total && (
-                <TR className="bg-muted/40 font-medium">
+                // pinned to the floor of the scroller, and sticky stops at its own place,
+                // so scrolling to the end puts it back under the last row rather than over it
+                <TR
+                  className={cn(
+                    "font-medium",
+                    pinned ? "bg-muted sticky bottom-0 z-10 border-t" : "bg-muted/40",
+                  )}
+                >
                   {columns.map((col) => (
-                    <TD key={col.key} num={col.num}>
+                    <TD key={col.key} num={col.num} className={cn(pinned && "bg-muted")}>
                       {share(col) ? "" : col.cell ? col.cell(total) : col.get(total)}
                     </TD>
                   ))}
