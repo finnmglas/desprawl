@@ -30,8 +30,7 @@ export function Chip({
   const { brands } = useDisplay()
   const name = BRANDS[label] ? label : label.replace(/\s+\S+$/, "")
   const brand = brands === "flashy" && BRANDS[name]
-  // the ink is picked for the brand colour, so the theme does not decide it.
-  // the colour itself comes down a little on dark, where full saturation glares
+  // picked for the brand, and toned down on dark
   const paint = brand
     ? ({ "--brand": `#${brand[0]}`, color: `#${brand[1]}` } as React.CSSProperties)
     : undefined

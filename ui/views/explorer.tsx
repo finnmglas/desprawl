@@ -113,11 +113,9 @@ export function Explorer({ stats }: { stats: Stats }) {
       num: true,
       flat: true,
       left: true,
-      // the label rather than the count behind it: sorting then groups the bands, and a
-      // folder's entries and a file's lines are two scales one number could not carry
+      // the label, not the count: a folder's entries and a file's lines differ
       get: (n) => (n.children ? spreadOf(entries(n)).label : lengthOf(n.code).label),
-      // a folder wears its band as a badge and a file says it in words, so the column
-      // itself tells the two apart before anyone reads it
+      // a badge for a folder, words for a file
       cell: (n) => {
         if (!n.children) {
           const band = lengthOf(n.code)

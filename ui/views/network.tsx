@@ -32,13 +32,13 @@ import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
 
 const GRAINS: Grain[] = ["module", "file", "function"]
-// a graph reads by its shape, so it gets most of the screen rather than a strip of it
+// a graph reads by its shape, so it gets the screen
 const TALLEST = 0.78
 // past this a layout is slower than anyone waits, so it is offered rather than run
 const MOST = 9000
 // heads on every wire stop reading as direction once they overlap
 const HEADS = 2600
-// the strip a module's name sits on, and the one part of it no node can cover
+// the strip a module name sits on
 const STRIP = 13
 
 const IMPORT = PAINT.down
@@ -64,8 +64,7 @@ const langOf = (file: string) => LANGS[file.split(".").pop()?.toLowerCase() ?? "
 export function Network({ stats }: { stats: Stats }) {
   const going = useGoing()
   const [read, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
-  // a picture somebody set up is the work: the grain, the colouring, every toggle and the
-  // camera all outlive leaving for another tab, so coming back is coming back to it
+  // a picture somebody set up is the work
   const [lang, setLang] = useKept("net.lang", "")
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
   const [grain, setGrain] = useKept<Grain>("net.grain", "file")
@@ -90,8 +89,7 @@ export function Network({ stats }: { stats: Stats }) {
     recall<{ scale: number; x: number; y: number }>("net.camera") ?? { scale: 1, x: 0, y: 0 },
   )
   const drag = useRef<{ x: number; y: number } | null>(null)
-  // one finger drags, two pinch: the canvas takes the touch itself, so without these a
-  // phone can only look at the picture
+  // one finger drags, two pinch
   const fingers = useRef<{ x: number; y: number; away: number } | null>(null)
   const [wide, setWide] = useState(900)
   const [tall, setTall] = useState(640)
@@ -101,7 +99,7 @@ export function Network({ stats }: { stats: Stats }) {
     if (!calls) void callGraph().then(setCalls)
   }, [])
 
-  // js and ts are one language written two ways, so a repo of both is not multi language
+  // js and ts are one language written two ways
   const multi = (held: string[]) => held.filter((one) => one !== "ts").length > 0 && held.length > 1
   const langs = useMemo(
     () =>
@@ -118,8 +116,7 @@ export function Network({ stats }: { stats: Stats }) {
   useEffect(() => {
     const measure = () => {
       setWide(frame.current?.clientWidth ?? 900)
-      // the layout viewport, not innerHeight: a phone reports the taller visual one and
-      // the picture ends up longer than the screen it is being read on
+      // the layout viewport, not innerHeight
       setTall(Math.max(420, Math.round(document.documentElement.clientHeight * TALLEST)))
     }
     measure()
@@ -147,8 +144,7 @@ export function Network({ stats }: { stats: Stats }) {
     [layout, graph, split, calls, grain, wide, tall, heavy, bounds],
   )
 
-  // drawing is not a render: a wheel turn through react repaints the page to move
-  // a camera, and every one of them waits for the frame after it
+  // drawing is not a render
   const drawing = useRef<() => void>(() => {})
   const queued = useRef(0)
   const schedule = () => {
@@ -169,7 +165,7 @@ export function Network({ stats }: { stats: Stats }) {
   // whether the camera is where the reader put it, or still where it was opened
   const touched = useRef(recall<boolean>("net.touched") ?? false)
   const framed = useRef(recall<{ w: number; h: number }>("net.framed") ?? { w: 0, h: 0 })
-  // written on the way out, so the next mount opens on the same corner of the same picture
+  // written on the way out
   useEffect(
     () => () => {
       keep("net.camera", view.current)
@@ -198,9 +194,7 @@ export function Network({ stats }: { stats: Stats }) {
     setNear(null)
     // the nodes walk to where they now are, so a grain change is followed
     if (moves && seats.current.size) moving.current = { from: seats.current, at: performance.now() }
-    // zoomed in, the same corner is wanted at the next grain: kept as a share, since the
-    // next drawing is a new size
-    // a chosen module is what the next grain frames
+    // kept as a share, since the next drawing resizes
     const kept = only && drawn.boxes.find((b) => b.id === only)
     const was = framed.current
     if (kept) {
@@ -225,7 +219,7 @@ export function Network({ stats }: { stats: Stats }) {
     framed.current = { w: drawn.width, h: drawn.height }
   }, [grain, drawn])
 
-  // a chosen module fills the frame, which is the only way to read one at this size
+  // a chosen module fills the frame
   const zoomTo = (box: Box) => {
     const scale = Math.min(4, ((wide - 24) / box.w) * 0.92, (tall / box.h) * 0.92)
     view.current = {
@@ -236,8 +230,7 @@ export function Network({ stats }: { stats: Stats }) {
     schedule()
   }
 
-  // arriving with something picked frames the module holding it and lights the very dot,
-  // rather than opening the whole picture and leaving the reader to find it again
+  // frame the module, light the dot
   useEffect(() => {
     const pick = going.at.pick
     if (!pick || !layout) return
@@ -255,8 +248,7 @@ export function Network({ stats }: { stats: Stats }) {
   const units = useMemo(() => new Map((layout?.units ?? []).map((u) => [u.path, u])), [layout])
   const where = useMemo(() => worked(stats.tree), [stats.tree])
   const owner = (path: string) => hands(path, where, stats.contributors)[0]?.who.name ?? ""
-  // what everything here is measured against, so a big file is big for this repo
-  // the deepest level any unit sits at, so the band is spread over the range in hand
+  // what everything here is measured against
   const deepest = useMemo(
     () => Math.max(1, ...(layout?.units ?? []).map((one) => one.level)),
     [layout],
@@ -342,8 +334,7 @@ export function Network({ stats }: { stats: Stats }) {
   const hunted = find.trim().toLowerCase()
   const at = useMemo(() => new Map((drawn?.spots ?? []).map((s) => [s.id, s])), [drawn])
 
-  // react listens passively, so preventDefault there is ignored
-  // under the cursor. The zoom has to own the wheel, which means binding it by hand
+  // react listens passively, so bind the wheel by hand
   useEffect(() => {
     const canvas = board.current
     if (!canvas) return
@@ -390,7 +381,7 @@ export function Network({ stats }: { stats: Stats }) {
     const rough = step < 1 || now < busy.current
     const text = (base: number) => (base * scale ** 0.35) / scale
 
-    // where a wire ends: a spot at this grain, or the box standing in for a file
+    // a spot at this grain, or the box for a file
     const where = (id: string) => {
       const spot = at.get(id)
       if (spot) return { ...seat(spot), r: spot.r }
@@ -627,8 +618,7 @@ export function Network({ stats }: { stats: Stats }) {
 
     if (names && !rough && !plan)
       for (const spot of drawn.spots) {
-        // every dot named at once is a wall of text, so a name waits for the zoom that
-        // fits it, and is sized against the screen rather than the graph
+        // a name waits for the zoom that fits it
         if (!lit?.has(spot.id) && spot.r * scale < 4.5) continue
         pen.fillStyle = `rgba(${PAINT.quiet}, 0.8)`
         pen.font = `${text(13)}px ui-sans-serif, system-ui, sans-serif`
@@ -704,8 +694,7 @@ export function Network({ stats }: { stats: Stats }) {
       <Loading stats={stats} current="Graph" what="Reading every import," rows={5} onward={false} />
     )
 
-  // a dot is a file, a declaration or a whole group depending on the grain, and each of
-  // those is worth reading, framing and opening: the click says which rather than picking
+  // the click says which, rather than picking
   const walk = (spot: Spot) =>
     going.open(
       grain === "function"
@@ -856,8 +845,7 @@ export function Network({ stats }: { stats: Stats }) {
                   size="sm"
                   onClick={() => {
                     setOnly("")
-                    // the pick came from another tab, and leaving it set would frame this
-                    // again the moment the reader stepped away and back
+                    // the pick came from another tab
                     if (going.at.pick) going.go({ pick: "" })
                     whole()
                   }}
@@ -906,8 +894,7 @@ export function Network({ stats }: { stats: Stats }) {
                   onTouchStart={(event) => {
                     const now = touching(event)
                     fingers.current = now
-                    // a tap has no hover before it, and the caption and the click both
-                    // read what is under the cursor
+                    // a tap has no hover before it
                     if (now && event.touches.length === 1) setNear(spotAt(now.x, now.y))
                   }}
                   onTouchMove={(event) => {
@@ -915,8 +902,7 @@ export function Network({ stats }: { stats: Stats }) {
                     const was = fingers.current
                     fingers.current = now
                     if (!now || !was) return
-                    // both fingers still down: the gap between them is the zoom, and the
-                    // point between them is what stays put while it changes
+                    // the gap is the zoom, the midpoint stays put
                     if (now.away && was.away) {
                       const next = Math.min(
                         8,

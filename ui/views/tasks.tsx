@@ -64,13 +64,12 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
   const [deps, setDeps] = useState<Deps | null>(window.__DESPRAWL_DEPS__ ?? null)
   const [kind, setKind] = useKept("tasks.kind", ALL)
   const [find, setFind] = useKept("tasks.find", "")
-  // the row says as much as a row can, and the rest is a panel rather than a jump into
-  // Files: opening a folder nobody asked to open is not what clicking a task means
+  // a panel, not a jump into Files
   const [opened, setOpened] = useState<Task | null>(null)
-  // a page has no disk, so the text detectors are read on the other side and sent over
+  // a page has no disk, so the detectors are read on the other side
   const [text, setText] = useState<Sprawl | null>(window.__DESPRAWL_SPRAWL__ ?? null)
   const where = useMemo(() => worked(stats.tree), [stats.tree])
-  // a task names a file, and the tally is per folder: the folder holding it is the answer
+  // the tally is per folder
   const crewOf = (task: Task) => {
     const at = task.where.replace(/\/?\*$/, "")
     for (let path = at; path; path = path.split("/").slice(0, -1).join("/")) {
@@ -118,8 +117,7 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
   )
   const minutes = found.reduce((sum, one) => sum + one.minutes, 0)
   const easy = found.filter((one) => one.mechanical)
-  // where a task is can be a file, a folder or the repo itself, and each leads somewhere
-  // different: the panel says which rather than opening a folder nobody asked for
+  // a file, a folder or the repo, so the panel says which
   const walk = (where: string) => {
     const at = where.replace(/\/?\*$/, "")
     open({ kind: isFile(at) ? "file" : "folder", id: at === "." ? "" : at })

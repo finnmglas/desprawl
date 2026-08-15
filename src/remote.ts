@@ -54,7 +54,7 @@ function place(url: string): string {
   return join(downloads(), "desprawl", plain(host.split(":")[0]), ...path.split("/").map(plain))
 }
 
-/** Clone it, or bring the copy we already have up to date, and say where it is */
+/** clone it, or bring the copy we have up to date */
 export function local(asked: string): string {
   const url = full(asked)
   const dir = place(url)

@@ -47,8 +47,7 @@ const SECTION_TAB: Record<string, string> = Object.fromEntries(
 )
 export const tabOf = (id: string): string => SECTION_TAB[id] ?? ""
 
-/** a tab's ids in the order they were saved, drift-repaired: gone ids drop out,
- * a section added since keeps landing at the end instead of vanishing */
+/** drift-repaired: gone ids drop out, new ones land at the end */
 export function orderOf(tab: string, saved: Record<string, string[]>): string[] {
   const known = TAB_SECTIONS[tab] ?? []
   const kept = (saved[tab] ?? []).filter((id) => known.includes(id))
@@ -125,8 +124,7 @@ export function land(id: string | null): void {
 
 /** the id being dragged, so its own card can grey out where it used to sit */
 export const useDragging = (): string | null => draggedStore.use()
-/** which gap a drag is currently over, so a line can mark it, distinct from
- * where the drag started, since that card stays put until the drop lands */
+/** distinct from where the drag started, which stays put */
 export const useDropTarget = (): { before: string; after: boolean } | null => dropStore.use()
 
 export const dragStart = (id: string) => draggedStore.set(id)
@@ -155,8 +153,7 @@ const isDefaultOrder = (tab: string, saved: string[]): boolean => {
   return saved.length === known.length && saved.every((id, i) => id === known[i])
 }
 
-/** whether anything is hidden or out of its default order right now, so a reset
- * only offers itself when it would actually change something */
+/** so a reset only offers itself when it would change something */
 export function useCustomized(): boolean {
   const [hidden] = hiddenStore.use()
   const [order] = orderStore.use()
@@ -172,9 +169,7 @@ export function useHidden(): [string[], (id: string, on: boolean) => void] {
   return [hidden, toggle]
 }
 
-/** a tab's order, and a mover that swaps past the nearest still-visible neighbour, so
- * moving past sections hidden in between reads as one step rather than none.
- * takes hidden from the caller, which already reads it, rather than subscribing twice */
+/** swaps past the nearest visible neighbour, so a hidden one is not a step */
 export function useOrder(tab: string, hidden: string[]) {
   const [all, set] = orderStore.use()
   const list = orderOf(tab, all)

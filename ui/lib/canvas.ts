@@ -8,12 +8,7 @@ export const PAINT = {
   quiet: "128, 128, 128", // itself, and the lines between levels
 }
 
-/**
- * a node no colouring has an opinion about: near black on a light page, near white on a
- * dark one, so it is the most visible dot rather than the least. Neutral on purpose: the
- * blue grey it used to be drawn in is C's own brand colour, and beside a C file it read
- * as one
- */
+/** a node no colouring has an opinion about, neutral on purpose */
 export const plain = (): string =>
   document.documentElement.classList.contains("dark") ? "235, 235, 238" : "24, 24, 27"
 

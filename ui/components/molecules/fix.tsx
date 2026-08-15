@@ -37,7 +37,7 @@ export function Fix({
   const [agent, setAgent] = useState<Agent | null>(null)
   const [open, setOpen] = useState(false)
   const [extra, setExtra] = useState("")
-  // one panel per row, so the choice lives on disk where every one of them sees it
+  // on disk, so every panel sees the choice
   const [pick, setPick] = useState(() => readPrefs().agent)
   const set = (next: Partial<Prefs["agent"]>) => {
     const merged = { ...pick, ...next }
@@ -172,8 +172,7 @@ export function Fix({
         createPortal(
           <div
             id={`fix-${seat}`}
-            // react sends events up the tree this was written in, not the one it is drawn
-            // in, so without this every click also presses the row underneath
+            // react sends events up the tree this was written in
             onClick={(event) => event.stopPropagation()}
             onPointerDown={(event) => event.stopPropagation()}
             style={{ top: at.top, left: at.left, width: WIDE }}

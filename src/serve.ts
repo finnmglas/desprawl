@@ -151,8 +151,7 @@ export function serve(
   keep = false,
   port = PORT,
   viewer?: string,
-  // localhost is reachable by any page, so the token is the real barrier, not the port.
-  // kept stable across a restart, so a dead tab's reconnect command still gets in
+  // the token is the barrier, not the port, and it survives a restart
   token = randomBytes(16).toString("hex"),
 ): Promise<string> {
   const tabs = new Set<ServerResponse>()
@@ -384,8 +383,7 @@ export function serve(
           return json(moved(repo, from, to, names))
         }
 
-        // the whole thing as one file, using whatever this run has already built
-        // printed by a real browser, so the text stays text
+        // the whole thing as one file, printed by a real browser
         if (url.pathname === "/api/pdf") {
           const port = (server.address() as { port: number }).port
           const theme = url.searchParams.get("theme") === "dark" ? "dark" : "light"
@@ -491,9 +489,7 @@ export function serve(
         if (url.pathname === "/api/actions/stop") {
           return json({ stopped: stopAction(url.searchParams.get("id") ?? "") })
         }
-        // an agent is watched like anything long, but listing it beside pnpm dev reads
-        // as one of this repo's commands
-        // by then it is a line on a page, and the page may drop it
+        // an agent is watched like anything long, but not listed beside pnpm dev
         if (url.pathname === "/api/actions/forget")
           return json({ forgotten: forget(url.searchParams.get("id") ?? "") })
 
@@ -530,9 +526,7 @@ export function serve(
           return
         }
 
-        // read once a page asks. A read that got no answer is not kept: cached silence
-        // reads as "nothing filed" all session
-        // seconds on a large repo, and the same answer until the files change
+        // read once a page asks, and silence is never cached
         if (url.pathname === "/api/sprawl") {
           const paths = Object.keys((imports ||= build(repo)).modules)
           return json(

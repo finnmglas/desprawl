@@ -8,17 +8,16 @@ import type { Churn, Commit, Contributor, Series } from "./model.ts"
 /** letters and digits only, so casing, initials and spacing never split one person in two */
 const norm = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "")
 
-/** a prefix, not a substring: "ann" sits inside "joanne" too, "vivek" only starts "vivekgopalakrishnan".
- * five characters keeps a real first name from bridging two different "sam"s */
+/** a prefix, not a substring, and five characters at least */
 const near = (a: string, b: string): boolean =>
   Math.min(a.length, b.length) >= 5 && (a.startsWith(b) || b.startsWith(a))
 
-/** what this identity signs as, if it names a known tool, so it reads apart from a person */
+/** what it signs as, so a tool reads apart from a person */
 const botOf = (name: string, email: string): string =>
   SIGNERS.find(([match]) => match.test(name) || match.test(email))?.[1] ??
   (/\[bot\]/.test(email) ? "bot" : "")
 
-// -M writes renames as a{b => c}d or b => c. Braces without an arrow are just a path
+// -M writes renames as a{b => c}d, or b => c
 const source = (path: string): string => {
   if (!path.includes(" => ")) return path
   const open = path.indexOf("{")
@@ -378,10 +377,7 @@ export const count = (repo: string): number =>
   Number(git(repo, "rev-list", "--count", "HEAD").trim()) || 0
 
 // authors, output, loc, ...
-/**
- * A blobless clone has commits and trees, not contents: --numstat would fetch every blob
- * back one round trip at a time and never finish. Names it still knows for free.
- */
+/** a blobless clone would fetch every blob to count lines */
 function thinly(repo: string): boolean {
   try {
     return !!git(repo, "config", "--get", "remote.origin.partialclonefilter").trim()
@@ -521,9 +517,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
     })
     .sort((a, b) => b.commits - a.commits)
 
-  // union-find over raw identities, merged only on an unmistakable name prefix: a
-  // repo's own .mailmap (already respected above, through %aN/%aE) is the real fix,
-  // this only stands in for the ones that never wrote one
+  // union-find, merged on an unmistakable name prefix. .mailmap is the real fix
   const parent = new Map<string, string>()
   const find = (k: string): string => {
     let r = k
@@ -557,7 +551,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
         for (const [name, n] of p.names) names.set(name, (names.get(name) ?? 0) + n)
         for (const path of p.paths) paths.add(path)
       }
-      // the identity with the most commits speaks for the group, so its email is the one shown
+      // the identity with the most commits speaks for the group
       const lead = [...people].sort((a, b) => b.commits - a.commits)[0]
       const name = [...names].sort((a, b) => b[1] - a[1])[0][0]
       const also =
@@ -610,8 +604,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
     first,
     last,
     byPath,
-    // resolved to the same indices the contributor list uses. Object.fromEntries would
-    // drop one side when a merge lands two raw identities on the same index, so this sums
+    // summed, since a merge can land two identities on one index
     byWho: new Map(
       [...byWho].map(([path, hands]) => {
         const at: Record<number, number> = {}

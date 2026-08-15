@@ -19,7 +19,7 @@ import type { Talk } from "../../../src/talk.ts"
 const BEAT = 1200
 const SLOW = 5000
 
-/** how long it took, or how long it has been going, said the way a person would */
+/** how long it took, said the way a person would */
 const spent = (since: number, until: number) => {
   const seconds = Math.round(((until || Date.now()) - since) / 1000)
   if (seconds < 60) return `${seconds}s`
@@ -40,8 +40,7 @@ function One({
 }) {
   const [said, setSaid] = useState("")
   const [open, setOpen] = useState(true)
-  // closing throws away the only record of what it did, so it is asked twice, and the
-  // second press is somewhere the first one was not
+  // closing throws away the only record, so it is asked twice
   const [sure, setSure] = useState(false)
   useEffect(() => {
     if (!sure) return
@@ -50,7 +49,7 @@ function One({
   }, [sure])
   const foot = useRef<HTMLDivElement>(null)
 
-  // a transcript that grows while you read it is only useful if it follows the last line
+  // a transcript that grows has to follow its last line
   useEffect(() => {
     if (open && talk.running) foot.current?.scrollIntoView({ block: "nearest" })
   }, [talk.turns.length, open, talk.running])
@@ -70,8 +69,7 @@ function One({
 
   const state = talk.running ? "working" : talk.code ? "stopped" : "done"
   const tone = talk.running ? OUTLINE.cool : talk.code ? OUTLINE.warn : OUTLINE.good
-  // what it was told to do with the work, since that is the difference between a diff to
-  // read and a pull request somebody has to close
+  // a diff to read, or a pull request somebody has to close
   const did = talk.mode === "unstaged" ? "left in the working tree" : talk.mode
 
   return (
@@ -181,7 +179,7 @@ function One({
   )
 }
 
-/** nothing at all until something is running, since an empty panel is a panel in the way */
+/** an empty panel is a panel in the way */
 export function Agents() {
   const [talks, setTalks] = useState<Talk[]>([])
 
@@ -198,8 +196,7 @@ export function Agents() {
       })
     }
     beat()
-    // a press that starts one puts it here on the press: waiting a beat for it to appear
-    // reads as the button having done nothing
+    // here on the press, or the button reads as having done nothing
     const stop = onAgent((made) => {
       setTalks((all) => [made, ...all.filter((one) => one.id !== made.id)])
       clearTimeout(timer)

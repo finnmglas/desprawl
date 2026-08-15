@@ -137,7 +137,7 @@ export const HostMark = ({ host, className }: { host: string; className?: string
   <Solid className={className} d={HOSTS[host] ?? HOSTS.git} />
 )
 
-/** the mark each tab is known by, so the tab bar and every link to one agree */
+/** the mark each tab is known by */
 export const MARKS: Record<string, React.ReactNode> = {
   Overview: <Bars />,
   Graph: <Dots />,

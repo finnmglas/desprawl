@@ -256,7 +256,7 @@ export function StackCard({
   )
 
   const head = folded ? (
-    // the whole row opens it, since a caret is a small target and the rest of the row does nothing
+    // a caret is a small target
     <div
       onClick={() => setOpen(!open)}
       className="relative flex cursor-pointer flex-row flex-wrap items-center gap-2"

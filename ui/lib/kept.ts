@@ -3,9 +3,7 @@
 
 import { useState } from "react"
 
-// a tab is unmounted the moment another one is opened, so every grain, filter, sort and
-// camera it held would be gone by the time the reader returns to it. This outlives the
-// component and not the page: a reload is still a fresh start
+// outlives the component, not the page: a reload is a fresh start
 const held = new Map<string, unknown>()
 
 /** useState, except the value survives the view being unmounted and mounted again */
@@ -20,6 +18,6 @@ export function useKept<T>(key: string, initial: T): [T, (next: T | ((was: T) =>
   return [value, set]
 }
 
-/** the same store for what lives in a ref: read on mount, written on the way out */
+/** the same store for a ref: read on mount, written on the way out */
 export const recall = <T>(key: string): T | undefined => held.get(key) as T | undefined
 export const keep = (key: string, value: unknown): void => void held.set(key, value)

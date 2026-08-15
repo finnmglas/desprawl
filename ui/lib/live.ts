@@ -39,8 +39,7 @@ const busy = (step: number) => {
   watching.forEach((fn) => fn(inflight))
 }
 
-// whether the session stream is currently open, so a dead server reads as
-// dead rather than as a tab that quietly stopped updating
+// so a dead server reads as dead, not as a quiet tab
 let online = true
 const watchingConn = new Set<(ok: boolean) => void>()
 export const onConnection = (fn: (ok: boolean) => void): (() => void) => {
@@ -102,8 +101,7 @@ export const olderCommits = (skip: number, count: number): Promise<Commit[]> =>
 export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/api/timeline", null)
 
 /** built on the first ask, or carried by a static page */
-// the heavy three, held for as long as the page lives: a tab is left and opened again all the
-// time, and every one of those was fetching a megabyte of graph it already had
+// held for the life of the page, or every tab switch refetches a megabyte
 const held = new Map<string, Promise<unknown>>()
 const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
   const found = (held.get(path) ?? made()) as Promise<T>
@@ -245,7 +243,7 @@ export const onAgent = (told: (made: Talk) => void) => {
   return () => watchers.delete(told)
 }
 
-/** the task goes over as text: the argv it turns into is built on the other side */
+/** the task goes over as text, the argv is built on the other side */
 export const startFix = (said: {
   id: string
   title: string

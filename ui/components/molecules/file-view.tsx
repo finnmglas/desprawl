@@ -47,7 +47,7 @@ export function FileView({
     return () => void (gone = true)
   }, [path])
 
-  // a third down rather than at the top, so what leads up to it is on screen too
+  // a third down, so what leads up to it is on screen
   useEffect(() => {
     if (!read?.text || !line || !box.current) return
     box.current.scrollTop = Math.max(0, PAD + (line - 1) * ROW - box.current.clientHeight / 3)

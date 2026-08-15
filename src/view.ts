@@ -15,7 +15,7 @@ import type { Graph } from "./graph.ts"
 import type { Stats } from "./model.ts"
 
 export function open(target: string): void {
-  // windows has no opener binary, its start is a shell builtin, and the "" is the window title
+  // windows start is a shell builtin, and the "" is the window title
   const [command, args] =
     process.platform === "win32"
       ? ["cmd", ["/c", "start", "", target]]
@@ -33,11 +33,10 @@ export function shell(): string {
   return readFileSync(built, "utf8")
 }
 
-/** past this the call graph is minutes of work and a file too big to send anywhere */
+/** past this the call graph is minutes of work */
 const HEAVY = 1500
 
-// the first one is the document's own: bundled code holds "</head>" in strings, and
-// vite hoists its script above anything left further down
+// the first is the document's own: bundled code holds </head> in strings
 const HEAD = "<head>"
 
 /** the page and everything it would ask a server for, reusing what a caller holds */
@@ -78,10 +77,7 @@ export function page(
   return { html, skipped: heavy && !said ? graph.stats.files : 0 }
 }
 
-/**
- * A published page hands every commit email over as one scrapeable blob. Blanking them
- * takes the faces with it: an avatar and a profile link are both derived from the address.
- */
+/** blanking the addresses takes the faces with them */
 export const anonymous = (stats: Stats): Stats => ({
   ...stats,
   contributors: stats.contributors.map((one) => ({ ...one, email: "" })),

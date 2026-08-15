@@ -33,8 +33,7 @@ async function pixels(node: HTMLElement, paint: string) {
 }
 
 /** genuinely vectors: every node holds svg icons, and the first was once the whole export */
-/** a chart is already vectors. The rest is html in a foreignObject with every computed
- * style written on, since an svg carries no stylesheet */
+/** a chart is vectors, the rest is html with its styles written on */
 async function vectors(node: HTMLElement, paint: string): Promise<string> {
   const chart = node.querySelector("svg.recharts-surface")
   if (chart) {
@@ -49,8 +48,7 @@ async function vectors(node: HTMLElement, paint: string): Promise<string> {
     })
     return new XMLSerializer().serializeToString(copy)
   }
-  // laid out alone, flex-1 and max-w mean nothing and it spreads, so it is pinned to the
-  // size it had on screen. No padding: a margin moved frame and content apart again
+  // pinned to the size it had on screen, since flex means nothing alone
   const box = node.getBoundingClientRect()
   const wide = Math.ceil(box.width)
   const tall = Math.ceil(box.height)
@@ -64,7 +62,7 @@ async function vectors(node: HTMLElement, paint: string): Promise<string> {
   return decodeURIComponent(url.slice("data:image/svg+xml;charset=utf-8,".length))
 }
 
-/** one more table that comes off the same panel, so two panels do not need two buttons */
+/** one more table off the same panel */
 export interface Sheet {
   name: string
   label: string

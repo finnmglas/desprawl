@@ -116,8 +116,7 @@ export function balanced(
   graph: Graph,
   { ideal = 10, least = 4, max = 128, share = 6 } = {},
 ): Record<string, string> {
-  // a file is one node of the graph however long it is, and its length is what it
-  // costs to read. Both matter, so a group's weight is its share of each
+  // a file is one node however long it is, and both matter
   const files = Object.keys(graph.modules).length || 1
   const lines = Object.values(graph.modules).reduce((sum, m) => sum + m.lines, 0) || 1
   const weight = (module?: { lines: number }) =>
@@ -170,15 +169,13 @@ export function balanced(
     const [worst, weight] = open.reduce((a, b) => (b[1] > a[1] ? b : a))
     if (chosen.size >= least && weight <= goal) break
 
-    // opened all at once, never one child at a time: peeling names a four file folder
-    // beside a hundred file one, and leaves the group it came from just as heavy
+    // all at once, or peeling leaves the parent just as heavy
     const inside = [...branches.values()].filter(
       (branch) => branch.path && !chosen.has(branch.path) && owner(branch.path) === worst,
     )
     const parts = inside
       .filter((b) => !inside.some((o) => o !== b && b.path.startsWith(`${o.path}/`)))
-      // a child too small to carry its own weight stays in what is left of its parent,
-      // which is what stops a folder of fifty siblings becoming fifty groups
+      // a child too small stays in what is left of its parent
       .filter((branch) => branch.weight >= goal / share)
     // a group of nothing but its own files cannot be opened any further
     if (!parts.length || chosen.size + parts.length > max) {
@@ -294,8 +291,7 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
     unit.instability = leaving + arriving ? leaving / (leaving + arriving) : 0
   }
 
-  // a group named for a folder still has to answer for its files, and one file that
-  // everything imports can decide the whole group's shape while describing only itself
+  // one file everything imports can decide a group's shape
   const inside = new Map<string, string[]>()
   for (const path of Object.keys(graph.modules)) {
     const group = keyOf(path)
@@ -332,13 +328,12 @@ export function fold(graph: Graph, at: number | Record<string, string>): Layout 
   // an import that only carries a type is gone by the time anything runs
   const runs = (path: string) =>
     Object.keys(seen(path).out).filter((to) => seen(path).out[to] > (seen(path).types[to] ?? 0))
-  // how big the loop a unit sits in still is once those are gone, 1 for none at all
+  // the loop a unit still sits in, 1 for none
   const still = new Map<string, number>()
   for (const group of scc(units.keys(), runs))
     for (const path of group) still.set(path, group.length)
 
-  // the ground truth every grouping is a lossy view of: contracting a graph both hides
-  // cycles inside a group and invents ones between groups, so the file rings are kept
+  // contracting a graph hides cycles and invents them, so file rings are kept
   const cycles: string[][] = []
   const across: Set<string>[] = []
   for (const group of scc(Object.keys(graph.modules), (path) =>
@@ -555,8 +550,7 @@ function read(
       band: "base",
       why: `${Math.round(arriving)}% of its edges arrive, so it is what the rest stands on`,
     }
-  // half of it is its own and it leans on one group: a leaf hanging off the tree, and
-  // nothing importing it means unused, never a top of the stack
+  // a leaf hanging off the tree, never a top of the stack
   if (kept >= 50 && reach <= 1)
     return {
       label: "Module*",
@@ -589,11 +583,7 @@ function read(
   }
 }
 
-/**
- * The shape, and whether it is worth trusting. A label decided on four imports sits a
- * single import away from another one, which is checked rather than guessed at from a
- * sample size: move one import each way and see whether the answer holds.
- */
+/** the shape, and whether one import each way would change it */
 export function shapeOf(inside: number, out: number, into = 0, reach = 2): Shape {
   const { firm, ...shape } = read(inside, out, into, reach)
   const less = (n: number) => Math.max(0, n - 1)

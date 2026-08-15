@@ -56,7 +56,7 @@ declare global {
 
 const TABS = ["Overview", "Graph", "Tasks"]
 
-// one object, not a literal per render: useView listens for as long as this stays the same
+// one object, not a literal per render: useView listens on identity
 const START = {
   tab: TABS[0],
   path: [],
@@ -357,12 +357,10 @@ function Root() {
   const [error, setError] = useState("")
   const live = isLive()
 
-  // settings live here, not in App: a repo that takes a minute to read should not
-  // spend that minute in the wrong theme
+  // here, not in App: a slow read should not spend it in the wrong theme
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
   const change = (next: Partial<Prefs>) => {
-    // read back rather than merged onto state: the fix panel saves without coming through
-    // here, and its choices would be written back over by the next theme click
+    // read back, since the fix panel saves without coming through here
     const merged = { ...readPrefs(), ...next }
     setPrefs(merged)
     savePrefs(merged)

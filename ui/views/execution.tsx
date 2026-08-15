@@ -85,12 +85,10 @@ export function Execution({ stats }: { stats: Stats }) {
       .values(),
   ].sort((a, b) => b.sites - a.sites)
 
-  // a repo of two languages is two pictures, and reading them apart is the only way to see either
+  // two languages are two pictures
   const langs = [...new Set(declared.map((s) => s.lang).filter(Boolean))].sort()
   const hunted = find.trim().toLowerCase()
-  // arriving with something picked keeps only what is under it, since a table of four
-  // thousand names is not an answer to having clicked one file. A folder scopes to
-  // everything inside it rather than to whichever file inside it happened to come first
+  // a folder scopes to everything inside it
   const inFile = at.pick.split("#")[0].replace(/\/?\*$/, "")
   const scoped = (file: string) => !inFile || file === inFile || file.startsWith(`${inFile}/`)
   const shown = declared.filter(

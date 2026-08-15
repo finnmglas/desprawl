@@ -52,8 +52,7 @@ export interface Calls {
   }
 }
 
-// a name opening an object entry, which is a field and not a reach for anything. A ternary
-// keeps its colon company, so the `?` is what tells the two apart
+// a field, not a reach. The ? tells it from a ternary
 const KEY = /[{,;]\s*[A-Za-z_$][\w$]*\s*:\s*$/
 // onClick={save} calls save. a dot owns the name, a spread does not
 const USED = /(?<![\w$])(?<!(?<!\.)\.)([A-Za-z_$][\w$]*)/g
@@ -96,8 +95,7 @@ const KEYWORD = new Set([
 /** what runs on import */
 export const TOP = "(top level)"
 
-// an import, up to the scrub's marker. It has to want a `from` the way a specifier does,
-// or `export default plugins([one()])` reads as one and the calls in it go with it
+// it has to want a from, the way a specifier does
 const BROUGHT = new RegExp(
   `(^|[\\s;})])(import|export)\\s+(type\\s+)?([^${MARK}]*?\\bfrom\\s*)?${MARK}\\d+${MARK}`,
   "g",
@@ -341,8 +339,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     }
   }
 
-  // a top level function on the jvm lives in a file named after nothing in particular, so
-  // an import that named no file is looked up by the declaration it named instead
+  // on the jvm, an import naming no file is looked up by declaration
   const declares = new Map<string, string[]>()
   for (const [id] of Object.entries(symbols)) {
     const name = id.split("#")[1]
@@ -360,8 +357,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     }
   }
 
-  // what an imported file declares is what its name means here, which is how a language
-  // that imports a module rather than its names is read at all
+  // for a language that imports a module rather than its names
   for (const module of Object.values(graph.modules)) {
     if (!module.lang || module.lang === "ts") continue
     const local = bindings.get(module.path)
@@ -448,8 +444,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         seen.add(name)
         if (name === symbol.name) continue
 
-        // a parameter shadows a file level name, but a file's top level has no parameters:
-        // reading the first brackets there picks up jsx and buries whatever it names
+        // a file's top level has no parameters, so the first brackets are jsx
         if (!top && takes.has(name)) continue
         const here = symbols[`${file}#${name}`]
         if (here) {

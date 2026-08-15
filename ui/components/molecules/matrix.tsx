@@ -58,7 +58,7 @@ export function Matrix({
   most?: number
   /** the imports the cut list names */
   cuts?: Set<string>
-  /** pairs a real file ring runs through, which is a loop at runtime and not a matter of tidiness */
+  /** pairs a real file ring runs through */
   rings?: Set<string>
   /** an order chosen elsewhere */
   order?: (a: Unit, b: Unit) => number
@@ -81,8 +81,7 @@ export function Matrix({
   const links = (u: Unit, side: "row" | "col") =>
     side === "row" ? leaving(u).length : arriving(u).length
 
-  // a grid showing only some of the groups should show the ones there is something to
-  // see in: a ring outranks a cut, a cut outranks an import that merely climbs
+  // a ring outranks a cut, a cut outranks a climb
   const worst = (u: Unit, side: "row" | "col") => {
     let score = rings?.has(`${u.path} ${u.path}`) ? 4 : 0
     const pairs: [string, string][] =
@@ -145,7 +144,7 @@ export function Matrix({
     const pen = fit(board, cols.length * cell, rows.length * cell)
     if (!pen) return
 
-    // a real ring is crossed out, the rest of the grid is tidiness and this one runs
+    // a real ring is crossed out, the rest is tidiness
     const cross = (x: number, y: number) => {
       const pad = cell > 16 ? 3 : cell > 10 ? 2 : 1
       pen.strokeStyle = "rgba(255, 255, 255, 0.98)"
@@ -159,7 +158,7 @@ export function Matrix({
       pen.stroke()
     }
 
-    // the band goes down first, so every cell of the chosen group is drawn on top of it
+    // the band first, so the chosen group draws on top
     const pickedRow = rows.findIndex((r) => r.path === chosen)
     const pickedCol = cols.findIndex((c) => c.path === chosen)
     if (pickedRow >= 0 || pickedCol >= 0) {
@@ -170,8 +169,7 @@ export function Matrix({
 
     rows.forEach((row, y) =>
       cols.forEach((col, x) => {
-        // a ring held inside one group is invisible between groups, so it is drawn on the
-        // diagonal instead: the whole loop is in there, and only opening it would show it
+        // a ring inside one group is invisible between groups
         if (row.path === col.path) {
           const held = rings?.has(`${row.path} ${row.path}`)
           pen.fillStyle = held ? `rgba(${PAINT.cut}, 0.85)` : `rgba(${PAINT.quiet}, 0.22)`
@@ -194,7 +192,7 @@ export function Matrix({
       }),
     )
 
-    // one line where the level changes, so a big grid reads as blocks and not as noise
+    // one line where the level changes
     pen.strokeStyle = `rgba(${PAINT.quiet}, 0.55)`
     pen.lineWidth = 1
     pen.beginPath()

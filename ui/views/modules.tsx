@@ -64,7 +64,7 @@ const reach = (unit: Unit) => Object.keys(unit.out).length
 /** a tilde says the label sits one import away from another one */
 const shaped = (shape: Shape) => (shape.sure ? shape.label : `~${shape.label}`)
 
-/** the label the rest of the group would get without the file the most imports arrive at */
+/** the label the group would get without its busiest file */
 const carried = (unit: Unit, shape: Shape) => {
   if (!unit.loudest || !shape.sure) return null
   const { internal, out, into, reach } = unit.without
@@ -127,8 +127,7 @@ const rooted = (paths: string[]) => shared(paths).replace(/^\.$/, "the repo root
 export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, string> }) {
   const going = useGoing()
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
-  // the grain, the search and the sort are what a reader set up here, so leaving for
-  // another tab and coming back finds them still set rather than back at the defaults
+  // set up here, so coming back finds them still set
   const [group, setGroup] = useKept("modules.group", "")
   const [keep, setKeep] = useKept("modules.keep", KEEP[0])
   const [wide, setWide] = useKept("modules.wide", false)
@@ -145,7 +144,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
   }, [])
 
   const at = group || AUTO
-  // kept, not just passed on: it is the only way back from a file to the group holding it
+  // kept: the only way back from a file to its group
   const split = useMemo(
     () => (graph ? (at === AUTO ? balanced(graph) : DEPTH[at]) : null),
     [graph, at],
@@ -181,7 +180,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
     for (const file of ring)
       for (const edge of graph.modules[file].out) {
         if (edge.type || !held.has(edge.to)) continue
-        // same group on both ends lands on the diagonal, where it is the only way to see it
+        // same group both ends lands on the diagonal
         rings.add(`${groupOf(file)} ${groupOf(edge.to)}`)
       }
   }
@@ -192,7 +191,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
   const hunted = find.trim().toLowerCase()
   const shown = hunted ? units.filter((u) => u.path.toLowerCase().includes(hunted)) : units
   const crowded = shown.length > 50
-  // auto names a group for what it is, so the folder it came from moves to its own column
+  // auto names a group for what it is
   const called = namesOf(units)
   const columns: Column<Unit>[] =
     at === AUTO
@@ -235,8 +234,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
     Array.from({ length: levels }, (_, i) => levels - 1 - i)
       .map((level): [number, Unit[]] => [level, units.filter((u) => u.level === level)])
       .filter(([, here]) => here.length)
-  // a group is a folder, a remainder like src/* or one file, and every one of those is
-  // worth reading, framing and opening: the click asks which rather than deciding for you
+  // the click asks which rather than deciding
   const choose = (path: string) => going.open(asGroup(path, label?.(path)))
   // the group answering for whatever the reader arrived holding, picked on another tab
   const focus = holds(

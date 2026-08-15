@@ -252,7 +252,7 @@ const profiles = (name: string): string[] => {
   }
 }
 
-/** what can be run and against which account. A request names an id, and it must be one of these */
+/** a request names an id, and it must be one of these */
 export function installs(): Install[] {
   return TOOLS.flatMap((tool) => {
     const bins = onPath(tool.name)
@@ -271,8 +271,7 @@ export function installs(): Install[] {
     })
     return [
       of(plain, tool.name),
-      // a wrapper sets its own config dir, named after it. The same plain binary on a
-      // second PATH entry is not a wrapper
+      // a wrapper sets its own config dir, named after it
       ...bins
         .slice(1)
         .filter((bin) => last(bin) !== tool.name)

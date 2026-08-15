@@ -219,8 +219,7 @@ const HOSTED: [RegExp, string][] = [
   [/^(.*\/)?skaffold\.ya?ml$/, "Kubernetes"],
 ]
 
-/** a name half the world uses: app.yaml, template.yaml, serverless.yml. Each has to say
- * what it is before it counts */
+/** a name half the world uses, so each says what it is */
 // prettier-ignore
 const AMBIGUOUS: [RegExp, RegExp, string][] = [
   [/^(.*\/)?app\.ya?ml$/, /^\s*runtime:\s*\S/m, "Google Cloud"],
@@ -450,7 +449,7 @@ const label = (table: Table, name: string): string =>
 /** newest commits only, a signature further back says little about the code now */
 const SIGNED_MAX = 20_000
 
-/** who signed it: the author line and the trailers, so writing about one is not being one */
+/** the author line and the trailers */
 /** the tool a trailer names, so Copilot:Claude reads as Copilot */
 const signer = (line: string): string =>
   line.replace(/^\s*[a-z-]+-by:\s*/i, "").replace(/^([^\s:]+):\S+/, "$1")
@@ -603,7 +602,7 @@ function shipped(
   manifests: Manifest[],
   boxes: { dockerfiles: number; compose: number; kubernetes: number; terraform: number },
   apps: string[],
-  /** what a manifest of another language says it builds, so cli is not an npm only word */
+  /** cli is not an npm only word */
   outside: string[] = [],
 ): string[] {
   const parts: string[] = []
@@ -632,7 +631,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
     .map((p) => manifest(repo, p))
     .filter((m): m is Manifest => !!m)
 
-  // one bucket per table, so adding a category is one line in TABLES and one row in the card
+  // one bucket per table
   const dep: Record<string, string[]> = {
     frameworks: [],
     state: [],
@@ -747,7 +746,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
   if (exts.has("mjs")) add(modules, "esm")
   if (exts.has("cjs")) add(modules, "cjs")
 
-  // a stray .js among python does not make a node project, a manifest or a tsconfig does
+  // a manifest or a tsconfig makes a node project, a stray .js does not
   const isNode = manifests.length > 0 || (found.typescript?.length ?? 0) > 0
   const kind = !isNode ? "none" : hasTs && hasJs ? "mixed" : hasTs ? "typescript" : "javascript"
 
@@ -815,11 +814,7 @@ const MANAGERS: Record<string, string> = {
   go: "go",
 }
 
-/**
- * What a package outside npm implies, sorted into the same buckets the node ones use: a
- * database client is a connection whichever language asks for it, and an async runtime is
- * a runtime. Only what shapes the whole program is a framework.
- */
+/** packages outside npm, in the same buckets the node ones use */
 // prettier-ignore
 const OUT_FRAMEWORKS: Table = {
   actix: "Actix", "actix-web": "Actix", axum: "Axum", rocket: "Rocket", warp: "warp",

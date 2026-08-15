@@ -37,7 +37,7 @@ export function Circle({
   const degree = (u: Unit) =>
     Object.keys(u.out).filter((p) => here.has(p)).length +
     Object.keys(u.in).filter((p) => here.has(p)).length
-  // busiest first to decide who is on the ring, then back into stack order to sit on it
+  // busiest first to pick the ring, then back into stack order
   const shown = [...linked]
     .sort((a, b) => degree(b) - degree(a))
     .slice(0, MOST)

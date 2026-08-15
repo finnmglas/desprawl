@@ -49,10 +49,7 @@ function sections(source: string): Map<string, string[]> {
   return found
 }
 
-/**
- * What version a line asks for. An inline table says so under `version`, a bare line says it
- * outright, and a path or workspace dependency says nothing at all: it is the repo itself.
- */
+/** a path or workspace dependency asks for nothing: it is the repo */
 const range = (line: string): string => {
   const at = line.indexOf("=")
   const said = at === -1 ? line : line.slice(at + 1).trim()
@@ -133,8 +130,7 @@ function python(root: string, path: string): Read {
   const held = sections(source)
   const project = held.get("project") ?? []
   const asked: Asked[] = []
-  // dependencies = ["a >= 1", "b"] spans lines, and the section reader joined them
-  // a requirement can carry its own brackets: "requests[socks]>=2"
+  // a requirement can carry brackets: requests[socks]>=2
   const listed =
     /(?:^|\n)dependencies\s*=\s*\[((?:[^\][]|\[[^\][]*\])*)\]/.exec(project.join("\n"))?.[1] ?? ""
   for (const one of listed.match(/["']([^"']+)["']/g) ?? []) {

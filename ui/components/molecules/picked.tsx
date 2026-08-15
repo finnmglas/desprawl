@@ -23,15 +23,14 @@ const WHAT: Record<Target["kind"], string> = {
 }
 
 interface Deed {
-  /** the tab it lands on, which is the whole label: the icon beside it says the rest */
+  /** the tab it lands on, which is the whole label */
   label: string
   why: string
   icon: React.ReactNode
   run: () => void
 }
 
-/** the counted row for a path, when the tree carries one. A served tree holds folders
- * only, so a file usually has none and the panel says less rather than nothing */
+/** a served tree holds folders only, so a file usually has none */
 function nodeAt(tree: Node, path: string): Node | undefined {
   let at: Node | undefined = tree
   for (const part of path.split("/").filter(Boolean)) {
@@ -59,7 +58,7 @@ export function Picked({
   const file = target.kind === "symbol" ? target.id.split("#")[0] : bare
   const name = target.name || bare.split("/").pop() || "the repo root"
   const node = nodeAt(stats.tree, target.kind === "symbol" ? file : bare)
-  // a group is a folder as often as not, and then Files opens it rather than its parent
+  // a group is often a folder, and Files opens it
   const roomy = target.kind === "folder" || target.kind === "module"
   const where = target.kind === "symbol" ? `${file}${target.line ? `:${target.line}` : ""}` : bare
   const live = isLive()
@@ -81,7 +80,7 @@ export function Picked({
         pick: roomy ? "" : file,
       }),
   }
-  // each says the panel it means as well as the tab, so the one that answers is ringed
+  // each names its panel, so the one that answers is ringed
   const inModules: Deed = {
     label: "Modules",
     icon: <Blocks />,
@@ -116,8 +115,7 @@ export function Picked({
           ? [inFiles, inModules, inGraph]
           : [inModules, inGraph, inFiles]
 
-  // the detail below says all of this and more, so the one line above it would only
-  // repeat itself with a second count of the same thing
+  // the detail below says all of this already
   const facts = target.detail
     ? null
     : (target.note ??

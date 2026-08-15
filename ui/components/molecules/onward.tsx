@@ -51,8 +51,7 @@ export function Onward({ stats, current }: { stats: Stats; current: string }) {
     Graph: "the picture, what depends on what, and what nothing reaches",
   }).filter(([to]) => to !== current)
 
-  // contents makes these the flex parent's own items, each defaulting to order 0
-  // and outranked by any reordered section, so they are pinned past every section id
+  // contents makes these the flex parent's items, pinned past every section
   const last = { order: 999 }
 
   return (

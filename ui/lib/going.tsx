@@ -4,8 +4,7 @@
 import { createContext, useContext } from "react"
 import type { View } from "./hash.ts"
 
-/** something a reader pointed at. Clicking one asks what to do with it rather than
- * guessing, since the same thing is worth reading, framing, opening and copying */
+/** clicking one asks what to do with it rather than guessing */
 export interface Target {
   kind: "file" | "folder" | "module" | "symbol"
   /** the repo path, or file#name for a declaration */
@@ -55,19 +54,14 @@ export const isFile = (path: string): boolean => /\.[a-z0-9]+$/i.test(path)
 
 const bare = (path: string) => path.replace(/\/?\*$/, "").split("#")[0]
 
-/**
- * which of these paths answers for what was picked: itself, the deepest one holding it,
- * or failing that the first one inside it. A pick travels between tabs that group the
- * repo differently, so the tab it lands on has to find its own nearest thing
- */
+/** itself, the deepest one holding it, or the first one inside it */
 export function holds(pick: string, paths: string[]): string {
   if (!pick) return ""
   const want = bare(pick)
   if (paths.includes(pick)) return pick
   const over = paths.filter((one) => want === bare(one) || want.startsWith(`${bare(one)}/`))
   if (over.length) return over.sort((a, b) => bare(b).length - bare(a).length)[0]
-  // nothing holds it, so the nearest thing inside it, shallowest first rather than
-  // whichever the layout happened to list first
+  // the nearest thing inside it, shallowest first
   const under = paths.filter((one) => bare(one).startsWith(`${want}/`))
   return under.sort((a, b) => bare(a).length - bare(b).length)[0] ?? ""
 }

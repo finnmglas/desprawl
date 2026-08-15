@@ -6,8 +6,7 @@ import { cn } from "../../lib/ui.ts"
 
 const EDGE = 8
 
-/** the box that would cut the bubble off, or push a scrollbar under it: the nearest
- * scrolling parent, or the window when nothing between clips */
+/** the nearest scrolling parent, or the window */
 function frame(from: HTMLElement | null): {
   top: number
   bottom: number
@@ -40,8 +39,7 @@ export function Tip({
   /** the side it prefers, which it gives up when that side has no room */
   side?: "top" | "bottom"
   className?: string
-  /** drop it entirely where there is no pointer to hover with, for a bubble whose
-   * contents a tap already opens somewhere it can be read properly */
+  /** no pointer to hover with, and a tap opens it elsewhere */
   hoverOnly?: boolean
   children: React.ReactNode
 }) {
@@ -55,8 +53,7 @@ export function Tip({
       const box = bubble.current?.getBoundingClientRect()
       const anchor = host.current?.getBoundingClientRect()
       if (!box || !anchor) return
-      // a table wraps itself in an overflow box: a bubble reaching past its edge is
-      // not only cut off, it widens what the box can scroll to
+      // a bubble past a table's edge widens what it scrolls to
       const cut = frame(host.current)
       const past = box.right > cut.right - EDGE ? cut.right - EDGE - box.right : 0
       const short = box.left < cut.left + EDGE ? cut.left + EDGE - box.left : 0

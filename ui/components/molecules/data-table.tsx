@@ -45,11 +45,10 @@ export interface DataTableProps<T> {
   file?: string
   /** more tables that come off this panel, offered inside its save button */
   saves?: Sheet[]
-  /** what the reader typed into the search, for a total row that has to agree with it */
+  /** for a total row that has to agree with the search */
   onFind?: (said: string) => void
   onEnd?: () => void // scrolled to the end
-  /** the row the reader came here to see: marked, unfolded and scrolled to, since
-   * arriving at a table of four hundred rows with nothing pointed out is arriving nowhere */
+  /** marked, unfolded and scrolled to */
   mark?: (row: T) => boolean
 }
 
@@ -113,8 +112,7 @@ export function DataTable<T>({
     return found
   }, [columns, rows_])
 
-  // num means the column is right aligned, not that it holds numbers: a date is a string
-  // sitting in one, and a string column adds up to nothing without anything being wrong
+  // num means right aligned, not that it holds numbers
   const counted = useMemo(
     () =>
       new Set(
@@ -228,7 +226,7 @@ export function DataTable<T>({
   const at = marked ? id(marked) : ""
   useEffect(() => {
     if (!marked) return
-    // a marked row behind the fold is a row nobody sees, so the fold gives way to it
+    // a marked row behind the fold is a row nobody sees
     if (!shown.includes(marked)) return setOpen(true)
     // a row that was never built cannot be scrolled to
     if (windowed) {
@@ -247,7 +245,7 @@ export function DataTable<T>({
     columns.map((c) => c.label),
     ...sorted.map((row) => columns.map((c) => scaled(c, row))),
   ]
-  // a title can carry a mark beside it, so the file name comes from its words only
+  // a title can carry a mark, so the file name is its words
   const slug = (typeof title === "string" ? title : (file ?? "table"))
     .toLowerCase()
     .replace(/\W+/g, "-")
@@ -387,8 +385,7 @@ export function DataTable<T>({
                 </TR>
               ))}
               {total && (
-                // pinned to the floor of the scroller, and sticky stops at its own place,
-                // so scrolling to the end puts it back under the last row rather than over it
+                // sticky stops at its own place
                 <TR
                   className={cn(
                     "font-medium",

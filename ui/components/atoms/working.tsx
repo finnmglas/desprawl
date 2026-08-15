@@ -10,7 +10,7 @@ const STEPS = [1, 2, 3, 2]
 // long enough that a request nobody waited for never says anything
 const PATIENCE = 800
 
-/** true once the wait is worth a word, so a blink neither flashes nor reflows the line */
+/** true once the wait is worth a word */
 export function useSlow(on?: boolean): boolean {
   const [slow, setSlow] = useState(false)
   useEffect(() => {

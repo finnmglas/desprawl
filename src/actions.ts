@@ -20,7 +20,7 @@ export interface Action {
   long?: boolean
   /** why it cannot work here, which is only ever said when it is certain */
   blocked?: string
-  /** it may well not work, and why, which is not the same as knowing it will not */
+  /** it may well not work, and why */
   caution?: string
 }
 
@@ -34,8 +34,7 @@ export interface Alive {
   code: number | null
 }
 
-// never ending, so a button would sit on them rather than finish. The name is a hint and
-// the command is the evidence: a script called ui is still a dev server underneath
+// never ending, so a button would sit on them
 const FOREVER = /(^|:)(dev|start|watch|serve|preview|storybook)$/
 const SERVES =
   /(^|\s)(vite|next|nuxt|remix|astro)(?!\s+build)(\s|$)|(^|\s)(webpack-dev-server|nodemon|http-server|live-server)(\s|$)|--watch\b|\bserve\b|cli\.ts\b/
@@ -70,7 +69,7 @@ const GIT: Action[] = [
 /** the owner, whichever way a remote is written */
 const ownerOf = (url: string) => url.trim().match(/[:/]([^/:]+)\/[^/]+?(?:\.git)?$/)?.[1] ?? ""
 
-/** the reflog of the one ref a push would move: asking each of thousands costs a process */
+/** the reflog of the one ref a push would move */
 function everPushed(root: string, upstream: string): boolean {
   try {
     return git(root, "reflog", "show", `refs/remotes/${upstream}`).includes("update by push")
@@ -89,7 +88,7 @@ const namesOf = (who: string) =>
       .filter(Boolean),
   )
 
-/** pushed before, or owned by the name on the commits. Neither is proof, so unclear is said rather than blocked */
+/** neither is proof, so unclear is said rather than blocked */
 function pushable(root: string): Pick<Action, "blocked" | "caution"> {
   const remote = (() => {
     try {
@@ -184,7 +183,7 @@ process.on("exit", () => {
   for (const one of held.values()) if (one.alive.running) signal(one.child, "SIGKILL")
 })
 
-/** left running, since a server has no end to wait for. `given` is the agent's own argv */
+/** left running, since a server has no end to wait for */
 export function begin(
   repo: string,
   id: string,
@@ -200,8 +199,7 @@ export function begin(
   stop(id)
 
   const [file, ...rest] = given ?? found.command.split(" ")
-  // its own group: a manager spawns the real server as a child, and signalling only the
-  // manager leaves the child holding the port, which is not what stop means
+  // its own group, or the child keeps the port
   const child = spawn(file, rest, {
     cwd: root,
     env: { ...process.env, FORCE_COLOR: "0", ...extra },

@@ -50,8 +50,7 @@ const write = (view: View): string => {
   return `#${q}`
 }
 
-// the view that was current when this entry was pushed, so a back link can name where it
-// goes without keeping a stack of its own: the browser already holds one
+// the entry behind this one, so back can name where it goes
 const behind = (): View | null => (history.state as { from?: View } | null)?.from ?? null
 
 export function useView(initial: View): [View, (next: Partial<View>) => void, View | null] {

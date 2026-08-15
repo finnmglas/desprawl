@@ -92,9 +92,7 @@ export function OverTime({
     [stats, picked, grain, curve, all, sizes, hours],
   )
 
-  // dragging across the chart zooms the chart, every other view stays where it was.
-  // the zoom is kept as an instant, not as bucket labels, so changing the granularity
-  // keeps the window you chose instead of throwing it away
+  // kept as an instant, so changing the grain keeps the window
   const [zoom, setZoom] = useState<[number, number] | null>(null)
   useEffect(() => {
     // iso, not the reading format: a german locale would hand over 7.7.2025
@@ -102,8 +100,7 @@ export function OverTime({
   }, [zoom])
   const [drag, setDrag] = useState<[string, string] | null>(null)
 
-  // what the axis covers right now, zoomed or whole, and the grains that span can carry.
-  // zooming in drops the coarse ones, and resetting the zoom hands them back
+  // zooming in drops the coarse grains, resetting hands them back
   const span = useMemo(() => {
     const first = (all?.first ?? stats.first).slice(0, 10)
     const last = (all?.last ?? stats.last).slice(0, 10)
@@ -112,8 +109,7 @@ export function OverTime({
   }, [zoom, all, stats.first, stats.last])
   // by the hour needs a live read, so a saved page never offers it
   const offered = useMemo(() => grainsFor(span).filter((g) => g !== "hour" || isLive()), [span])
-  // a window can outgrow a grain (hour past a month) or undercut one (year inside a
-  // month), so land on the nearest one it can carry rather than always the coarsest
+  // land on the nearest grain this span can carry
   useEffect(() => {
     if (!offered.includes(grain)) setGrain(nearestGrain(grain, offered))
   }, [offered, grain])

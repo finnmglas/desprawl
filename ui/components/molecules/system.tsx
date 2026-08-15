@@ -53,8 +53,7 @@ export function System({
   faces: Record<string, string>
   /** the group the reader arrived holding, so coming back lands on the one they left from */
   chosen?: string
-  /** the second argument is everything the hover bubble would have said, for a panel to
-   * show instead: a tap has no hover, and a tap is what opens one */
+  /** what the hover would have said, for a tap to show instead */
   onPick?: (path: string, about: React.ReactNode) => void
 }) {
   const { curve } = useDisplay()
@@ -264,9 +263,7 @@ export function System({
                             }
                       }
                       className={cn(
-                        // the card tone on dark, where the page background reads as a hole
-                        // a loop is named in the tip already, so it stays out of a picture
-                        // meant to be read at a glance
+                        // the card tone on dark, and a loop is named in the tip already
                         "bg-background hover:border-ring dark:bg-card relative flex w-full min-w-0 cursor-pointer flex-col overflow-hidden rounded-md border px-2.5 py-1.5 text-left transition-colors",
                         unit.path === chosen && "border-ring ring-ring ring-1",
                       )}

@@ -55,12 +55,12 @@ export function settle(
     // a kill or a missing binary carries no numeric code, and 0 would read as fine
     code: typeof err?.code === "number" ? err.code : err ? 1 : 0,
     seconds: Math.round((Date.now() - started) / 100) / 10,
-    // the end is where a runner puts its totals, and the head is where it puts noise
+    // totals go at the end, noise at the head
     output: output.length > 8000 ? `…\n${output.slice(-8000)}` : output || empty,
   }
 }
 
-// what each runner is asked to write a report with, when the repo has no script for it
+// what a runner is asked to report with, absent a script
 const MEASURE: Record<string, string> = {
   vitest: "npx vitest run --coverage --coverage.reporter=lcov",
   jest: "npx jest --coverage --coverageReporters=lcov",
@@ -175,11 +175,7 @@ export function tests(repo: string): Suite {
 
 const LIMIT = 10 * 60_000
 
-/**
- * Only when a reader asks: a suite is the one thing here that can take minutes. A script
- * is run by name through the manager, a synthesised coverage command through a shell,
- * and that command is only ever one this file wrote.
- */
+/** only when asked: a suite can take minutes */
 export function run(repo: string, script: string, command = ""): Promise<Run> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const run = manager(root)

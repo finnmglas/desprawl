@@ -83,11 +83,7 @@ function pack(sizes: { w: number; h: number }[], want: number) {
   return { places, w: Math.max(wide + PAD, 2 * PAD), h: y + tall + PAD }
 }
 
-/**
- * A few passes of push and pull, clamped to the box every time: a spot leaves its module
- * only by being put in another one. `lean` is where its outside neighbours sit, which is
- * what pulls a file to the edge nearest what it imports.
- */
+/** push and pull, clamped to the box each pass */
 function settle(
   spots: Spot[],
   pulls: [number, number][],
@@ -103,8 +99,7 @@ function settle(
     return
   }
   const middle = { x: box.x + box.w / 2, y: box.y + box.h / 2 }
-  // where it starts, not where it is pushed: a lasting pull would flatten every spot
-  // against the wall nearest what it imports, which is a line and not a layout
+  // where it starts, not where it is pushed
   spots.forEach((spot, i) => {
     const angle = (i / spots.length) * Math.PI * 2
     const to = lean.get(spot.id)
@@ -205,7 +200,7 @@ function loose(
       one.x += dx * heat
       one.y += dy * heat
     }
-    // shared by every wire on it, or a hub drags half the repo onto its own dot
+    // shared, or a hub drags the repo onto its dot
     for (const [a, b] of pulls) {
       const one = spots[a]
       const two = spots[b]
@@ -233,11 +228,7 @@ const members = (graph: Graph, calls: Calls | null, grain: Grain) =>
         kind: "file",
       }))
 
-/**
- * Import and call edges between whatever the nodes are, merged so one pair is one wire.
- * At function grain an import still runs between two files, which are boxes there, so an
- * end of a wire can be a box as easily as a spot.
- */
+/** imports and calls merged, one pair is one wire */
 function wires(
   graph: Graph,
   calls: Calls | null,
@@ -266,10 +257,7 @@ function wires(
   return [...found.values()]
 }
 
-/**
- * Boxes hold spots, level bands hold boxes, and the whole thing is sized before anything
- * is placed: a container cannot bound what it was drawn around.
- */
+/** sized before anything is placed */
 export function net(
   layout: Layout,
   graph: Graph,
@@ -319,7 +307,7 @@ export function net(
         }))
   ).map((spot) => ({ ...spot, r: Math.min(7, 2.5 + Math.sqrt(spot.weight) / 6) }))
 
-  // a file is a node at file grain and a box at function grain, and either can hold a wire
+  // a file is a node, or a box at function grain
   const live = new Set([...spots.map((s) => s.id), ...held.map((one) => one.file)])
   const wired = wires(
     graph,
@@ -348,7 +336,7 @@ export function net(
     return { spots, boxes: [], wires: wired, width: room, height: deep, passes }
   }
 
-  // innermost boxes first: a file box is sized by what it holds, a unit box by its files
+  // innermost boxes first
   const inner = new Map<string, Spot[]>()
   for (const spot of spots) inner.set(spot.box, [...(inner.get(spot.box) ?? []), spot])
 
@@ -379,8 +367,6 @@ export function net(
       : (inner.get(path) ?? []).length * ROW * ROW
 
   // a level is a band, deepest at the top
-  // the frame is wider than it is tall, so the layout is given that shape up front. Laying
-  // out narrow and scaling to fit would leave the picture in a column with the sides empty
   const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
   const wide = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
   const per = Math.max(2, Math.min(8, Math.round(wide / 300)))
@@ -394,8 +380,7 @@ export function net(
       const held = (inner.get(band) ?? []).length
       y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
     } else {
-      // two languages cannot import each other, so a shelf that mixes them draws lines
-      // across the picture that say nothing: each language keeps its own side
+      // each language keeps its own side
       const here = layout.units
         .filter((u) => u.level === level)
         .sort(
@@ -417,8 +402,7 @@ export function net(
         const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
         const total = weights.reduce((sum, one) => sum + one, 0) || 1
         const room = wide - 2 * PAD - GAP * (shelf.length - 1)
-        // its share of the shelf, but never wider than twice its own height: a letterbox
-        // holding twenty files in a row says nothing a list would not have said
+        // its share, never wider than twice its height
         const widths = shelf.map((unit, i) =>
           Math.max(
             120,
@@ -478,8 +462,7 @@ export function net(
       })
     }
 
-  // levels stack, so a deep repo grows past the frame and every fit shrinks it sideways to
-  // nothing. Squashing the stack keeps the width, which is where the reading happens
+  // squashing the stack keeps the width
   const squash = Math.max(0.75, Math.min(1, tall / Math.max(1, y)))
   if (squash < 1)
     for (const box of boxes) {

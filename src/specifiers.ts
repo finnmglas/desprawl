@@ -35,7 +35,7 @@ export function bound(clause: string): { local: string; name: string }[] {
   return out
 }
 
-/** `import { type A, type B }` is erased just as `import type { A, B }` is */
+/** import { type A } is erased like import type { A } */
 export function erased(clause: string): boolean {
   const listed = clause
     .replace(/\bfrom\s*$/, "")
@@ -61,8 +61,7 @@ export function scrub(
   const strings: string[] = []
   let code = ""
   let i = 0
-  // only javascript has a regex literal, and only python hashes a comment. Everything else
-  // is c shaped: two slashes, a block, and quotes
+  // everything but js and python is c shaped
   const js = flavour === "js"
   const py = flavour === "py"
   // rust nests its block comments, c and the jvm close on the first */
@@ -73,9 +72,7 @@ export function scrub(
     for (let back = code.length - 1; back >= 0; back--) {
       const ch = code[back]
       if (/\s/.test(ch)) continue
-      // `</div>` closes a tag and `{on} />` ends one, and tsx is full of both. A marker is a
-      // string that was already read: `<Icon className="x" />` ends with one, and so does
-      // plain division by a string, so a slash after it never opens a regex either
+      // a marker is a string already read, so no slash after it opens a regex
       return WORD.test(ch) || ch === ")" || ch === "]" || ch === "<" || ch === "}" || ch === MARK
     }
     return false
@@ -165,7 +162,7 @@ export function scrub(
         at += source[at] === "\\" ? 2 : 1
       strings.push(source.slice(i + 1, at))
       code += `${MARK}${strings.length - 1}${MARK}`
-      // an apostrophe in jsx text opens a string that never closes, and its line has to survive that
+      // an apostrophe in jsx text opens a string that never closes
       i = source[at] === "\n" ? at : at + 1
     } else if (js && ch === "`") {
       // an expression inside a template can hold an import
@@ -230,8 +227,7 @@ export interface Symbols {
 const NAMED = /export\s*\{([^}]*)\}/g
 const DECLARED =
   /(^|[\s;}])export\s+(default\s+)?(async\s+)?(function|class|const|let|var|interface|type|enum|abstract)\b/g
-// its own, whether it exports it here or at the bottom. `type {` is a re-export, not a
-// declaration, and a body holding one is indented, so only the first column counts
+// a body holding one is indented, so only the first column counts
 const OWN =
   /^(export\s+)?(default\s+)?(async\s+)?(function|class|const|let|var|interface|enum|abstract|declare|namespace|type(?!\s*\{))\b/gm
 const FUNCTIONS = /(^|[\s;}])(async\s+)?function\b/g
@@ -289,7 +285,7 @@ export function specifiers(source: string, done?: ReturnType<typeof scrub>): Spe
 /** what a language other than javascript asks for, off its own patterns */
 export function foreign(source: string, dialect: Dialect, done?: ReturnType<typeof scrub>) {
   const { code, strings } = done ?? scrub(source, dialect.flavour)
-  // an include names its file in quotes, so for c the scrub is put back before reading
+  // an include names its file in quotes, so c is unscrubbed first
   const undo = (text: string) => text.replace(MARKED, (_, n) => strings[Number(n)] ?? "")
   const read = dialect.quoted
     ? code.replace(MARKED, (_, n) => JSON.stringify(strings[Number(n)] ?? ""))
@@ -304,8 +300,7 @@ export function foreign(source: string, dialect: Dialect, done?: ReturnType<type
       ).trim()
       // an angled include is the toolchain's, never a file in this repo
       const outside = m[1] === "<"
-      // only the first reading of a statement is a claim: `use a::{b}` says a is a module
-      // and guesses that b might be one too
+      // only the first reading is a claim
       const held = dialect.expand ? dialect.expand(said) : [said]
       held.forEach((text, which) => {
         if (text)

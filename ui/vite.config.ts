@@ -8,9 +8,7 @@ import react from "@vitejs/plugin-react"
 import { defineConfig, type Plugin } from "vite"
 import { viteSingleFile } from "vite-plugin-singlefile"
 
-// viteSingleFile leaves the icon a sibling file, and view.ts copies the html alone.
-// So fold the icon in and drop the copy, after viteSingleFile: before it the href is
-// still a placeholder. Dev resolves off disk and is untouched.
+// fold the icon in after viteSingleFile, or the href is a placeholder
 function inlineFavicon(): Plugin {
   return {
     name: "desprawl:inline-favicon",

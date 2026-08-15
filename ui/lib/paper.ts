@@ -5,7 +5,7 @@ import html2canvas from "html2canvas-pro"
 import { jsPDF } from "jspdf"
 import PptxGenJS from "pptxgenjs"
 
-// pptxgenjs exports a umd namespace beside the class, so the bit used here is named by hand
+// pptxgenjs exports a umd namespace beside the class
 interface Sheet {
   background: { color: string }
   addText: (text: string, options: Record<string, unknown>) => void

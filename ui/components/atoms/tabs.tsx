@@ -21,8 +21,7 @@ export function Tabs({ tabs, value, onChange, className, grow, icons }: TabsProp
   const strip = useRef<HTMLDivElement>(null)
   const here = useRef<HTMLButtonElement>(null)
 
-  // a narrow screen shows three of seven, and the one you are on has to be one of them.
-  // scrollLeft rather than scrollIntoView, which would drag the page up as well
+  // the one you are on has to be on screen. scrollLeft, or the page jumps
   useEffect(() => {
     const box = strip.current
     const button = here.current

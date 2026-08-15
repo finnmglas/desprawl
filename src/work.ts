@@ -51,10 +51,7 @@ const SEVERITY: Record<string, number> = { critical: 4, high: 3, moderate: 2, lo
 // six screens of one function: a handful in a clean repo, none in a small one
 const LONG = 300
 
-/**
- * Minutes of an agent, off the only two runs timed here: 1.2 for the largest task, 1.9 for
- * an advisory. Files opened decides it, not lines. Past 45m a guess means nothing.
- */
+/** off the only two runs timed here. Files opened decides it, not lines */
 const timed = (edits: number, lines = 0) =>
   Math.min(45, Math.max(2, Math.round(2 + edits * 1.5 + lines / 150)))
 
@@ -230,8 +227,7 @@ function fromCalls(calls: Calls | null): Task[] {
       // nothing stops, it only costs
       hits: "maintainability",
     })
-  // one declaration nobody holds at once. A long file is not the same: the longest here
-  // are word lists, and there is nothing to refactor in a list
+  // one declaration nobody holds at once. A long word list is not the same
   for (const one of Object.values(calls.symbols).filter(
     (row) => row.kind !== "module" && row.lines >= LONG,
   ))
@@ -248,8 +244,7 @@ function fromCalls(calls: Calls | null): Task[] {
       hits: "maintainability",
     })
 
-  // a repeated name is not work: handleSubmit is thirteen functions, Page is a framework
-  // demand. Execution says it as a fact and leaves the reading to a person
+  // a repeated name is not work, it is a fact for a person to read
   return found
 }
 
@@ -334,11 +329,7 @@ function fromText(text: Sprawl): Task[] {
   return found
 }
 
-/**
- * Exported and called nowhere here. Each one is a public surface or a leftover and only a
- * person knows which, so this is one decision to make rather than one task per declaration:
- * the execution tab lists them, and a library will honestly have hundreds.
- */
+/** one decision to make, not one task per declaration */
 function fromOpen(calls: Calls | null): Task[] {
   if (!calls) return []
   const live = reached(calls, true)

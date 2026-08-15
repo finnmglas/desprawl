@@ -34,10 +34,7 @@ export interface Knowledge {
   links: Link[]
 }
 
-/**
- * Everything desprawl knows at this grain, as things and relations. The same graphs the
- * tabs draw, in a shape something else can read: nothing here a panel does not show.
- */
+/** the graphs as typed things and relations, for whatever reads them next */
 export function knowledge(
   repo: string,
   graph: Graph,
@@ -89,7 +86,7 @@ export function knowledge(
       links.push({ from: one.file, to: one.id, sort: "contains", weight: 1 })
     }
 
-  // an install is a thing too: it is what a module leans on that nobody here wrote
+  // an install is a thing too
   for (const name of Object.keys(graph.packages))
     keep({ id: `npm:${name}`, sort: "package", label: name, inside: "", lines: 0 })
   for (const module of Object.values(graph.modules))
@@ -109,7 +106,7 @@ export function knowledge(
       if (from !== to) links.push({ from, to, sort: "imports", weight: 1 })
     }
 
-  // a file's top level is not a declaration, it is the file: a call from it is a call from there
+  // a file's top level is the file, not a declaration
   const idOf = (one: { id: string; file: string; kind: string }) =>
     one.kind === "module" ? one.file : one.id
   for (const one of Object.values(calls?.symbols ?? {}))

@@ -4,7 +4,7 @@
 
 import * as React from "react"
 import { sink, type Toast } from "../../lib/toast.ts"
-// the queue lives in lib so anything may raise one, this stays where components look for it
+// the queue lives in lib, this stays where components look
 export { toast } from "../../lib/toast.ts"
 import { cn } from "../../lib/ui.ts"
 

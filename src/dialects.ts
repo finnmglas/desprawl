@@ -86,8 +86,7 @@ const DIALECTS: Dialect[] = [
   },
   {
     id: "go", label: "Go", exts: ["go"], flavour: "c",
-    // one import per line, or a block of them in parens. A member line holds nothing but
-    // an optional alias and the path: composite literals carry commas, statements carry more
+    // one import per line, or a block in parens
     imports: [
       /^import\s+(?:[\w.]+\s+)?"([^"\n]+)"/gm,
       /^[^\S\n]+(?!return\b)(?:[\w.]+[^\S\n]+)?"([^"\n]+)"[^\S\n]*(?:\/\/.*)?$/gm,
@@ -159,11 +158,7 @@ export const READS = new RegExp(`\\.(${[...BY_EXT.keys()].join("|")})$`, "i")
 
 export const LANGUAGES = DIALECTS.map((one) => one.id)
 
-/**
- * Where a specifier lands. Each language spells the same idea differently: rust walks its
- * crate, python its packages, the jvm its folders, c its include paths. Nothing here reads
- * a build file, so a target the repo does not hold is simply outside it.
- */
+/** where a specifier lands, per language. No build file is read */
 export function candidates(
   dialect: Dialect,
   text: string,
@@ -178,7 +173,7 @@ export function candidates(
   if (dialect.id === "rust") {
     // #[path = "x.rs"] says the file outright, relative to this one
     if (/\.rs$/.test(text)) return [[...dir, ...text.split("/")].join("/"), text]
-    // a file is a module, so its parent is the folder it sits in and `super::x` is a sibling
+    // a file is a module, so super::x is a sibling
     const parts = text.split("::").filter((one) => one && one !== "*")
     if (!parts.length) return []
     if (parts.length === 1 && !/^(crate|super|self|std|core|alloc)$/.test(parts[0]))
@@ -245,7 +240,6 @@ export function candidates(
 
   if (dialect.id === "jvm") {
     const parts = text.replace(/\.\*$/, "").split(".").filter(Boolean)
-    // `import a.b.thing` names a top level function as often as a class called thing, and
     // the file holding it is one segment up
     const held = parts.length > 1 ? parts.slice(0, -1) : parts
     const roots = [
@@ -321,11 +315,7 @@ export function onlyIn<T extends { modules: Record<string, Held> }>(graph: T, la
   return { ...graph, modules: held }
 }
 
-/**
- * Words the language itself owns, and what its runtime provides. Without these a `when` in
- * kotlin and a `Some` in rust read as calls to something nobody declared, which is not a
- * gap in the repo but a gap in what we know about the language.
- */
+/** words the language owns, and what its runtime provides */
 // prettier-ignore
 const OWNED: Record<string, { keywords: string[]; runtime: string[] }> = {
   rust: {

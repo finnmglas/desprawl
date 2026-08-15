@@ -74,8 +74,7 @@ const RUNTIME = /parcelRequire|webpackJsonp|__webpack_require__|System\.register
 function bundled(file: string): boolean {
   try {
     const head = readFileSync(file, "utf8").slice(0, 4096)
-    // scrubbed first: a tool that names these markers holds them in a regex or a string,
-    // and this file is one. Unscrubbed, it read itself as a bundle and vanished
+    // scrubbed first, or this file reads itself as a bundle
     if (RUNTIME.test(scrub(head).code)) return true
     const lines = head.split("\n")
     return lines.length > 1 && head.length / lines.length > 300
@@ -274,8 +273,7 @@ export function build(repo: string): Graph {
       modules[from].symbols = counted(done.code, dialect)
       for (const spec of foreign(source, dialect, done)) {
         if (!spec.guess) seen++
-        // an angled include is usually the toolchain's and sometimes the project's own, and
-        // the repo itself is what says which
+        // the repo says whether an angled include is its own
         const tried = candidates(dialect, spec.text, from, crates)
         const held = tried.find((one) => modules[one])
         const folder = held ? null : tried.find((one) => one.endsWith("/"))
@@ -300,8 +298,7 @@ export function build(repo: string): Graph {
           continue
         }
         const name = outsideOf(dialect, spec.text) || (spec.type ? spec.text : "")
-        // a specifier that named this project and landed nowhere is broken, and one that
-        // named somebody else's crate or package was never ours to find
+        // somebody else's crate was never ours to find
         if (!name) {
           if (!spec.guess) missing.push({ from, specifier: spec.text, reason: "no such file" })
           continue
@@ -465,11 +462,7 @@ function outsideOf(dialect: Dialect, text: string): string {
   return text.split("/").pop() ?? text
 }
 
-/**
- * The jvm needs no import for a class beside it, so those edges are invisible in the text.
- * A sibling whose name is used here is one this file leans on, which is the same rule the
- * call graph uses and the only way a package of ten files does not read as ten islands.
- */
+/** the jvm needs no import for a sibling class, so a used name is an edge */
 function siblings(modules: Record<string, Module>, root: string): void {
   const byFolder = new Map<string, string[]>()
   for (const [path, one] of Object.entries(modules))

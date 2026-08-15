@@ -5,7 +5,7 @@ import { BRANDS } from "./brands.ts"
 
 const channel = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
 
-/** a near black mark vanishes on a dark page, and an unknown label has no colour to give */
+/** a near black mark vanishes on a dark page */
 export function tint(label: string): string {
   const hex = BRANDS[label]?.[0]
   if (!hex) return "var(--muted-foreground)"

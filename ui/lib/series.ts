@@ -185,8 +185,7 @@ export function rows(
 
   const raw: Record<string, (number | undefined)[]> = {}
   for (const key of picked) {
-    // commits and devs from all history when known, the rest from the window
-    // sparse readings, carried forward
+    // commits and devs span all history, the rest the window
     if (key === "size") {
       const filled: (number | undefined)[] = new Array(length).fill(undefined)
       for (const s of sizes ?? []) {

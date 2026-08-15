@@ -77,7 +77,7 @@ const LANGS: Column<Node>[] = [
 /** the pinned row at the bottom, which answers for the list rather than for a package */
 type Row = Dep & { every?: Dep[] }
 
-/** one number with what it is and where it came from, since a lone number explains nothing */
+/** a lone number explains nothing */
 const Fact = ({
   label,
   value,
@@ -463,9 +463,7 @@ export function Overview({
   onMetadata: (open: boolean) => void
 }) {
   const { at, go, open } = useGoing()
-  // every one of these carries what was clicked into the tab it opens: a language shades
-  // the tree by itself, a line kind shades it by that kind, a window opens on those days
-  // the row that shaded the tree clears it when picked again, so the same click undoes
+  // each carries what was clicked into where it opens
   const onLang = (picked: string) => {
     if (at.lang === picked) {
       go({ lang: "", kind: "" })
@@ -474,7 +472,7 @@ export function Overview({
     go({ lang: picked, kind: "", path: [], pick: "", tab: "Overview", panel: "tree_files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
-  // the tree is a panel here rather than a tab, so Files means scroll to it, not leave
+  // a panel here, so Files means scroll to it
   const onCard = (next: string, shade?: string) => {
     go(
       next === "Files"
@@ -559,8 +557,7 @@ export function Overview({
   const [identity, setIdentity] = useState(IDENTITY[0])
   // moot once a time frame is picked below: that list is already one row per person
   const contributors = identity === IDENTITY[1] ? stats.identities : stats.contributors
-  // nobody committed under two addresses, so the two lists are the same list and the
-  // switch between them is a control that does nothing
+  // one address each, so the switch would change nothing
   const folded = useMemo(() => {
     const key = (one: Contributor) => (one.email || one.name).toLowerCase()
     const people = stats.contributors.map(key).sort()
@@ -570,8 +567,7 @@ export function Overview({
     )
   }, [stats.contributors, stats.identities])
   const [hunt, setHunt] = useState("")
-  // the scope decides which rows there are and the table searches within them: the totals
-  // row is a prop rather than a row, so it has to be told what the search left
+  // the totals row is a prop, so it is told what the search left
   const scoped = useMemo(
     () => (kit?.list ?? []).filter((one) => scope === SCOPE[1] || one.direct),
     [kit, scope],

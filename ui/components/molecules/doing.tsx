@@ -33,7 +33,7 @@ export function Doing({ onDone }: { onDone?: () => void }) {
     if (isLive()) void repoActions().then(setList)
   }, [])
 
-  // a server writes as it goes, so what it has said so far is asked for on a beat
+  // a server writes as it goes, so it is asked on a beat
   useEffect(() => {
     if (!isLive()) return
     const tick = () => void aliveActions().then(setUp)
@@ -105,8 +105,7 @@ export function Doing({ onDone }: { onDone?: () => void }) {
                         size="sm"
                         disabled={!!busy || !!one.blocked}
                         onClick={() => press(one)}
-                        // the same card colour the copy and save buttons sit on, or on dark
-                        // these read as holes cut in the panel
+                        // the card colour, or on dark these read as holes
                         className={cn(
                           "bg-card",
                           one.outward && "border-amber-500/60",

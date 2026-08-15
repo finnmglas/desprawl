@@ -13,8 +13,7 @@ export interface Prefs {
   brands: Brands
   /** how many rows every table shows before it folds, scrolls or prints the lot */
   rows: Shown
-  /** whether the metadata under the architecture card stays open. Open by default: it is
-   * the answer to what is this repo, and folding it hides that behind a click */
+  /** open by default: it answers what is this repo */
   metadata: boolean
   /** what the fix panel was last set to: nobody picks a different cli every time */
   agent: { install: string; model: string; mode: string; trust: string }

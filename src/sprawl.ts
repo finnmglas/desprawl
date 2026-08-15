@@ -78,7 +78,7 @@ const skip = (line: string) =>
   line.startsWith("export ") ||
   /^[)\]}>,;]+$/.test(line)
 
-/** the same lines in two files, grown as far as they match, so one copy is one finding */
+/** the same lines in two files, grown as far as they match */
 export function copied(repo: string, paths: string[]): Twice[] {
   const held = new Map<string, string[]>()
   const starts = new Map<string, [string, number][]>()
@@ -98,14 +98,11 @@ export function copied(repo: string, paths: string[]): Twice[] {
     }
   }
   const found: Twice[] = []
-  // a run lies on one diagonal of the two files, so where each diagonal ended is enough to
-  // know a later start is inside a run already found
+  // a run lies on one diagonal, so where each ended is enough
   const ends = new Map<string, number>()
-  // each seat against the next one in another file, never every pair: a line written ten
-  // thousand times would otherwise be fifty million comparisons and no finding at all
+  // each seat against the next, never every pair
   for (const [, seats] of starts) {
-    // a line written this often is boilerplate, and any real run through it holds a rarer
-    // line to start from. Without this, two files of one repeated line are quadratic
+    // a line this common is boilerplate, and quadratic without this
     if (seats.length < 2 || seats.length > COMMON) continue
     for (let a = 0; a < seats.length; a++) {
       const [one, at] = seats[a]

@@ -304,8 +304,7 @@ export async function deps(repo: string): Promise<Deps> {
   if (!list.length)
     list.push(...[...wanted].map(([name, dev]) => blank(name, range(name), dev, "npm")))
 
-  // every other language keeps what it asks for in a manifest of its own, and nothing of
-  // it is on disk here: the range is all there is, which is enough for an advisory
+  // nothing on disk, so the range is all there is
   const tracked = git(root, "ls-files", "-z").split("\0").filter(Boolean)
   const found = manifests(root, tracked).filter((one) => one.path !== "package.json")
   // a crate or module this repo itself builds is not something it depends on
@@ -326,7 +325,7 @@ export async function deps(repo: string): Promise<Deps> {
     ])
     missed = filed.missed
     for (const one of list) {
-      // osv was asked with the pinned range when nothing is installed, so read it back the same way
+      // osv was asked with the pinned range, so read it back the same way
       one.advisories = filed.found.get(`${one.name}@${one.version || pinned(one.range)}`) ?? []
       const told = when.get(one.name)
       one.released = told?.times.modified ?? ""

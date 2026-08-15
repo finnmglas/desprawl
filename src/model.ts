@@ -91,7 +91,7 @@ export interface Contributor {
   last: string
   /** other emails folded into this row, since a name this close is not a coincidence */
   also?: string[]
-  /** the tool this identity signs as, if it names one, so it reads apart from a person */
+  /** what it signs as, so a tool reads apart from a person */
   bot?: string
 }
 
@@ -225,8 +225,7 @@ export interface Stats extends Split {
   last: string
 }
 
-// stderr piped, not inherited, so git's own wording never lands on top of ours.
-// quotePath off, or a path with an umlaut arrives escaped and matches nothing
+// stderr piped, and quotePath off for umlauts
 export const git = (cwd: string, ...args: string[]): string =>
   execFileSync("git", ["-c", "core.quotePath=false", ...args], {
     cwd,

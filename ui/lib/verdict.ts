@@ -123,7 +123,7 @@ export const spreadOf = (entries: number, folders?: number, roomy = false) => {
   return { ...band, tone: tone[band.label] }
 }
 
-/** the colour without the border, for a band said as words rather than worn as a badge */
+/** the colour without the border, for words rather than a badge */
 export const INK: Record<string, string> = {
   bloated: "text-red-700 dark:text-red-300",
   oversize: "text-amber-700 dark:text-amber-300",
@@ -131,10 +131,7 @@ export const INK: Record<string, string> = {
   thin: "text-muted-foreground",
 }
 
-/**
- * a file read on the same four bands a folder is, so one column says how big both are.
- * Lines rather than bytes: what there is to read is what makes a file hard to work in
- */
+/** a file on the same four bands as a folder, read in lines */
 export function lengthOf(code: number): { label: string; why: string; tone: string } {
   const band =
     code >= 800

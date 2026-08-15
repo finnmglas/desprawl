@@ -35,10 +35,7 @@ export const older = (have: string, want: string): boolean => {
   return i >= 0 && (a[i] ?? 0) < b[i]
 }
 
-/**
- * Node and git are not ours to install, so a missing one has to say so itself.
- * Everything else desprawl needs ships inside the package.
- */
+/** node and git are not ours to install */
 export function needs(): string | null {
   const want = ENGINE.replace(/[^\d.]/g, "")
   if (older(process.versions.node, want))

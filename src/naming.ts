@@ -81,8 +81,7 @@ const said = (part: string) =>
 
 const cased = (phrase: string) => {
   const words = phrase.split(" ").filter(Boolean)
-  // `app_ui/ui` borrows the folder above and lands on "app ui ui": a word the rest of the
-  // name already says is said once, and it is the later one that keeps its place
+  // a word the name already says is said once, and the later one keeps its place
   return words
     .filter(
       (word, i) => !words.slice(i + 1).some((later) => later.toLowerCase() === word.toLowerCase()),
@@ -105,11 +104,7 @@ export function isId(segment: string): boolean {
 
 const VARIES = /^\[.+\]$/
 
-/**
- * What a group is called out loud. A remainder says whether opening it shows folders or
- * files, a route parameter is named for what it details, and an id is left as written
- * since only its characters tell two apart. `deep` is how far a clash has climbed.
- */
+/** what a group is called out loud. deep is how far a clash has climbed */
 export function nameOf(path: string, folders = 0, deep = 0): string {
   if (path === LOOSE_FILES) return "Repo root [files]"
   const parts = path.split("/")
@@ -151,7 +146,7 @@ export function nameOf(path: string, folders = 0, deep = 0): string {
   return `${short || name} [${tag}]`
 }
 
-/** two groups called the same thing is worse than one long name, so only a clash grows */
+/** only a clash grows */
 export function namesOf(units: { path: string; folders: number }[]): Map<string, string> {
   const folders = new Map(units.map((u) => [u.path, u.folders]))
   const names = new Map(units.map((u) => [u.path, nameOf(u.path, u.folders)]))
@@ -161,7 +156,7 @@ export function namesOf(units: { path: string; folders: number }[]): Map<string,
     for (const [path, name] of names) taken.set(name, [...(taken.get(name) ?? []), path])
     const clashing = [...taken.values()].filter((paths) => paths.length > 1).flat()
     if (!clashing.length) break
-    // `a-b` and `a_b` are read the same however far it climbs, so the path becomes the name
+    // a-b and a_b read the same, so the path becomes the name
     const spent = deep > 8
     for (const path of clashing)
       names.set(path, spent ? path : nameOf(path, folders.get(path), deep))

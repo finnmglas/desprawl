@@ -41,8 +41,7 @@ export function download(name: string, text: string | Blob, type = "text/csv"): 
   const a = document.createElement("a")
   a.href = url
   a.download = name
-  // a megabyte is still streaming when click returns, and revoking under it
-  // reads to the browser as a network error
+  // revoking while it still streams reads as a network error
   a.style.display = "none"
   document.body.append(a)
   a.click()

@@ -7,11 +7,7 @@ import type { Calls, Symbol } from "./calls.ts"
 /** what a declaration is to the code that runs */
 export type Reach = "runs" | "called" | "open" | "dead"
 
-/**
- * Everything the running code can arrive at. The top level of every file is a root
- * since importing it runs it, and an export optionally is one too: nothing here has
- * to call it for something outside to.
- */
+/** every file's top level is a root, and an export optionally is one */
 export function reached(calls: Calls, exports: boolean): Set<string> {
   const roots = Object.values(calls.symbols)
     .filter((s) => s.kind === "module" || (exports && s.exported))
@@ -73,7 +69,7 @@ export function twins(calls: Calls): { name: string; files: string[]; lines: num
     .sort((a, b) => b.files.length - a.files.length || b.lines - a.lines)
 }
 
-/** functions that call each other in a ring. A call to itself is never recorded, so every ring spans two */
+/** a call to itself is never recorded, so every ring spans two */
 export const rings = (calls: Calls): string[][] =>
   scc(Object.keys(calls.symbols), (id) => calls.symbols[id]?.calls ?? []).filter(
     (group) => group.length > 1,
