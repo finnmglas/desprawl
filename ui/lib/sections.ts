@@ -111,6 +111,20 @@ function liveStore<T>(initial: T) {
 
 const draggedStore = liveStore<string | null>(null)
 const dropStore = liveStore<{ before: string; after: boolean } | null>(null)
+const landedStore = liveStore<string | null>(null)
+
+/** the id a link just scrolled to, so it can say so before it settles into the page */
+export const useLanded = (): string | null => landedStore.use()
+
+const LANDED_MS = 2000
+let clearing: ReturnType<typeof setTimeout> | undefined
+
+/** ring the panel a link aimed at, then let it go */
+export function land(id: string | null): void {
+  clearTimeout(clearing)
+  landedStore.set(id)
+  if (id) clearing = setTimeout(() => landedStore.set(null), LANDED_MS)
+}
 
 /** the id being dragged, so its own card can grey out where it used to sit */
 export const useDragging = (): string | null => draggedStore.use()

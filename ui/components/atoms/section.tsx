@@ -8,6 +8,7 @@ import {
   tabOf,
   useDragging,
   useDropTarget,
+  useLanded,
   useHidden,
   useOrder,
 } from "../../lib/sections.ts"
@@ -28,6 +29,7 @@ export function Section({
   const [hidden, setHidden] = useHidden()
   const { list: order, move, drop } = useOrder(tabOf(id), hidden)
   const dragging = useDragging()
+  const landed = useLanded()
   const target = useDropTarget()
   if (hidden.includes(id)) return null
   const visible = order.filter((one) => !hidden.includes(one))
@@ -36,7 +38,14 @@ export function Section({
     <div
       data-section={id}
       style={{ order: order.indexOf(id) }}
-      className={cn("relative transition-opacity", dragging === id && "opacity-40", className)}
+      // scrolled to by a link, so it stops clear of the window edge rather than against it,
+      // and wears a ring for a moment so the panel that was meant is the one you look at
+      className={cn(
+        "relative scroll-mt-1.5 transition-[opacity,box-shadow] duration-500",
+        dragging === id && "opacity-40",
+        landed === id && "ring-ring rounded-xl ring-2 ring-offset-2 ring-offset-transparent",
+        className,
+      )}
       onDragOver={(event) => {
         if (!dragging || dragging === id) return
         event.preventDefault()

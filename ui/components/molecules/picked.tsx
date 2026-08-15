@@ -81,23 +81,24 @@ export function Picked({
         pick: roomy ? "" : file,
       }),
   }
+  // each says the panel it means as well as the tab, so the one that answers is ringed
   const inModules: Deed = {
     label: "Modules",
     icon: <Blocks />,
     why: "the group holding it",
-    run: () => leave({ tab: "Modules", pick: target.id }),
+    run: () => leave({ tab: "Modules", panel: "table_modules", pick: target.id }),
   }
   const inGraph: Deed = {
     label: "Graph",
     icon: <Dots />,
     why: "framed in the picture",
-    run: () => leave({ tab: "Graph", pick: target.id }),
+    run: () => leave({ tab: "Graph", panel: "network_graph", pick: target.id }),
   }
   const inCalls: Deed = {
     label: "Execution",
     icon: <Run />,
     why: "what it declares",
-    run: () => leave({ tab: "Execution", pick: target.id }),
+    run: () => leave({ tab: "Execution", panel: "table_declarations", pick: target.id }),
   }
   const readIt: Deed = {
     label: "Read",

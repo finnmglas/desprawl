@@ -19,7 +19,7 @@ import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
-import { syncHidden, syncOrder } from "./lib/sections.ts"
+import { land, syncHidden, syncOrder } from "./lib/sections.ts"
 import { copy, describes } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
 import { cn } from "./lib/ui.ts"
@@ -87,7 +87,7 @@ function App({
 }) {
   // view state lives in the url, so back works and a link carries the place
   const [at, go, was] = useView(START)
-  const { tab, from, to, panel } = at
+  const { tab, from, to, panel, pick } = at
   // what the reader pointed at, answered with everywhere it leads rather than one guess
   const [target, setTarget] = useState<Target | null>(null)
   const [busy, setBusy] = useState(0)
@@ -130,18 +130,37 @@ function App({
   const { scale, curve, brands } = prefs
   setSimple(scale === "simple") // before the tree below renders
 
-  // a tab holds more than a screen, so a link can name the panel it means. Waiting a frame
-  // lets the tab paint, since the section has to exist before it can be scrolled to
+  // a tab holds more than a screen, so a link can name the panel it means. The panels above
+  // it load on their own clock and grow after the first paint, which would leave the target
+  // stranded halfway down, so the scroll is repeated until it stops moving
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const spot = panel && document.querySelector<HTMLElement>(`[data-section="${panel}"]`)
-      if (spot) spot.scrollIntoView({ block: "start", behavior: "smooth" })
-      else scrollTo({ top: 0 })
-    })
+    if (!panel) {
+      land(null)
+      scrollTo({ top: 0 })
+      setTarget(null)
+      return
+    }
+    let last = Infinity
+    const settle = setInterval(() => {
+      const spot = document.querySelector<HTMLElement>(`[data-section="${panel}"]`)
+      if (!spot) return
+      land(panel)
+      // a pick is a row, and the table scrolls to its own marked row: two scrolls would
+      // fight, and the row is the more exact answer, so only the ring is ours
+      if (pick) return clearInterval(settle)
+      const top = Math.round(spot.getBoundingClientRect().top)
+      if (Math.abs(top - last) < 2) return clearInterval(settle)
+      last = top
+      spot.scrollIntoView({ block: "start", behavior: "smooth" })
+    }, 250)
+    const give = setTimeout(() => clearInterval(settle), 4000)
     // the panel is about where you were standing, so leaving that place closes it
     setTarget(null)
-    return () => cancelAnimationFrame(frame)
-  }, [tab, panel])
+    return () => {
+      clearInterval(settle)
+      clearTimeout(give)
+    }
+  }, [tab, panel, pick])
   const [faces, setFaces] = useState<Record<string, string>>({})
   useEffect(() => {
     void loadFaces(stats).then(setFaces)

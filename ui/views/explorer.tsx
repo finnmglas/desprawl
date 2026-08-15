@@ -54,6 +54,8 @@ export function Explorer({ stats }: { stats: Stats }) {
   const { at, go, open } = useGoing()
   const { path, lang, kind, pick } = at
   const setPath = (next: string[]) => go({ path: next, pick: "" })
+  // the panel's own name is the way back to nothing chosen: no folder, no shading
+  const reset = () => go({ path: [], pick: "", lang: "", kind: "" })
   const setLang = (next: string) => go({ lang: next, kind: "" })
   const setKind = (next: string) => go({ kind: next, lang: "" })
 
@@ -152,7 +154,7 @@ export function Explorer({ stats }: { stats: Stats }) {
           // every segment walks back to itself, so no crumb bar and no up button beside it
           title={
             <span className="flex flex-wrap items-center gap-1">
-              <button onClick={() => setPath([])} className="hover:text-foreground cursor-pointer">
+              <button onClick={reset} className="hover:text-foreground cursor-pointer">
                 Files
               </button>
               {path.map((part, i) => (
