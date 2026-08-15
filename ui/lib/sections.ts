@@ -9,13 +9,15 @@ export const TAB_SECTIONS: Record<string, string[]> = {
   Overview: [
     "kpis_overview",
     "system_overview",
-    "actions_overview",
     "timeline_overview",
+    "tree_files",
     "table_languages",
     "table_contributors",
     "ai_overview",
-    "card_tests",
     "table_deps",
+    // what you do to the repo rather than what it is, so both sit at the bottom
+    "card_tests",
+    "actions_overview",
   ],
   Modules: [
     "kpis_modules_imports",
@@ -40,7 +42,6 @@ export const TAB_SECTIONS: Record<string, string[]> = {
   History: ["history_commits"],
   Graph: ["network_graph"],
   Tasks: ["kpis_tasks", "card_agents", "table_tasks"],
-  Files: ["tree_files", "distribution_languages"],
 }
 
 // which tab a section id belongs to, read off TAB_SECTIONS rather than passed in

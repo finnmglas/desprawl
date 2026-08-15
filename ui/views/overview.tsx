@@ -14,6 +14,7 @@ import { METRICS } from "../lib/columns.ts"
 import { Moved } from "../components/atoms/moved.tsx"
 import { Mark } from "../components/molecules/mark.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
+import { Explorer } from "./explorer.tsx"
 import { OverTime } from "./over-time.tsx"
 import { StackCard } from "../components/molecules/stack-card.tsx"
 import { Doing } from "../components/molecules/doing.tsx"
@@ -463,12 +464,22 @@ export function Overview({
   const { at, go, open } = useGoing()
   // every one of these carries what was clicked into the tab it opens: a language shades
   // the tree by itself, a line kind shades it by that kind, a window opens on those days
+  // the row that shaded the tree clears it when picked again, so the same click undoes
   const onLang = (picked: string) => {
-    go({ lang: picked, kind: "", path: [], pick: "", tab: "Files" })
+    if (at.lang === picked) {
+      go({ lang: "", kind: "" })
+      return toast("Cleared", "The tree is no longer shaded")
+    }
+    go({ lang: picked, kind: "", path: [], pick: "", tab: "Overview", panel: "tree_files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
+  // the tree is a panel here rather than a tab, so Files means scroll to it, not leave
   const onCard = (next: string, shade?: string) => {
-    go(next === "Files" ? { tab: next, kind: shade ?? "", lang: "" } : { tab: next })
+    go(
+      next === "Files"
+        ? { tab: "Overview", panel: "tree_files", kind: shade ?? "", lang: "" }
+        : { tab: next, panel: "" },
+    )
     if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
   const onCommits = (from: string, to: string) => {
@@ -709,6 +720,8 @@ export function Overview({
       <Section id="actions_overview">
         <Doing />
       </Section>
+
+      <Explorer stats={stats} />
 
       <Section id="timeline_overview">
         <OverTime

@@ -14,18 +14,23 @@ export type View = {
   /** what the reader picked to get here: a file, a folder, a group or a file#name.
    * Every tab that can say something about it highlights it rather than opening blank */
   pick: string
+  /** the section to land on, since a tab holds more panels than fit a screen */
+  panel: string
 }
 
 const read = (fallback: View): View => {
   const q = new URLSearchParams(location.hash.slice(1))
+  // Files became a panel on Overview, so a link written before that still lands on the tree
+  const asked = q.get("tab") || fallback.tab
   return {
-    tab: q.get("tab") || fallback.tab,
+    tab: asked === "Files" ? "Overview" : asked,
     path: (q.get("path") || "").split("/").filter(Boolean),
     lang: q.get("lang") || "",
     kind: q.get("kind") || "",
     from: q.get("from") || "",
     to: q.get("to") || "",
     pick: q.get("pick") || "",
+    panel: q.get("panel") || (asked === "Files" ? "tree_files" : ""),
   }
 }
 
@@ -38,6 +43,7 @@ const write = (view: View): string => {
   if (view.from) q.set("from", view.from)
   if (view.to) q.set("to", view.to)
   if (view.pick) q.set("pick", view.pick)
+  if (view.panel) q.set("panel", view.panel)
   return `#${q}`
 }
 

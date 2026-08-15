@@ -75,7 +75,8 @@ export function Picked({
     why: roomy ? "the tree, inside it" : "the tree, at its folder",
     run: () =>
       leave({
-        tab: "Files",
+        tab: "Overview",
+        panel: "tree_files",
         path: roomy ? bare.split("/").filter(Boolean) : folderOf(file),
         pick: roomy ? "" : file,
       }),

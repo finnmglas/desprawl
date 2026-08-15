@@ -2,17 +2,14 @@
 // goal: click folders, see loc per language
 
 import { useEffect, useMemo, useState } from "react"
-import { Back } from "../components/atoms/back.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
 import { Button } from "../components/atoms/button.tsx"
 import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { withShare } from "../lib/columns.ts"
-import { Distribution } from "../components/molecules/distribution.tsx"
+
 import { FileView } from "../components/molecules/file-view.tsx"
 import { Section } from "../components/atoms/section.tsx"
-import { Input } from "../components/atoms/input.tsx"
 import { Kind } from "../components/molecules/mark.tsx"
-import { Onward } from "../components/molecules/onward.tsx"
 import { Tip } from "../components/atoms/tip.tsx"
 import { num, pct } from "../lib/format.ts"
 import { filesIn, isLive } from "../lib/live.ts"
@@ -23,12 +20,15 @@ import { lengthOf, spreadOf } from "../lib/verdict.ts"
 import { cn } from "../lib/ui.ts"
 import type { Node, Stats } from "../../src/model.ts"
 
-// what a line is, since none of the three has a brand colour to borrow
-const SPLIT: Record<string, { paint: string; of: (n: Node) => number }> = {
-  Code: { paint: "var(--chart-1)", of: (n) => n.code },
-  Comments: { paint: "var(--chart-4)", of: (n) => n.comment },
-  Blank: { paint: "var(--muted-foreground)", of: (n) => n.blank },
+// which line count a row can be shaded by
+const SPLIT: Record<string, (n: Node) => number> = {
+  Code: (n) => n.code,
+  Comments: (n) => n.comment,
+  Blank: (n) => n.blank,
 }
+
+// rows past this fold sit behind the table's own "show more"
+const FOLD = 12
 
 // what opening it would show. A served tree carries directories only, and counts the rest
 const entries = (n: Node) => (n.children ? n.children.length + (n.leaves ?? 0) : 0)
@@ -57,7 +57,6 @@ export function Explorer({ stats }: { stats: Stats }) {
   const setLang = (next: string) => go({ lang: next, kind: "" })
   const setKind = (next: string) => go({ kind: next, lang: "" })
 
-  const [filter, setFilter] = useState("")
   // a served tree is directories only, files arrive on open
   const [fetched, setFetched] = useState<Record<string, Node[]>>({})
   // only a served run has the file itself, a saved page has the counts of it
@@ -72,18 +71,16 @@ export function Explorer({ stats }: { stats: Stats }) {
     void filesIn(key).then((files) => setFetched((prev) => ({ ...prev, [key]: files })))
   }, [key, here.leaves])
 
+  // the table folds and searches these itself, so nothing is filtered on the way in
   const rows = useMemo(
-    () =>
-      [...(here.children ?? []), ...(fetched[key] ?? [])].filter((c) =>
-        filter ? c.name.toLowerCase().includes(filter.toLowerCase()) : true,
-      ),
-    [here, filter, fetched, key],
+    () => [...(here.children ?? []), ...(fetched[key] ?? [])],
+    [here, fetched, key],
   )
 
   // share of whatever is picked inside each row, painted as a bar
   const langTotal = lang ? (here.langs[lang] ?? 0) : 0
-  const share = (n: Node) => (kind ? SPLIT[kind].of(n) : own(n, lang))
-  const whole = kind ? SPLIT[kind].of(here) : langTotal
+  const share = (n: Node) => (kind ? SPLIT[kind](n) : own(n, lang))
+  const whole = kind ? SPLIT[kind](here) : langTotal
 
   // the root is allowed its config and docs, a folder inside it is not
   const standing = spreadOf(entries(here), undefined, !path.length)
@@ -146,122 +143,109 @@ export function Explorer({ stats }: { stats: Stats }) {
   ]
 
   return (
-    <div className="flex flex-col gap-3">
-      <Back />
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-1 text-sm">
-          <Button variant="ghost" size="sm" onClick={() => setPath([])}>
-            {stats.repo.split("/").pop()}
-          </Button>
-          {path.map((part, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <span className="text-muted-foreground">/</span>
-              <Button variant="ghost" size="sm" onClick={() => setPath(path.slice(0, i + 1))}>
-                {part}
-              </Button>
+    // contents, so both sections are Overview's own items and reorder against its panels
+    <div className="contents">
+      <Section id="tree_files" className="flex min-w-0 flex-col gap-3">
+        <DataTable
+          className="min-w-0"
+          // the panel is called Files, and the path only joins it once there is one:
+          // every segment walks back to itself, so no crumb bar and no up button beside it
+          title={
+            <span className="flex flex-wrap items-center gap-1">
+              <button onClick={() => setPath([])} className="hover:text-foreground cursor-pointer">
+                Files
+              </button>
+              {path.map((part, i) => (
+                <span key={i} className="flex items-center gap-1">
+                  <span className="text-muted-foreground font-normal">/</span>
+                  <button
+                    onClick={() => setPath(path.slice(0, i + 1))}
+                    className="hover:text-foreground cursor-pointer font-mono"
+                  >
+                    {part}
+                  </button>
+                </span>
+              ))}
+              {/* the folder you are standing in, judged like the ones listed inside it,
+                  beside its own name rather than lost among the controls */}
+              <Tip text={standing.why}>
+                <Badge variant="outline" className={cn("ml-1", standing.tone)}>
+                  {standing.label}
+                </Badge>
+              </Tip>
             </span>
-          ))}
-        </div>
-        <div className="ml-auto flex w-full items-center gap-2 sm:w-auto">
-          {path.length > 0 && (
-            <Button variant="outline" size="sm" onClick={() => setPath(path.slice(0, -1))}>
-              up
+          }
+          file={`${path.join("-") || "root"}-tree`}
+          hint={
+            here.leaves && !fetched[key]
+              ? `loading ${num(here.leaves)} files`
+              : lang || kind
+                ? `shaded by ${lang || kind.toLowerCase()} share`
+                : live
+                  ? "click a folder to descend, a file to read it"
+                  : "click a folder to descend, a file to see where it leads"
+          }
+          columns={columns}
+          rows={rows}
+          id={(n) => n.path}
+          fold={FOLD}
+          saves={[
+            {
+              name: `${path.join("-") || "root"}-tree`,
+              label: "Folder tree",
+              note: `${num(here.files)} files, every child of ${path.join("/") || "/"}, as`,
+              rows: () => flatten(here),
+            },
+          ]}
+          onRowClick={enter}
+          mark={(n) => !!pick && n.path === pick}
+          rowStyle={(n) =>
+            lang || kind
+              ? {
+                  // washed rather than solid: the bar is behind the numbers, not over them
+                  backgroundImage:
+                    "linear-gradient(color-mix(in oklch, var(--chart-2) var(--wash), transparent), color-mix(in oklch, var(--chart-2) var(--wash), transparent))",
+                  backgroundRepeat: "no-repeat",
+                  backgroundSize: `${(share(n) / (whole || 1)) * 100}% 100%`,
+                }
+              : undefined
+          }
+        >
+          {/* what the reader came here to see, said rather than left to be spotted */}
+          {pick && (
+            <Button variant="outline" size="sm" onClick={() => go({ pick: "" })}>
+              {pick.split("/").pop()} ✕
             </Button>
           )}
-          <Input
-            className="w-full sm:w-44"
-            placeholder="filter"
-            value={filter}
-            onChange={(e) => setFilter(e.currentTarget.value)}
-          />
-        </div>
-      </div>
-
-      {/* a grid cell is as wide as its content unless told otherwise, and a wide table
-          would push the page sideways rather than scroll inside its own card */}
-      <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-        <Section id="tree_files" className="min-w-0 lg:col-span-2">
-          <DataTable
-            className="min-w-0"
-            title={path.length ? path.join("/") : "/"}
-            hint={
-              here.leaves && !fetched[key]
-                ? `loading ${num(here.leaves)} files`
-                : lang || kind
-                  ? `shaded by ${lang || kind.toLowerCase()} share`
-                  : live
-                    ? "click a folder to descend, a file to read it"
-                    : "click a folder to descend, a file to see where it leads"
-            }
-            columns={columns}
-            rows={rows}
-            id={(n) => n.path}
-            fold={100}
-            saves={[
-              {
-                name: `${path.join("-") || "root"}-tree`,
-                label: "Folder tree",
-                note: `${num(here.files)} files, every child of ${path.join("/") || "/"}, as`,
-                rows: () => flatten(here),
-              },
-            ]}
-            onRowClick={enter}
-            mark={(n) => !!pick && n.path === pick}
-            rowStyle={(n) =>
-              lang || kind
-                ? {
-                    backgroundImage: "linear-gradient(var(--chart-2), var(--chart-2))",
-                    backgroundRepeat: "no-repeat",
-                    backgroundSize: `${(share(n) / (whole || 1)) * 100}% 100%`,
-                  }
-                : undefined
-            }
-          >
-            {/* what the reader came here to see, said rather than left to be spotted */}
-            {pick && (
-              <Button variant="outline" size="sm" onClick={() => go({ pick: "" })}>
-                {pick.split("/").pop()} ✕
+          {/* a language arrives from the Languages table, and leaves from here */}
+          {lang && (
+            <Button variant="outline" size="sm" onClick={() => setLang("")}>
+              {lang} ✕
+            </Button>
+          )}
+          {/* picking the one already on clears it, so there is no "all" to reach for */}
+          <div className="flex items-center gap-0.5">
+            {Object.keys(SPLIT).map((one) => (
+              <Button
+                key={one}
+                size="sm"
+                variant={kind === one ? "secondary" : "ghost"}
+                className="text-muted-foreground h-6 px-1.5 text-xs font-normal data-[on]:text-inherit"
+                data-on={kind === one || undefined}
+                onClick={() => setKind(kind === one ? "" : one)}
+              >
+                {one.toLowerCase()}
               </Button>
-            )}
-            {/* the folder you are standing in, judged like the ones listed inside it */}
-            <Tip text={standing.why}>
-              <Badge variant="outline" className={standing.tone}>
-                {standing.label}
-              </Badge>
-            </Tip>
-          </DataTable>
-        </Section>
-
-        <Section id="distribution_languages" className="flex min-w-0 flex-col gap-3">
-          <Distribution
-            title={path.length ? `${path.join("/")} languages` : "Languages"}
-            langs={here.langs}
-            selected={lang}
-            onSelect={(next) => {
-              setKind("")
-              setLang(next)
-            }}
-          />
-          <Distribution
-            title="Lines"
-            langs={{ Code: here.code, Comments: here.comment, Blank: here.blank }}
-            paint={(name) => SPLIT[name].paint}
-            selected={kind}
-            onSelect={(next) => {
-              setLang("")
-              setKind(next)
-            }}
-          />
-        </Section>
-      </div>
+            ))}
+          </div>
+        </DataTable>
+      </Section>
 
       <FileView
         path={opened?.path ?? ""}
         node={opened ?? undefined}
         onClose={() => setOpened(null)}
       />
-
-      <Onward stats={stats} current="Files" />
     </div>
   )
 }

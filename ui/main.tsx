@@ -14,7 +14,6 @@ import { Toaster, toast } from "./components/atoms/toast.tsx"
 import { Execution } from "./views/execution.tsx"
 import { Network } from "./views/network.tsx"
 import { Tasks } from "./views/tasks.tsx"
-import { Explorer } from "./views/explorer.tsx"
 import { Graph } from "./views/graph.tsx"
 import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
@@ -56,10 +55,19 @@ declare global {
   }
 }
 
-const TABS = ["Overview", "Modules", "Execution", "Files", "History", "Tasks", "Graph"]
+const TABS = ["Overview", "Modules", "Execution", "History", "Tasks", "Graph"]
 
 // one object, not a literal per render: useView listens for as long as this stays the same
-const START = { tab: TABS[0], path: [], lang: "", kind: "", from: "", to: "", pick: "" }
+const START = {
+  tab: TABS[0],
+  path: [],
+  lang: "",
+  kind: "",
+  from: "",
+  to: "",
+  pick: "",
+  panel: "",
+}
 
 // the summary wears its name alone up here, whatever it is known by elsewhere
 const BAR = { ...MARKS, Overview: undefined }
@@ -79,7 +87,7 @@ function App({
 }) {
   // view state lives in the url, so back works and a link carries the place
   const [at, go, was] = useView(START)
-  const { tab, from, to } = at
+  const { tab, from, to, panel } = at
   // what the reader pointed at, answered with everywhere it leads rather than one guess
   const [target, setTarget] = useState<Target | null>(null)
   const [busy, setBusy] = useState(0)
@@ -122,11 +130,18 @@ function App({
   const { scale, curve, brands } = prefs
   setSimple(scale === "simple") // before the tree below renders
 
+  // a tab holds more than a screen, so a link can name the panel it means. Waiting a frame
+  // lets the tab paint, since the section has to exist before it can be scrolled to
   useEffect(() => {
-    scrollTo({ top: 0 })
+    const frame = requestAnimationFrame(() => {
+      const spot = panel && document.querySelector<HTMLElement>(`[data-section="${panel}"]`)
+      if (spot) spot.scrollIntoView({ block: "start", behavior: "smooth" })
+      else scrollTo({ top: 0 })
+    })
     // the panel is about where you were standing, so leaving that place closes it
     setTarget(null)
-  }, [tab])
+    return () => cancelAnimationFrame(frame)
+  }, [tab, panel])
   const [faces, setFaces] = useState<Record<string, string>>({})
   useEffect(() => {
     void loadFaces(stats).then(setFaces)
@@ -147,13 +162,6 @@ function App({
         onRange={(a, b) => go({ from: a, to: b })}
         faces={faces}
       />
-    ) : one === "Overview" ? (
-      <Overview
-        stats={stats}
-        metadata={prefs.metadata || printing}
-        onMetadata={(open) => change({ metadata: open })}
-        faces={faces}
-      />
     ) : one === "Modules" ? (
       <Modules stats={stats} faces={faces} />
     ) : one === "Tasks" ? (
@@ -163,7 +171,13 @@ function App({
     ) : one === "Execution" ? (
       <Execution stats={stats} />
     ) : (
-      <Explorer stats={stats} />
+      // Overview last, so a tab nobody knows any more lands somewhere readable
+      <Overview
+        stats={stats}
+        metadata={prefs.metadata || printing}
+        onMetadata={(open) => change({ metadata: open })}
+        faces={faces}
+      />
     )
 
   return (
@@ -292,7 +306,9 @@ function App({
                 className="xl:w-auto"
                 tabs={TABS}
                 value={tab}
-                onChange={(next) => go({ tab: next })}
+                // reaching for a tab by hand means the whole tab, so what a link aimed at
+                // is dropped: no landing on someone else's panel, no marked row scrolled to
+                onChange={(next) => go({ tab: next, panel: "", pick: "" })}
               />
               <ThemeToggle {...themed} />
               <Settings
