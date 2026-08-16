@@ -34,15 +34,24 @@ export interface Knowledge {
   links: Link[]
 }
 
+/** the graphs to read and what to read them at. This runs in a browser too, so nothing
+ * here reaches disk: build() and layers() are the caller's to run */
+export interface Asking {
+  graph: Graph
+  layout: Layout
+  /** null when the call graph is not wanted, or not read yet */
+  calls?: Calls | null
+  grain?: Grain
+  /** the depth folders are grouped at, or a path to group map */
+  split?: number | Record<string, string>
+}
+
 /** the graphs as typed things and relations, for whatever reads them next */
-export function knowledge(
-  repo: string,
-  graph: Graph,
-  calls: Calls | null,
-  layout: Layout,
-  grain: Grain,
-  split: number | Record<string, string>,
-): Knowledge {
+export function knowledge(repo: string, asking: Asking): Knowledge {
+  const { graph, layout } = asking
+  const calls = asking.calls ?? null
+  const grain = asking.grain ?? "file"
+  const split = asking.split ?? 1
   const unitAt = (path: string) =>
     typeof split === "number" ? unitOf(path, split) : (split[path] ?? unitOf(path, 1))
   const things: Thing[] = []

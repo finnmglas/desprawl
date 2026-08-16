@@ -31,8 +31,10 @@ Defaults to UI, CLI available.
 Analyze git-tracked repos (files, history, imports, calls):
 
 - **commits** tracked and classified per time and module, loc split into code, comment, blank, nesting
+- **timeline** by hour, day, week, month or year, whichever the span can draw
 - **tokens** estimated to predict ai cost
-- **contributors** listed traceably (also ai)
+- **contributors** listed traceably (also ai), merged by email
+- **history** as a commit log with the branch rails beside it
 - **stack** from manifests and marker files, frameworks etc
 - **imports** are graphed, mapped and structured into groups logically to show module structure
 - **cycles** read off the files themselves (so nothing invented or lost)
@@ -40,6 +42,9 @@ Analyze git-tracked repos (files, history, imports, calls):
 - **dependencies** licence of every installed package + version advisories
 - **tests** counted read-only, run from interface w/ coverage
 - **actions** git and scripts a repo declares, servers controllable from panel
+- **tasks** what to clean up, sized, each handed to an agent that streams back into the panel
+- **search** one box finds any panel by what it is called and what it holds
+- **panels** dragged, reordered, hidden, and set to hold 5, 10 or all rows
 
 ```
 /home/you/desprawl  @3982e3d
@@ -64,14 +69,15 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
-|                          |                                      |
-| ------------------------ | ------------------------------------ |
-| `desprawl`               | open interface on current directory  |
-| `desprawl ../other-repo` | open another repo                    |
-| `desprawl <git url>`     | clone to downloads, then open        |
-| `desprawl cli`           | print report in cli                  |
-| `desprawl --static`      | open static html file, no server     |
-| `desprawl --json`        | whole cli report, tree + time series |
+|                              |                                            |
+| ---------------------------- | ------------------------------------------ |
+| `desprawl`                   | open interface on current directory        |
+| `desprawl ../other-repo`     | open another repo                          |
+| `desprawl <git url>`         | clone to downloads, then open              |
+| `desprawl cli`               | print report in cli                        |
+| `desprawl --static`          | open static html file, no server           |
+| `desprawl --json`            | whole cli report, tree + time series       |
+| `desprawl check --base main` | what this branch added, exit 1 if anything |
 
 | flag          |                                                         |
 | ------------- | ------------------------------------------------------- |
@@ -85,6 +91,7 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 | `--keep`      | keep server after the tab closes                        |
 | `--raw`       | exact numbers instead of scaled ones                    |
 | `--json`      | machine readable, numbers exact                         |
+| `--base REF`  | what `check` compares against                           |
 
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 
@@ -104,19 +111,29 @@ A saved file carries both graphs, the dependency table and what the test suite h
 
 Every panel saves as CSV, TSV, JSON, TOML, Markdown or Excel, every drawing as PNG, JPEG, WebP or SVG, and the whole report as a PDF printed by your own browser, so the text in it stays text.
 
+## Check a diff
+
+```sh
+desprawl check --base main
+```
+
+Reads the base ref in a worktree of its own and reports what this branch **added**, never what the repo already holds: import cycles, unresolved imports and barrel files. Exits 1 if anything grew, so it plugs into CI or an agent loop.
+
+A threshold on a total becomes a target, and "this repo has 3 loops" is not actionable on a repo that is already a mess. "Your diff added a loop that was not on main" is local, cheap and unarguable.
+
 ## Library
 
 Importable types. `desprawl --json` covers everything else.
 
 ```ts
-import { analyze, build, calls, cycles, fold, knowledge } from "desprawl"
+import { analyze, build, calls, cycles, layers, knowledge } from "desprawl"
 
 const stats = analyze(repo) // loc, languages, history, contributors, stack
 const graph = build(repo) // imports, per file
 const reach = calls(repo, graph) // declarations and what calls what
 const loops = cycles(graph) // file cycles, nothing invented or lost
-const layout = fold(graph, 1) // files grouped into modules and levels
-const found = knowledge(repo, graph, reach, layout, "file", 1)
+const layout = layers(graph, 1) // files grouped into modules and levels
+const found = knowledge(repo, { grain: "file", graph, calls: reach, layout })
 ```
 
 `knowledge()` returns the whole picture as typed things & relations.

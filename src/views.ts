@@ -289,14 +289,13 @@ function past(repo: string) {
 
 /** the whole repo as things and the relations between them, at the grain asked for */
 function known(repo: string, read: Read, ask: Asked) {
-  const found = knowledge(
-    repo,
-    read.graph,
-    read.calls,
-    read.layout,
-    (ask.grain ?? "module") as Grain,
-    read.split,
-  )
+  const found = knowledge(repo, {
+    grain: (ask.grain ?? "module") as Grain,
+    split: read.split,
+    graph: read.graph,
+    calls: read.calls,
+    layout: read.layout,
+  })
   return {
     text: asRows(found)
       .map((row) => row.join("\t"))

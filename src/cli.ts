@@ -5,6 +5,7 @@
 import { existsSync, statSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
+import { check } from "./check.ts"
 import { deps } from "./deps.ts"
 import { tests } from "./tests.ts"
 import { human, nest, pct, tokens } from "./human.ts"
@@ -37,6 +38,7 @@ const { values, positionals } = (() => {
         static: { type: "boolean", default: false },
         anon: { type: "boolean", default: false },
         out: { type: "string" },
+        base: { type: "string" },
         keep: { type: "boolean", default: false },
         // set by a disconnected tab's own copied reconnect command, never typed by hand
         token: { type: "string" },
@@ -62,6 +64,7 @@ if (values.help) {
       "desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep]",
       "         [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
       `desprawl ${VIEWS.join("|")} [path] [--json]`,
+      "desprawl check [path] --base REF [--json]",
       "         tasks also takes [--kind K] [--impact I] [--limit N] [--offline]",
       "         knowledge also takes [--grain module|file|function]",
       `         any of them takes [--lang ${LANGUAGES.join("|")}]`,
@@ -75,7 +78,7 @@ const missing = needs()
 if (missing) fail(missing)
 
 // a first positional is the command only when it names one, otherwise it is the path
-const KNOWN = ["cli", "view", ...VIEWS]
+const KNOWN = ["cli", "view", "check", ...VIEWS]
 const command = KNOWN.includes(positionals[0] ?? "") ? positionals[0] : ""
 const asked = (command ? positionals[1] : positionals[0]) ?? process.cwd()
 
@@ -206,6 +209,28 @@ try {
   if (!statSync(target).isDirectory()) fail(`${target} is a file, and desprawl reads a repo`)
   git(target, "rev-parse", "--show-toplevel")
   git(target, "rev-parse", "HEAD")
+
+  // what this branch added, never what the repo holds: a threshold becomes a target
+  if (command === "check") {
+    const base = values.base
+    if (!base) fail("check needs a --base to compare against, like --base main")
+    const found = check(target, base!)
+    if (values.json) {
+      console.log(JSON.stringify(found, null, 2))
+      process.exit(found.worse ? 1 : 0)
+    }
+    console.log(`${found.head} against ${found.base}`)
+    for (const one of found.counts) {
+      const sign =
+        one.added > 0 ? `+${one.added}` : one.now < one.was ? `${one.now - one.was}` : "0"
+      console.log(`${sign.padStart(5)}  ${one.name}  (${one.was} to ${one.now})`)
+      for (const which of one.which) console.log(`       ${which}`)
+      if (one.added > one.which.length)
+        console.log(`       and ${one.added - one.which.length} more`)
+    }
+    if (!found.worse) console.log("\nnothing new to answer for")
+    process.exit(found.worse ? 1 : 0)
+  }
 
   // one panel, straight to the terminal: the same numbers the tab shows
   if (VIEWS.includes(command as View)) {

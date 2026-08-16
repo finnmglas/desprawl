@@ -20,7 +20,13 @@ const built = (grain: "module" | "file" | "function") => {
   const dir = repo(source)
   const graph = build(dir)
   const split = balanced(graph)
-  return knowledge(dir, graph, calls(dir, graph), fold(graph, split), grain, split)
+  return knowledge(dir, {
+    graph,
+    calls: calls(dir, graph),
+    layout: fold(graph, split),
+    grain,
+    split,
+  })
 }
 
 test("every link joins two things that are listed, at every grain", () => {

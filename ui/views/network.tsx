@@ -742,7 +742,8 @@ export function Network({ stats }: { stats: Stats }) {
                     name: "knowledge-graph",
                     label: "Knowledge graph",
                     note: "every module, file, declaration and install, and what relates them, at this grain, as",
-                    rows: () => asRows(knowledge(stats.repo, graph, calls, layout, grain, split)),
+                    rows: () =>
+                      asRows(knowledge(stats.repo, { grain, split, graph, calls, layout })),
                   },
                 ]
               : undefined
