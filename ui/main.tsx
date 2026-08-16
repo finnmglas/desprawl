@@ -2,7 +2,7 @@
 // goal: mount, ui
 
 import { createRoot } from "react-dom/client"
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { MARKS, NpmMark } from "./components/atoms/icons.tsx"
 import { Onward } from "./components/molecules/onward.tsx"
 import { Settings } from "./components/molecules/settings.tsx"
@@ -11,6 +11,8 @@ import { Waiting } from "./components/atoms/waiting.tsx"
 import { useSlow } from "./components/atoms/working.tsx"
 import { Tabs } from "./components/atoms/tabs.tsx"
 import { Toaster, toast } from "./components/atoms/toast.tsx"
+import { Button } from "./components/atoms/button.tsx"
+import { Card, CardContent } from "./components/atoms/card.tsx"
 import { Execution } from "./views/execution.tsx"
 import { Network } from "./views/network.tsx"
 import { Tasks } from "./views/tasks.tsx"
@@ -18,7 +20,18 @@ import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
 import { setLocale } from "./lib/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
-import { land, syncHidden, syncOrder } from "./lib/sections.ts"
+import {
+  hunt,
+  land,
+  onTab,
+  syncHidden,
+  syncOrder,
+  useHunt,
+  useShownCount,
+  viewsFor,
+  viewsOf,
+} from "./lib/sections.ts"
+import { Find } from "./components/molecules/find.tsx"
 import { copy, describes } from "./lib/export.ts"
 import { num, setSimple } from "./lib/format.ts"
 import { cn } from "./lib/ui.ts"
@@ -68,6 +81,9 @@ const START = {
   panel: "",
 }
 
+// words that land on a panel every repo has
+const SUGGEST = ["licences", "dead code", "contributors", "coverage", "timeline"]
+
 // the summary wears its name alone up here, whatever it is known by elsewhere
 const BAR = { ...MARKS, Overview: undefined }
 
@@ -87,6 +103,29 @@ function App({
   // view state lives in the url, so back works and a link carries the place
   const [at, go, was] = useView(START)
   const { tab, panel, pick } = at
+  const said = useHunt()
+  const found = useShownCount()
+  // the box answers every keystroke, the page waits for the typing to stop: each change
+  // mounts and unmounts whole views, and on a large repo that is seconds of work
+  const [typed, setTyped] = useState("")
+  useEffect(() => {
+    if (typed === said) return
+    const wait = setTimeout(() => hunt(typed), 250)
+    return () => clearTimeout(wait)
+  }, [typed])
+  useEffect(() => {
+    if (!said) setTyped("")
+  }, [said])
+  // only the views holding a match are mounted, or a search builds every graph in the repo.
+  // once mounted a view stays: rebuilding a call graph costs seconds, hiding it costs nothing
+  const [built, setBuilt] = useState<string[]>([])
+  const needed = useMemo(() => (said ? viewsFor(said) : null), [said])
+  useEffect(() => {
+    if (!needed) return
+    const fresh = [...needed].filter((one) => !built.includes(one))
+    if (fresh.length) setBuilt([...built, ...fresh])
+  }, [needed, built])
+  const wanted = (name: string) => !needed || needed.has(name) || built.includes(name)
   // what the reader pointed at, answered with everywhere it leads rather than one guess
   const [target, setTarget] = useState<Target | null>(null)
   const [busy, setBusy] = useState(0)
@@ -173,9 +212,9 @@ function App({
       <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
       <>
-        <Network stats={stats} />
-        <Modules stats={stats} faces={faces} />
-        <Execution stats={stats} />
+        {wanted("Network") && <Network stats={stats} />}
+        {wanted("Modules") && <Modules stats={stats} faces={faces} />}
+        {wanted("Execution") && <Execution stats={stats} />}
         <Onward stats={stats} current="Graph" />
       </>
     ) : (
@@ -190,7 +229,10 @@ function App({
   return (
     <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows }}>
       <GoingProvider value={{ at, go, was, open: setTarget }}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6">
+        <div
+          data-hunting={said || undefined}
+          className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6"
+        >
           {/* a saved file is read by someone who did not run it, so it says what it is */}
           {!isLive() && (
             <div
@@ -256,7 +298,20 @@ function App({
               <div className="flex min-w-0 items-center gap-2">
                 {/* folder name is the repo name */}
                 <button
-                  onClick={() => go({ tab: TABS[0], path: [], lang: "", kind: "", pick: "" })}
+                  onClick={() => {
+                    setTyped("")
+                    hunt("")
+                    go({
+                      tab: TABS[0],
+                      path: [],
+                      lang: "",
+                      kind: "",
+                      pick: "",
+                      panel: "",
+                      from: "",
+                      to: "",
+                    })
+                  }}
                   className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
                 >
                   {name}
@@ -307,15 +362,24 @@ function App({
             {/* seven tabs, a theme switch and a menu need most of a laptop, so they keep a
                 row of their own until there is room for the repo name beside them */}
             <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 xl:w-auto">
-              <Tabs
-                grow
-                icons={BAR}
-                className="xl:w-auto"
-                tabs={TABS}
-                value={TABS.includes(tab) ? tab : TABS[0]}
-                // by hand means the whole tab
-                onChange={(next) => go({ tab: next, panel: "", pick: "" })}
-              />
+              {said ? (
+                <p className="text-muted-foreground min-w-0 flex-1 truncate text-sm">
+                  {found === 0
+                    ? `nothing here matches ${said}`
+                    : `${found === 1 ? "1 panel" : `${found} panels`} matching ${said}`}
+                </p>
+              ) : (
+                <Tabs
+                  grow
+                  icons={BAR}
+                  className="xl:w-auto"
+                  tabs={TABS}
+                  value={TABS.includes(tab) ? tab : TABS[0]}
+                  // by hand means the whole tab
+                  onChange={(next) => go({ tab: next, panel: "", pick: "" })}
+                />
+              )}
+              <Find value={typed} onChange={setTyped} placeholder="Search panels" />
               <Settings
                 stats={stats}
                 prefs={prefs}
@@ -327,7 +391,16 @@ function App({
             </div>
           </header>
 
-          {(printing ? TABS : [tab]).map((one, i) => (
+          {/* searching answers with panels, so every tab is mounted and each one shows
+              only what matched */}
+          {(printing
+            ? TABS
+            : said
+              ? TABS.filter(
+                  (one) => onTab(said, one) || viewsOf(one).some((v) => built.includes(v)),
+                )
+              : [tab]
+          ).map((one, i) => (
             <section
               key={one}
               className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
@@ -343,6 +416,35 @@ function App({
               </div>
             </section>
           ))}
+
+          {said && found === 0 && (
+            <Card>
+              <CardContent className="flex flex-col items-start gap-3 p-6">
+                <p className="text-sm">
+                  Nothing here matches <span className="font-medium">{said}</span>.
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  A panel answers to what it is called and what it holds, and one this repo has
+                  nothing for is not here at all. Try{" "}
+                  {SUGGEST.map((one, i) => (
+                    <span key={one}>
+                      {i > 0 && ", "}
+                      <button
+                        onClick={() => setTyped(one)}
+                        className="hover:text-foreground cursor-pointer underline decoration-dotted"
+                      >
+                        {one}
+                      </button>
+                    </span>
+                  ))}
+                  .
+                </p>
+                <Button variant="outline" size="sm" onClick={() => setTyped("")}>
+                  Clear search
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Picked target={target} stats={stats} onClose={() => setTarget(null)} />
         </div>

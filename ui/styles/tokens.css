@@ -130,3 +130,8 @@
     break-inside: avoid;
   }
 }
+
+/* searching answers with panels: anything on a tab that is not one steps aside */
+[data-hunting] [data-shot] :not([data-section]):not(.contents):not([data-section] *) {
+  display: none;
+}

@@ -6,7 +6,7 @@ import { Back } from "../atoms/back.tsx"
 import { Eye, MARKS } from "../atoms/icons.tsx"
 import { Waiting } from "../atoms/waiting.tsx"
 import { useGoing } from "../../lib/going.tsx"
-import { TAB_SECTIONS, useHidden } from "../../lib/sections.ts"
+import { TAB_SECTIONS, useHidden, useHunt } from "../../lib/sections.ts"
 import type { Stats } from "../../../src/model.ts"
 
 /** what a graph view shows until its graph arrives */
@@ -41,8 +41,10 @@ export function Loading({
 
 export function Onward({ stats, current }: { stats: Stats; current: string }) {
   const { go } = useGoing()
+  const said = useHunt()
   const [hidden, setHidden] = useHidden()
   const revealable = (TAB_SECTIONS[current] ?? []).filter((id) => hidden.includes(id))
+  if (said) return null
 
   // the tab is the title, and what it holds is a handful of words under it
   const links = Object.entries({

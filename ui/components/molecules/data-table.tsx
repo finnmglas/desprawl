@@ -188,11 +188,16 @@ export function DataTable<T>({
     if (found.every((n) => n > 0)) setWidths(found)
   }, [columns.length, widths.length, rows])
 
-  const windowed = pinned && unit > 0 && shown.length > WINDOW_FROM
-  const first = windowed ? Math.max(0, Math.floor(scrolled / unit) - OVERSCAN) : 0
-  const last_ = windowed
+  // a row height is only known after a paint, and painting every row to learn it is the
+  // cost this avoids, so a screenful stands in until then
+  const windowed = pinned && shown.length > WINDOW_FROM
+  const measured = windowed && unit > 0
+  const first = measured ? Math.max(0, Math.floor(scrolled / unit) - OVERSCAN) : 0
+  const last_ = measured
     ? Math.min(shown.length, Math.ceil((scrolled + tall) / unit) + OVERSCAN)
-    : shown.length
+    : windowed
+      ? Math.min(shown.length, WINDOW_FROM)
+      : shown.length
   const slice = windowed ? shown.slice(first, last_) : shown
 
   // read once a frame rather than per event
@@ -328,7 +333,7 @@ export function DataTable<T>({
               </TR>
             </THead>
             <TBody>
-              {windowed && first > 0 && (
+              {measured && first > 0 && (
                 <tr aria-hidden style={{ height: Math.round(first * unit) }} />
               )}
               {slice.map((row) => (
@@ -367,7 +372,7 @@ export function DataTable<T>({
                   })}
                 </TR>
               ))}
-              {windowed && last_ < shown.length && (
+              {measured && last_ < shown.length && (
                 <tr aria-hidden style={{ height: Math.round((shown.length - last_) * unit) }} />
               )}
               {foldable && (

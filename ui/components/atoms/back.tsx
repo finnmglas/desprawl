@@ -2,15 +2,18 @@
 // goal: returning to where you actually came from
 
 import { useGoing } from "../../lib/going.tsx"
+import { useHunt } from "../../lib/sections.ts"
 
 const said = (view: { tab: string; path: string[] }, tab: string) =>
   view.tab === tab ? (view.path.length ? view.path.join("/") : "where you were") : view.tab
 
 export function Back() {
   const { at, was, go } = useGoing()
+  const hunting = useHunt()
   // a tab opened first has nothing behind it, and the summary is the sensible floor
   const to = was && !(was.tab === at.tab && was.path.join("/") === at.path.join("/")) ? was : null
 
+  if (hunting) return null
   return (
     <button
       data-print="hide"

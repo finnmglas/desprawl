@@ -256,7 +256,7 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
   ]
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    <div className="contents">
       <div className="flex flex-wrap items-center gap-2">
         <Back />
         {/* the table is what this repo needs doing, this is whatever you need doing */}

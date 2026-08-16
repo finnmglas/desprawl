@@ -600,7 +600,7 @@ export function Overview({
     Object.values(edges).reduce((sum, n) => sum + n, 0)
 
   return (
-    <div className="flex flex-col gap-4 sm:gap-6">
+    <div className="contents">
       <Section id="kpis_overview">
         <Kpis>
           {[
