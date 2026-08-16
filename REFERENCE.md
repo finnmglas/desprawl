@@ -130,4 +130,4 @@ One entry point, everything else internal & free to move, so `desprawl/dist/*` i
 
 ## Continue
 
-[README.md](README.md), [CONTRIBUTING.md](CONTRIBUTING.md)
+[README.md](README.md), [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md)
