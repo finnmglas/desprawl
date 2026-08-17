@@ -51,6 +51,7 @@ import type { Calls as Called } from "../src/calls.ts"
 import type { Deps as Depended } from "../src/deps.ts"
 import type { Suite as Suited } from "../src/tests.ts"
 import type { Graph as Imports } from "../src/graph.ts"
+import type { Api as Routed } from "../src/routes.ts"
 import type { Sprawl as Sprawled } from "../src/work.ts"
 import type { Stats } from "../src/model.ts"
 
@@ -61,6 +62,7 @@ declare global {
     /** a static export carries both graphs too, since there is no server to ask */
     __DESPRAWL_GRAPH__?: Imports
     __DESPRAWL_CALLS__?: Called
+    __DESPRAWL_ROUTES__?: Routed
     __DESPRAWL_DEPS__?: Depended
     __DESPRAWL_TESTS__?: Suited
     __DESPRAWL_SPRAWL__?: Sprawled

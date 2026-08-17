@@ -190,6 +190,24 @@ const ASSIGNED =
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
+/** an indented language ends a body where the indentation comes back to the head */
+function block(code: string, from: number): number {
+  const head = code.lastIndexOf("\n", from) + 1
+  const deep = (line: string) => /^[^\S\n]*/.exec(line)![0].length
+  const own = deep(code.slice(head, code.indexOf("\n", head) + 1 || undefined))
+  let at = code.indexOf("\n", from)
+  if (at === -1) return code.length
+  while (at < code.length) {
+    const next = code.indexOf("\n", at + 1)
+    const line = code.slice(at + 1, next === -1 ? code.length : next)
+    // a blank line belongs to whatever comes after it
+    if (line.trim() && deep(line) <= own) return at
+    if (next === -1) return code.length
+    at = next
+  }
+  return code.length
+}
+
 /** the first brace past the parameters, matched. An arrow ends with its line */
 function span(code: string, from: number): number {
   let depth = 0
@@ -304,7 +322,8 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       const id = `${module.path}#${name}`
       // `= class extends Base {` declares no name, and extends is not one
       if (symbols[id] || KEYWORD.has(name)) return
-      const end = span(code, at)
+      // python and ruby write a body as an indent, and there is no brace to match
+      const end = dialect?.flavour === "py" ? block(code, at) : span(code, at)
       bodies.set(id, [at, end])
       ;(mine.get(module.path) ?? mine.set(module.path, []).get(module.path)!).push(id)
       symbols[id] = {

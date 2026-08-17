@@ -10,6 +10,7 @@ import type { Action, Alive } from "../../src/actions.ts"
 import type { Agent } from "../../src/agent.ts"
 import type { Talk } from "../../src/talk.ts"
 import type { Graph } from "../../src/graph.ts"
+import type { Api } from "../../src/routes.ts"
 import type { Detail, Hours, Moved, Timeline } from "../../src/history.ts"
 import type { Source } from "../../src/serve.ts"
 import type { Commit, Node } from "../../src/model.ts"
@@ -132,6 +133,12 @@ export const callGraph = (): Promise<Calls | null> =>
   window.__DESPRAWL_CALLS__
     ? Promise.resolve(window.__DESPRAWL_CALLS__)
     : once("/api/calls", () => ask<Calls | null>("/api/calls", null))
+
+/** the endpoints, the call sites, and which of them reach each other */
+export const apiGraph = (): Promise<Api | null> =>
+  window.__DESPRAWL_ROUTES__
+    ? Promise.resolve(window.__DESPRAWL_ROUTES__)
+    : once("/api/routes", () => ask<Api | null>("/api/routes", null))
 
 /** the whole thing as one file, built by the server */
 export async function staticPage(): Promise<string | null> {

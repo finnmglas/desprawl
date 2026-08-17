@@ -21,6 +21,7 @@ AI-touched repos sprawl: dupe modules, unreachable code, import cycles, deps nob
 
 - **structure** - imports graphed and grouped into modules
 - **execution** - call graph visualized, naming unreachable code, recursion, repetition
+- **api** - endpoints served and call sites made, matched up, drawn in red across repos
 - **dependencies** - licence and security issues
 - **history** - commits classified by time, module, devs traced
 - **tasks** - all cleanups collected, ready to hand off to agents / dev team

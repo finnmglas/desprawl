@@ -16,7 +16,9 @@ import {
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
-import { everyCall, fleet, graphs, many } from "./many.ts"
+import { everyApi, everyCall, fleet, graphs, many } from "./many.ts"
+import { api as apiOf } from "./routes.ts"
+import type { Api } from "./routes.ts"
 import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
@@ -179,6 +181,7 @@ export function serve(
   /** and the readers, per repo, so a fleet never rebuilds another repo's graph */
   const built = new Map<string, Graph>()
   const rung = new Map<string, Calls>()
+  const wired = new Map<string, Api>()
   const graphOf = (where: string): Graph => {
     const seen = built.get(where)
     if (seen) return seen
@@ -406,6 +409,16 @@ export function serve(
           const one = at(url)
           graphOf(one)
           return json(callsOf(one))
+        }
+
+        // which file serves an endpoint and which one calls it, across the whole folder
+        if (url.pathname === "/api/routes") {
+          const one = at(url)
+          const seen = wired.get(one)
+          if (seen) return json(seen)
+          const made = one ? apiOf(one, graphOf(one), callsOf(one)) : everyApi(repo)
+          wired.set(one, made)
+          return json(made)
         }
 
         // what moved between two dates, per file, for painting a window on the picture

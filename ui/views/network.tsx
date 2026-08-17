@@ -4,7 +4,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
 import { Button } from "../components/atoms/button.tsx"
+import { Badge } from "../components/atoms/badge.tsx"
 import { Card, CardContent } from "../components/atoms/card.tsx"
+import { DataTable, type Column } from "../components/molecules/data-table.tsx"
 import { CardHead } from "../components/molecules/card-head.tsx"
 import { Section } from "../components/atoms/section.tsx"
 import { Input } from "../components/atoms/input.tsx"
@@ -16,7 +18,7 @@ import { BRANDS } from "../lib/brands.ts"
 import { LANGS } from "../../src/langs.ts"
 import { onlyIn } from "../../src/dialects.ts"
 import { PAINT, fit, plain } from "../lib/canvas.ts"
-import { callGraph, importGraph } from "../lib/live.ts"
+import { apiGraph, callGraph, importGraph } from "../lib/live.ts"
 import { file as asFile, group as asGroup, holds, isFile, symbol, useGoing } from "../lib/going.tsx"
 import { keep, recall, useKept } from "../lib/kept.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
@@ -27,6 +29,7 @@ import { net, type Box, type Grain, type Net, type Spot, type Wire } from "../li
 import { asRows, knowledge } from "../../src/knowledge.ts"
 import { balanced, fold } from "../../src/layers.ts"
 import { cn } from "../lib/ui.ts"
+import type { Api, Client, Endpoint } from "../../src/routes.ts"
 import type { Calls } from "../../src/calls.ts"
 import type { Graph } from "../../src/graph.ts"
 import type { Stats } from "../../src/model.ts"
@@ -43,6 +46,8 @@ const STRIP = 13
 
 const IMPORT = PAINT.down
 const CALL = PAINT.loop
+// red, and the only edge here that crosses a repo
+const REQUEST = PAINT.cut
 const PAINTS = ["module", "language", "size", "shape", "level", "kind", "one colour"]
 const WIRED = ["kind", "module", "leaving"]
 // green to red: bloated against its neighbours, not in the abstract
@@ -67,9 +72,11 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   // a picture somebody set up is the work
   const [lang, setLang] = useKept("net.lang", "")
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
+  const [routes, setRoutes] = useState<Api | null>(window.__DESPRAWL_ROUTES__ ?? null)
   const [grain, setGrain] = useKept<Grain>("net.grain", "file")
   const [imports, setImports] = useKept("net.imports", false)
   const [wired, setWired] = useKept("net.calls", true)
+  const [http, setHttp] = useKept("net.http", true)
   const [bounds, setBounds] = useKept("net.bounds", true)
   const [names, setNames] = useKept("net.names", true)
   const [find, setFind] = useKept("net.find", "")
@@ -97,6 +104,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   useEffect(() => {
     if (!graph) void importGraph().then(setGraph)
     if (!calls) void callGraph().then(setCalls)
+    if (!routes) void apiGraph().then(setRoutes)
   }, [])
 
   // js and ts are one language written two ways
@@ -142,9 +150,9 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   const drawn: Net | null = useMemo(
     () =>
       layout && graph && split && !heavy
-        ? net(layout, graph, calls, grain, split, wide - 24, tall, !bounds, repos)
+        ? net(layout, graph, calls, routes, grain, split, wide - 24, tall, !bounds, repos)
         : null,
-    [layout, graph, split, calls, grain, wide, tall, heavy, bounds],
+    [layout, graph, split, calls, routes, grain, wide, tall, heavy, bounds],
   )
 
   // drawing is not a render
@@ -334,6 +342,21 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     return [...seen].slice(0, 14).map(([label, colour]) => ({ label, colour }))
   }, [drawn, paint, grain, units, called])
 
+  // one row per endpoint and per call site, each carrying what the links say about it
+  const served: Served[] = useMemo(() => {
+    const by = new Map<string, number>()
+    for (const one of routes?.links ?? []) by.set(one.endpoint, (by.get(one.endpoint) ?? 0) + 1)
+    return (routes?.endpoints ?? [])
+      .map((one) => ({ ...one, callers: by.get(one.id) ?? 0 }))
+      .sort((a, b) => b.callers - a.callers || a.path.localeCompare(b.path))
+  }, [routes])
+  const asked: Asked[] = useMemo(() => {
+    const to = new Map((routes?.links ?? []).map((one) => [one.call, one.to]))
+    return (routes?.clients ?? [])
+      .map((one) => ({ ...one, reaches: to.get(one.id) ?? "" }))
+      .sort((a, b) => (b.reaches ? 1 : 0) - (a.reaches ? 1 : 0) || a.path.localeCompare(b.path))
+  }, [routes])
+
   const hunted = find.trim().toLowerCase()
   const at = useMemo(() => new Map((drawn?.spots ?? []).map((s) => [s.id, s])), [drawn])
 
@@ -516,11 +539,13 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                   to: a === b ? wire.to : b,
                   imports: 0,
                   calls: 0,
+                  http: 0,
                   types: true,
                   held: 0,
                 }
                 found.imports += wire.imports
                 found.calls += wire.calls
+                found.http += wire.http
                 found.held++
                 if (!wire.types) found.types = false
                 return held.set(key, found)
@@ -551,13 +576,26 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       const kinds: [number, string, number][] = []
       if (imports && wire.imports) kinds.push([wire.imports, IMPORT, 1])
       if (wired && wire.calls) kinds.push([wire.calls, CALL, -1])
+      // straight, since the two bows are taken, and never faded like a type import
+      if (http && wire.http) kinds.push([wire.http, REQUEST, 0])
       for (const [weight, colour, bow] of kinds) {
         // heavier pairs read darker, in a few steps so the batching survives it
         const heft = Math.min(1, weight / 6)
-        const alpha = quiet ? 0.03 : lit ? 0.85 : wire.types ? 0.13 : 0.22 + 0.3 * heft
-        const key = `${tint ?? colour} ${alpha.toFixed(2)}`
+        const request = colour === REQUEST
+        const alpha = quiet
+          ? 0.03
+          : lit
+            ? 0.85
+            : request
+              ? 0.55 + 0.35 * heft
+              : wire.types
+                ? 0.13
+                : 0.22 + 0.3 * heft
+        // a request stays red whatever the lines are coloured by: nothing else crosses a repo
+        const own = request ? null : tint
+        const key = `${own ?? colour} ${alpha.toFixed(2)}`
         const { line, head } = draw(key)
-        styles.set(key, tint ? fade(tint, alpha) : ink(colour, alpha))
+        styles.set(key, own ? fade(own, alpha) : ink(colour, alpha))
         const mx = (from.x + to.x) / 2
         const my = (from.y + to.y) / 2
         const dx = to.x - from.x
@@ -593,7 +631,8 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     }
     for (const [key, path] of lines) {
       pen.strokeStyle = styles.get(key)!
-      pen.lineWidth = (bundle ? 1.6 : 1) / scale
+      // the red ones are the point of the picture when they are there at all
+      pen.lineWidth = ((bundle ? 1.6 : 1) * (key.startsWith(REQUEST) ? 1.8 : 1)) / scale
       pen.stroke(path)
       pen.fillStyle = styles.get(key)!
       pen.fill(heads.get(key)!)
@@ -777,6 +816,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
         <div className="ml-auto flex flex-wrap items-center gap-1">
           {toggle(imports, setImports, "imports", IMPORT)}
           {toggle(wired, setWired, "calls", CALL)}
+          {!!routes?.links.length && toggle(http, setHttp, "api", REQUEST)}
           {toggle(bounds, setBounds, "bounds")}
           <Menu title="What to draw">
             <MenuSection
@@ -994,6 +1034,14 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                 : "arranged loose, since bounds are off"}
               . Drag or one finger to move, wheel or pinch to zoom, hover to keep only what one
               touches. An import bows one way and a call the other, so a pair with both shows both.
+              {!!routes?.links.length && (
+                <>
+                  {" "}
+                  <span style={{ color: `rgb(${REQUEST})` }}>Red</span> is an http request from a
+                  call site to the file serving that path, which is the one edge here that crosses a
+                  repo.{" "}
+                </>
+              )}
               A faint line is a type only import, and{" "}
               {drawn.wires.length > HEADS
                 ? "arrows are drawn on hover only at this size"
@@ -1007,6 +1055,76 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
           )}
         </p>
       </Section>
+
+      {!!routes?.endpoints.length && (
+        <Section id="table_endpoints">
+          <DataTable
+            title="Endpoints served here"
+            hint="every path this code answers on, off the routers and the route files themselves"
+            rows={served}
+            id={(one) => one.id}
+            columns={ENDS}
+            onRowClick={(one) => going.open(asFile(one.handler ?? one.file, one.path))}
+            file="endpoints"
+          />
+        </Section>
+      )}
+
+      {!!routes?.clients.length && (
+        <Section id="table_requests">
+          <DataTable
+            title="Call sites"
+            hint="every http request this code makes, and the endpoint it lands on when one is here"
+            rows={asked}
+            id={(one) => one.id}
+            columns={SITES}
+            onRowClick={(one) => going.open(asFile(one.file, `${one.method} ${one.path}`))}
+            file="call-sites"
+          />
+        </Section>
+      )}
     </div>
   )
 }
+
+const WHERE = (file: string, line: number) => (
+  <span className="font-mono text-xs">
+    {shortPath(file, 46)}:{line}
+  </span>
+)
+
+const VERB = (method: string) => (
+  <Badge variant="outline" className="font-mono text-[11px]">
+    {method}
+  </Badge>
+)
+
+interface Served extends Endpoint {
+  /** call sites that reach it, from anywhere in the fleet */
+  callers: number
+}
+
+interface Asked extends Client {
+  /** the file serving it, empty when nothing here does */
+  reaches: string
+}
+
+// prettier-ignore
+const ENDS: Column<Served>[] = [
+  { key: "method", label: "verb", get: (one) => one.method, cell: (one) => VERB(one.method), left: true },
+  { key: "path", label: "path", get: (one) => one.path, cell: (one) => <span className="font-mono text-xs">{one.path}</span> },
+  { key: "callers", label: "called from", num: true, get: (one) => one.callers },
+  { key: "framework", label: "by", get: (one) => one.framework },
+  { key: "where", label: "declared in", get: (one) => `${one.file}:${one.line}`, cell: (one) => WHERE(one.file, one.line) },
+  { key: "handler", label: "answered by", get: (one) => one.handler ?? "", cell: (one) => one.handler ? <span className="font-mono text-xs">{shortPath(one.handler, 40)}</span> : "-" },
+]
+
+// prettier-ignore
+const SITES: Column<Asked>[] = [
+  { key: "method", label: "verb", get: (one) => one.method, cell: (one) => VERB(one.method), left: true },
+  { key: "path", label: "path", get: (one) => one.path, cell: (one) => <span className="font-mono text-xs">{one.path}</span> },
+  { key: "host", label: "host", get: (one) => one.host || "", cell: (one) => one.host || "-" },
+  { key: "reaches", label: "reaches", get: (one) => one.reaches || "outside", cell: (one) => one.reaches ? <span className="font-mono text-xs">{shortPath(one.reaches, 40)}</span> : <span className="text-muted-foreground">outside</span> },
+  { key: "framework", label: "by", get: (one) => one.framework },
+  { key: "where", label: "called in", get: (one) => `${one.file}:${one.line}`, cell: (one) => WHERE(one.file, one.line) },
+]

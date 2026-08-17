@@ -57,6 +57,8 @@ const MARKED = new RegExp(`${MARK}(\\d+)${MARK}`, "g")
 export function scrub(
   source: string,
   flavour: Flavour = "js",
+  /** a template keeps its written text, every hole in it a star. Off, it reads as empty */
+  templates = false,
 ): { code: string; strings: string[] } {
   const strings: string[] = []
   let code = ""
@@ -64,6 +66,8 @@ export function scrub(
   // everything but js and python is c shaped
   const js = flavour === "js"
   const py = flavour === "py"
+  // both quote styles hold a string, and a hash opens a comment
+  const php = flavour === "php"
   // rust nests its block comments, c and the jvm close on the first */
   const nests = flavour === "rs"
 
@@ -82,7 +86,7 @@ export function scrub(
     const ch = source[i]
     const next = source[i + 1]
 
-    if (py && ch === "#") {
+    if ((py || php) && ch === "#") {
       const end = source.indexOf("\n", i)
       i = end === -1 ? source.length : end
     } else if (py && /^[fF][rRbB]?["']/.test(source.slice(i)) && !WORD.test(code.at(-1) ?? " ")) {
@@ -93,8 +97,9 @@ export function scrub(
       const fence = triple ? quote.repeat(3) : quote
       let at = i + /^[fF][rRbB]?/.exec(source.slice(i))![0].length + fence.length
       let held = ""
+      let said = ""
       while (at < source.length && source.slice(at, at + fence.length) !== fence) {
-        if (source[at] === "\\") at += 2
+        if (source[at] === "\\") ((said += source[at + 1] ?? ""), (at += 2))
         else if (source[at] === "{" && source[at + 1] !== "{") {
           let depth = 1
           const from = ++at
@@ -104,11 +109,13 @@ export function scrub(
             if (depth) at++
           }
           held += ` ${source.slice(from, at)} `
+          // the hole keeps what filled it, so a base url held in a name can be read back
+          said += `{${source.slice(from, at).trim().replace(/\s+/g, "")}}`
           at++
-        } else at++
+        } else said += source[at++]
       }
-      const inner = scrub(held, "py")
-      strings.push("")
+      const inner = scrub(held, "py", templates)
+      strings.push(templates ? said : "")
       const base = strings.length
       strings.push(...inner.strings)
       const kept = inner.code
@@ -149,11 +156,11 @@ export function scrub(
       strings.push(source.slice(at, to))
       code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(source.slice(i, to), /\n/g))}`
       i = to + fence.length
-    } else if (!js && !py && ch === "'" && /^'(\\.|[^'\\])'/.test(source.slice(i))) {
+    } else if (!js && !py && !php && ch === "'" && /^'(\\.|[^'\\])'/.test(source.slice(i))) {
       // a char literal, and its neighbour 'a in &'a str, which opens nothing
       code += " "
       i += /^'\\/.test(source.slice(i)) ? 4 : 3
-    } else if (!js && !py && ch === "'") {
+    } else if (!js && !py && !php && ch === "'") {
       code += " "
       i++
     } else if (ch === '"' || ch === "'") {
@@ -168,8 +175,9 @@ export function scrub(
       // an expression inside a template can hold an import
       let at = i + 1
       let flat = ""
+      let said = ""
       while (at < source.length && source[at] !== "`") {
-        if (source[at] === "\\") at += 2
+        if (source[at] === "\\") ((said += source[at + 1] ?? ""), (at += 2))
         else if (source[at] === "$" && source[at + 1] === "{") {
           let depth = 1
           let from = (at += 2)
@@ -179,11 +187,12 @@ export function scrub(
             if (depth) at++
           }
           flat += ` ${source.slice(from, at)} `
+          said += `{${source.slice(from, at).trim().replace(/\s+/g, "")}}`
           at++
-        } else at++
+        } else said += source[at++]
       }
-      const inner = scrub(flat)
-      strings.push("")
+      const inner = scrub(flat, "js", templates)
+      strings.push(templates ? said : "")
       const marker = `${MARK}${strings.length - 1}${MARK}`
       // its own strings land further along, so the numbers pointing at them move with them
       const base = strings.length

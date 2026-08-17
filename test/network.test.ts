@@ -6,6 +6,7 @@ import { test } from "node:test"
 import { build } from "../src/graph.ts"
 import { calls } from "../src/calls.ts"
 import { fold } from "../src/layers.ts"
+import { api } from "../src/routes.ts"
 import { net } from "../ui/lib/network.ts"
 import { repo } from "./repo.ts"
 
@@ -20,7 +21,7 @@ const source = {
 const laid = (grain: "module" | "file" | "function") => {
   const dir = repo(source)
   const graph = build(dir)
-  return net(fold(graph, 1), graph, calls(dir, graph), grain, 1, 900, 600)
+  return net(fold(graph, 1), graph, calls(dir, graph), api(dir, graph), grain, 1, 900, 600)
 }
 
 test("every node sits inside the box drawn around it, whatever the grain", () => {

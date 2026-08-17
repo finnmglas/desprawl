@@ -8,6 +8,8 @@ import { build } from "./graph.ts"
 import { calls } from "./calls.ts"
 import { near, norm } from "./history.ts"
 import { blank, merge, rank, VERSION } from "./model.ts"
+import { joined, reading } from "./routes.ts"
+import type { Api, Client, Endpoint } from "./routes.ts"
 import type { Calls } from "./calls.ts"
 import type { Graph } from "./graph.ts"
 import type { Commit, Contributor, Node, Series, Stats } from "./model.ts"
@@ -235,6 +237,30 @@ export function graphs(path: string): Graph {
   const asked = all.stats.edges + all.stats.external + all.missing.length
   all.stats.coverage = asked ? (all.stats.edges + all.stats.external) / asked : 1
   return all
+}
+
+/** every repo's api, read as one wire: a call in one repo lands on an endpoint in another */
+export function everyApi(path: string): Api {
+  const endpoints: Endpoint[] = []
+  const clients: Client[] = []
+  for (const one of fleet(path)) {
+    const under = named(one)
+    const at = (file: string) => `${under}/${file}`
+    const graph = build(one)
+    const found = reading(one, graph, calls(one, graph))
+    endpoints.push(
+      ...found.endpoints.map((held) => ({
+        ...held,
+        id: at(held.id),
+        file: at(held.file),
+        handler: held.handler ? at(held.handler) : undefined,
+      })),
+    )
+    clients.push(
+      ...found.clients.map((held) => ({ ...held, id: at(held.id), file: at(held.file) })),
+    )
+  }
+  return joined(endpoints, clients)
 }
 
 /** and every call graph, on the same prefixed keys */

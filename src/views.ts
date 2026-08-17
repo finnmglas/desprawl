@@ -10,6 +10,8 @@ import { deps as depsOf } from "./deps.ts"
 import { build } from "./graph.ts"
 import { balanced, fold } from "./layers.ts"
 import { reachOf, reached } from "./reach.ts"
+import { everyApi, fleet } from "./many.ts"
+import { api as apiOf } from "./routes.ts"
 import { copied, repeated, talky } from "./sprawl.ts"
 import { wall } from "./system.ts"
 import { human } from "./human.ts"
@@ -24,6 +26,7 @@ export const VIEWS = [
   "modules",
   "execution",
   "deps",
+  "api",
   "stack",
   "sprawl",
   "history",
@@ -238,6 +241,63 @@ function shape(read: Read) {
   }
 }
 
+/** what it serves, what it calls, and which of those reach each other */
+function wired(repo: string, ask: Asked) {
+  // a folder of repos is one wire: a call in one of them lands on an endpoint in another
+  const found = fleet(repo).length
+    ? everyApi(repo)
+    : (() => {
+        const read = readIn(repo)
+        return apiOf(repo, read.graph, read.calls)
+      })()
+  const by = new Map<string, number>()
+  for (const one of found.links) by.set(one.endpoint, (by.get(one.endpoint) ?? 0) + 1)
+  const take = ask.limit ?? 40
+  const rest = (all: unknown[]) => (all.length > take ? `\n… and ${all.length - take} more` : "")
+  const ends = [...found.endpoints].sort(
+    (a, b) => (by.get(b.id) ?? 0) - (by.get(a.id) ?? 0) || a.path.localeCompare(b.path),
+  )
+  const to = new Map(found.links.map((one) => [one.call, one.to]))
+  const sites = [...found.clients].sort(
+    (a, b) => (to.has(b.id) ? 1 : 0) - (to.has(a.id) ? 1 : 0) || a.path.localeCompare(b.path),
+  )
+  const text =
+    found.endpoints.length + found.clients.length
+      ? [
+          `${n(found.stats.endpoints)} endpoints, ${n(found.stats.clients)} call sites, ` +
+            `${n(found.stats.linked)} of them land here and ${n(found.stats.outside)} go elsewhere` +
+            (found.stats.frameworks.length ? `, off ${found.stats.frameworks.join(", ")}` : ""),
+          "",
+          grid([
+            ["ENDPOINT", "VERB", "CALLED FROM", "BY", "WHERE"],
+            ...ends
+              .slice(0, take)
+              .map((one) => [
+                cut(one.path, 52),
+                one.method,
+                by.get(one.id) ?? 0,
+                one.framework,
+                cut(`${one.handler ?? one.file}:${one.line}`, 44),
+              ]),
+          ]) + rest(ends),
+          "",
+          grid([
+            ["CALL SITE", "VERB", "HOST", "REACHES", "WHERE"],
+            ...sites
+              .slice(0, take)
+              .map((one) => [
+                cut(one.path, 44),
+                one.method,
+                cut(one.host || "-", 24),
+                cut(to.get(one.id) ?? "outside", 36),
+                cut(`${one.file}:${one.line}`, 40),
+              ]),
+          ]) + rest(sites),
+        ].join("\n")
+      : "nothing here serves or calls an http endpoint"
+  return { text, data: found }
+}
+
 /** what kind of project this is, off the manifests and the marker files */
 function kit(repo: string) {
   const { stack } = analyze(repo)
@@ -313,6 +373,7 @@ export async function views(
   if (view === "deps") return packages(repo)
   if (view === "stack") return kit(repo)
   if (view === "history") return past(repo)
+  if (view === "api") return wired(repo, ask)
   const read = readIn(repo, ask.lang ?? "")
   if (view === "knowledge") return known(repo, read, ask)
   if (view === "architecture") return shape(read)

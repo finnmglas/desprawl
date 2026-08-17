@@ -1,7 +1,8 @@
 // owner: finn
 // goal: how each language spells a comment, an import and a declaration
 
-export type Flavour = "js" | "c" | "py" | "rs"
+// php is c shaped, but a single quote opens a string there and a hash opens a comment
+export type Flavour = "js" | "c" | "py" | "rs" | "php"
 
 /** the shape onlyIn needs: enough of a module to keep its edges honest */
 interface Held {
@@ -68,15 +69,16 @@ const DIALECTS: Dialect[] = [
       /^[^\S\n]*from\s+([.\w]+)\s+import\b/gm,
       /^[^\S\n]*import\s+([.\w]+)/gm,
     ],
-    // a nested def is a closure, and only the first column declares
+    // a method is indented, and a class holding one declares nothing else
     decls: [
-      { kind: "function", re: /^(?:async\s+)?def\s+([A-Za-z_]\w*)/gm },
-      { kind: "class", re: /^class\s+([A-Za-z_]\w*)/gm },
+      { kind: "function", re: /^[^\S\n]*(?:async\s+)?def\s+([A-Za-z_]\w*)/gm },
+      { kind: "class", re: /^[^\S\n]*class\s+([A-Za-z_]\w*)/gm },
     ],
   },
   {
     id: "jvm", label: "Java", exts: ["java", "kt", "kts", "scala", "groovy"], flavour: "c",
-    imports: [/^[^\S\n]*import\s+(?:static\s+)?([\w.]+(?:\.\*)?)/gm],
+    // the star at the end is part of the name: a package, not a class
+    imports: [/^[^\S\n]*import\s+(?:static\s+)?([\w.]*[\w*])/gm],
     // prettier-ignore
     decls: [
       { kind: "class", re: /(?:^|[\s;}])(?:public\s+|private\s+|protected\s+|internal\s+|open\s+|final\s+|abstract\s+|sealed\s+|data\s+|static\s+|suspend\s+|inline\s+|override\s+)*(?:class|interface|object|enum|record|trait)\s+([A-Za-z_]\w*)/gm },
@@ -124,7 +126,7 @@ const DIALECTS: Dialect[] = [
     ],
   },
   {
-    id: "php", label: "PHP", exts: ["php"], flavour: "c",
+    id: "php", label: "PHP", exts: ["php"], flavour: "php",
     quoted: true,
     imports: [/^[^\S\n]*(?:use|require|require_once|include|include_once)\s*\(?\s*["']?([\w\\/.]+)/gm],
     decls: [
@@ -133,15 +135,22 @@ const DIALECTS: Dialect[] = [
     ],
   },
   {
-    id: "c", label: "C", exts: ["c", "h", "cc", "cpp", "cxx", "hpp", "hh", "hxx", "ipp"],
+    // an arduino sketch is c++ with a different extension, and cuda is too
+    id: "c", label: "C",
+    exts: ["c", "h", "cc", "cpp", "cxx", "hpp", "hh", "hxx", "ipp", "inl", "tcc", "ino", "pde", "cu", "cuh"],
     flavour: "c",
     // a quoted include is this project's, an angled one is the toolchain's
     quoted: true,
     imports: [/^[^\S\n]*#\s*include\s*(?:(<)([^>\n]+)>|"([^"\n]+)")/gm],
+    // a method sits inside a class, so it is indented, and a header declares without a body
     // prettier-ignore
     decls: [
       { kind: "class", re: /(?:^|[\s;}])(?:struct|class|union|enum)\s+([A-Za-z_]\w*)\s*(?::[^{;]*)?\{/gm },
-      { kind: "function", re: /^(?:[A-Za-z_][\w:<>,*&\s]*?[\s*&])([A-Za-z_]\w*)\s*\([^;]*\)\s*(?:const\s*)?\{/gm },
+      { kind: "function", re: /^[^\S\n]*(?:[A-Za-z_~][\w:<>,*&\s]*?[\s*&~])([A-Za-z_]\w*)\s*\([^;]*\)\s*(?:const\s*)?(?:noexcept\s*)?(?:override\s*)?\s*(?=\{)/gm },
+      // a function shaped macro is called like one, so it declares a name too
+      { kind: "function", re: /^[^\S\n]*#\s*define\s+([A-Za-z_]\w*)\s*(?=\()/gm },
+      // and a parameter list of types, or `Thing name(1, 2);` reads as one of these
+      { kind: "function", re: /^[^\S\n]*(?:[A-Za-z_][\w:<>,*&\s]*?[\s*&])([A-Za-z_]\w*)\s*\((?=\s*(?:void\s*)?\)|[^;{)]*(?:[A-Za-z_][\w:<>]*[\s*&]+[*&]*[A-Za-z_]|\.\.\.))[^;{]*\)\s*(?:const\s*)?(?:noexcept\s*)?;/gm },
     ],
   },
 ]
@@ -240,6 +249,16 @@ export function candidates(
 
   if (dialect.id === "jvm") {
     const parts = text.replace(/\.\*$/, "").split(".").filter(Boolean)
+    // `import a.b.*` is every file in that package, the way the compiler reads it
+    const all = text.endsWith(".*")
+      ? [
+          `${parts.join("/")}/`,
+          `src/main/kotlin/${parts.join("/")}/`,
+          `src/main/java/${parts.join("/")}/`,
+          `app/src/main/kotlin/${parts.join("/")}/`,
+          `app/src/main/java/${parts.join("/")}/`,
+        ]
+      : []
     // the file holding it is one segment up
     const held = parts.length > 1 ? parts.slice(0, -1) : parts
     const roots = [
@@ -250,6 +269,7 @@ export function candidates(
       ["app", "src", "main", "java"],
     ]
     return [
+      ...all,
       ...roots.flatMap((at) => spell([...at, ...parts], exts)),
       ...roots.flatMap((at) => spell([...at, ...held], exts)),
       ...spell(parts, exts),
@@ -420,7 +440,10 @@ const OWNED: Record<string, { keywords: string[]; runtime: string[] }> = {
       "volatile", "inline", "register", "auto", "void", "char", "short", "int", "long", "float",
       "double", "signed", "unsigned", "class", "public", "private", "protected", "virtual",
       "template", "typename", "namespace", "using", "new", "delete", "this", "operator", "friend",
-      "explicit", "constexpr", "noexcept", "nullptr", "true", "false", "try", "catch", "throw"],
+      "explicit", "constexpr", "noexcept", "nullptr", "true", "false", "try", "catch", "throw",
+      "defined", "static_cast", "dynamic_cast", "reinterpret_cast", "const_cast", "static_assert",
+      "decltype", "alignof", "alignas", "thread_local", "mutable", "override", "final", "concept",
+      "requires", "co_await", "co_return", "co_yield", "consteval", "constinit", "typeid"],
     runtime: ["printf", "fprintf", "sprintf", "snprintf", "scanf", "malloc", "calloc", "realloc",
       "free", "memcpy", "memset", "memmove", "strlen", "strcpy", "strncpy", "strcmp", "strncmp",
       "strcat", "fopen", "fclose", "fread", "fwrite", "fseek", "ftell", "exit", "abort", "assert",

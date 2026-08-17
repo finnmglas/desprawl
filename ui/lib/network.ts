@@ -3,6 +3,7 @@
 
 import { unitOf, type Layout } from "../../src/layers.ts"
 import type { Calls } from "../../src/calls.ts"
+import type { Api } from "../../src/routes.ts"
 import type { Graph } from "../../src/graph.ts"
 
 import type { Grain } from "../../src/knowledge.ts"
@@ -39,6 +40,8 @@ export interface Wire {
   /** how many imports and how many calls run this way, either can be 0 */
   imports: number
   calls: number
+  /** and how many http requests, which cross a repo where an import cannot */
+  http: number
   /** every import of it is erased by the build */
   types: boolean
 }
@@ -228,19 +231,20 @@ const members = (graph: Graph, calls: Calls | null, grain: Grain) =>
         kind: "file",
       }))
 
-/** imports and calls merged, one pair is one wire */
+/** imports, calls and requests merged, one pair is one wire */
 function wires(
   graph: Graph,
   calls: Calls | null,
+  api: Api | null,
   grain: Grain,
   of: (file: string) => string,
   live: Set<string>,
 ): Wire[] {
   const found = new Map<string, Wire>()
-  const add = (from: string, to: string, kind: "imports" | "calls", type: boolean) => {
+  const add = (from: string, to: string, kind: "imports" | "calls" | "http", type: boolean) => {
     if (from === to || !live.has(from) || !live.has(to)) return
     const key = `${from} ${to}`
-    const wire = found.get(key) ?? { from, to, imports: 0, calls: 0, types: true }
+    const wire = found.get(key) ?? { from, to, imports: 0, calls: 0, http: 0, types: true }
     wire[kind]++
     if (!type) wire.types = false
     found.set(key, wire)
@@ -254,6 +258,14 @@ function wires(
       if (grain === "function") add(symbol.id, target, "calls", false)
       else add(of(symbol.file), of(other.file), "calls", false)
     }
+  // a request is between files, whatever grain is drawn: at function grain that is two boxes
+  for (const one of api?.links ?? [])
+    add(
+      grain === "module" ? of(one.from) : one.from,
+      grain === "module" ? of(one.to) : one.to,
+      "http",
+      false,
+    )
   return [...found.values()]
 }
 
@@ -262,6 +274,7 @@ export function net(
   layout: Layout,
   graph: Graph,
   calls: Calls | null,
+  api: Api | null,
   grain: Grain,
   split: number | Record<string, string>,
   width: number,
@@ -287,13 +300,21 @@ export function net(
   }
   const held = members(graph, calls, grain).filter((one) => known.has(unitAt(one.file)))
 
+  // a fleet draws one column per repo, and every band inside it is that repo's own
+  const columns = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
+  const lanes = Math.max(1, columns.length)
+  const band = (path: string) =>
+    lanes > 1
+      ? `${repoOf(path)}:L${known.get(path)?.level ?? 0}`
+      : `L${known.get(path)?.level ?? 0}`
+
   // module grain draws the unit itself, so the level band is the only box it needs
   const spots: Spot[] = (
     grain === "module"
       ? layout.units.map((u) => ({
           id: u.path,
           label: u.path,
-          box: `L${u.level}`,
+          box: band(u.path),
           weight: u.lines,
           kind: u.role,
           x: 0,
@@ -317,6 +338,7 @@ export function net(
   const wired = wires(
     graph,
     calls,
+    api,
     grain,
     (file) => (grain === "module" ? unitAt(file) : file),
     live,
@@ -374,9 +396,6 @@ export function net(
   // a level is a band, deepest at the top
   const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
   const wideAll = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
-  // a fleet is one column per repo, side by side, since nothing imports across them
-  const columns = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
-  const lanes = Math.max(1, columns.length)
   const wide = lanes > 1 ? Math.max(320, wideAll / lanes) : wideAll
   const per = Math.max(2, Math.min(8, Math.round(wide / 300)))
   let deepest = 0
@@ -391,7 +410,8 @@ export function net(
       const top = y
       const mine: Box[] = []
       if (grain === "module") {
-        const held = (inner.get(band) ?? []).length
+        // the dots in this band, which in a fleet is this repo's band and not the whole row
+        const held = (inner.get(lanes > 1 ? `${column}:${band}` : band) ?? []).length
         y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
       } else {
         // each language keeps its own side

@@ -276,12 +276,15 @@ export function build(repo: string): Graph {
         // the repo says whether an angled include is its own
         const tried = candidates(dialect, spec.text, from, crates)
         const held = tried.find((one) => modules[one])
-        const folder = held ? null : tried.find((one) => one.endsWith("/"))
-        const inside = folder
-          ? Object.keys(modules).filter(
+        // a package names a folder, and which root that folder sits under is not written
+        let inside: string[] = []
+        if (!held)
+          for (const folder of tried.filter((one) => one.endsWith("/"))) {
+            inside = Object.keys(modules).filter(
               (one) => one.startsWith(folder) && !one.slice(folder.length).includes("/"),
             )
-          : []
+            if (inside.length) break
+          }
         if (!held && inside.length) {
           for (const one of inside) {
             if (one === from) continue

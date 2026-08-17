@@ -30,6 +30,8 @@ export const PANELS: Panel[] = [
   { id: "actions_overview", tab: "Overview", view: "Overview", title: "Actions",              words: "actions run scripts commands git pull push fetch build dev servers tasks npm pnpm" },
 
   { id: "network_graph", tab: "Graph", view: "Network", title: "Graph",                   words: "graph picture map drawing dots nodes wires edges imports calls grain force layout visual network diagram" },
+  { id: "table_endpoints", tab: "Graph", view: "Network", title: "Endpoints served here",   words: "api endpoints routes http rest url urls paths handlers controllers views serves server routing router get post put patch delete" },
+  { id: "table_requests", tab: "Graph", view: "Network", title: "Call sites",              words: "api requests call sites fetch axios http client calls out endpoints consumed reaches outside third party" },
   { id: "kpis_modules_imports", tab: "Graph", view: "Modules", title: "Imports",                 words: "imports import edges dependencies resolution external depth per file coupling" },
   { id: "kpis_modules_groups", tab: "Graph", view: "Modules", title: "Module groups",           words: "modules module groups levels cohesion depth auto grouping structure layers" },
   { id: "table_modules", tab: "Graph", view: "Modules", title: "Module groups",           words: "modules module groups folders units files owner imports levels structure boundaries" },

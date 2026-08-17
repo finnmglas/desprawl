@@ -8,6 +8,7 @@ Notable changes per release. Dates are the day the tag shipped.
 
 ### Added
 
+- **The api graph.** Every endpoint a repo serves and every http call site it holds, matched up, drawn in red on the graph: the one edge that crosses a repo, so a folder of repos shows its frontend reaching into its backend. Endpoints come off the routers themselves (django includes and DRF routers, express and nest mounts, fastapi and flask prefixes, spring, jaxrs, laravel, rails, actix, axum, gin, chi, aspnet, ktor, vapor, esp, and a bare node server dispatching on the path) and off file based routers (next app and pages, sveltekit, nuxt, nitro). Call sites come off fetch, axios and every renamed instance of it, requests, httpx, retrofit, okhttp, ktor, reqwest, guzzle, faraday, HttpClient, websockets, and a wrapper of the repo's own named after the verb it sends. A base url held in a name is read back out, so `${BASE}/plans` is a path and `{_BASE}/user` names its host. Two panels list both sides, and `desprawl api` prints them.
 - **Panel search.** One box beside the tabs finds any panel across every tab by what it is called and what it holds, so `licences`, `dead code` and `who wrote` all land. Matches render as a flat list, tabs come back on clear.
 - **Library exports.** `import { analyze, build, calls, cycles, fold, knowledge } from "desprawl"`, with types. One entry point, everything else internal.
 - **Hourly timeline.** A window of a month or less can be read by the hour, every series off one live `git log --numstat`, so nothing in it is windowed differently from anything beside it.
@@ -28,6 +29,11 @@ Notable changes per release. Dates are the day the tag shipped.
 
 ### Fixed
 
+- **Python bodies ended at their first line.** A `def` has no brace to match, so every python declaration spanned a line or two and two thirds of the call graph was attributed to the file's top level instead of the function holding it. Bodies now end where the indentation comes back, and a method inside a class declares a name at all. On a django backend that took call coverage from 72% to 92% and the edges from 11k to 29k.
+- **C and C++ saw only definitions in the first column**, so every method inside a class and every prototype in a header was invisible, and a function shaped macro declared nothing. Call coverage on an arduino firmware went from 22% to 68%. Arduino sketches (`.ino`), CUDA and a few more C++ spellings are read as C++ now.
+- **A jvm wildcard import named nothing.** `import com.app.*` dropped its star before resolution, so a package import resolved to no file at all: it now names every file in that package, the way the compiler reads it. On a kotlin launcher that trebled the import edges and took call coverage from 82% to 90%.
+- **PHP single quotes were read as character literals**, so half the strings in a php file, its `require` paths among them, were erased before anything read them.
+- **A folder of repos collapsed to one dot** at module grain with bounds on, since every dot named a band that only existed per repo.
 - A windowed table drew every row on its first paint to learn a row height. On a repo of 150k declarations that was 30 seconds; it is now under a second.
 - Rails, headers and pinned totals never stuck, because the table's own overflow box was swallowing them.
 - Panels the repo has nothing for no longer count as search results.
