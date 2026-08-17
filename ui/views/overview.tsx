@@ -456,11 +456,14 @@ export function Overview({
   faces,
   metadata,
   onMetadata,
+  repos = [],
 }: {
   stats: Stats
   faces: Record<string, string>
   metadata: boolean
   onMetadata: (open: boolean) => void
+  /** the repos in a fleet, so the architecture is drawn one per repo */
+  repos?: string[]
 }) {
   const { at, go, open } = useGoing()
   // each carries what was clicked into where it opens
@@ -698,7 +701,35 @@ export function Overview({
           </CardHead>
           <CardContent>
             <div ref={wall_}>
-              {graph ? (
+              {graph && repos.length > 0 ? (
+                // one wall per repo, side by side: a fleet has no single architecture
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {/* a repo with nothing to draw is a card of empty bands */}
+                  {repos
+                    .map((one) => ({
+                      one,
+                      mine: units.filter((u) => u.path === one || u.path.startsWith(`${one}/`)),
+                    }))
+                    .filter(({ mine }) => mine.length > 0)
+                    .map(({ one, mine }) => (
+                      <System
+                        key={one}
+                        name={one}
+                        people={stats.contributors}
+                        worked={where}
+                        faces={faces}
+                        units={mine}
+                        repos={repos}
+                        stack={stats.stack}
+                        chosen={holds(
+                          at.pick,
+                          units.map((u) => u.path),
+                        )}
+                        onPick={(path, about) => open({ ...group(path), detail: about })}
+                      />
+                    ))}
+                </div>
+              ) : graph ? (
                 <System
                   name={name}
                   moved={range && isLive() ? changed : undefined}

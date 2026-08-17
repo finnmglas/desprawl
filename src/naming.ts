@@ -147,6 +147,23 @@ export function nameOf(path: string, folders = 0, deep = 0): string {
 }
 
 /** only a clash grows */
+/** the same, with a repo prefix taken off first: a group is named for where it sits
+ * inside its own repo, not for the folder the repos happen to share */
+export function namesUnder(
+  units: { path: string; folders: number }[],
+  repos: string[],
+): Map<string, string> {
+  if (!repos.length) return namesOf(units)
+  const under = (path: string) => repos.find((one) => path === one || path.startsWith(`${one}/`))
+  const inside = units.map((u) => {
+    const repo = under(u.path)
+    const rest = repo ? u.path.slice(repo.length + 1) : u.path
+    return { ...u, path: rest || repo || u.path }
+  })
+  const named = namesOf(inside)
+  return new Map(units.map((u, i) => [u.path, named.get(inside[i].path) ?? u.path]))
+}
+
 export function namesOf(units: { path: string; folders: number }[]): Map<string, string> {
   const folders = new Map(units.map((u) => [u.path, u.folders]))
   const names = new Map(units.map((u) => [u.path, nameOf(u.path, u.folders)]))

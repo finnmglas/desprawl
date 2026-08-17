@@ -52,12 +52,22 @@ const connected = (ok: boolean) => {
   watchingConn.forEach((fn) => fn(ok))
 }
 
+// a folder of repos: which one every request below is about, empty for all of them
+let only = ""
+export const readingRepo = (): string => only
+/** switching drops everything held for the one before it */
+export const readRepo = (name: string): void => {
+  only = name
+  drop()
+}
+
 async function ask<T>(path: string, fallback: T, sent?: RequestInit): Promise<T> {
   const t = token()
   if (!t) return fallback
   busy(1)
   try {
-    const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}`, sent)
+    const named = only ? `&repo=${encodeURIComponent(only)}` : ""
+    const res = await fetch(`${path}${path.includes("?") ? "&" : "?"}t=${t}${named}`, sent)
     if (res.ok) return (await res.json()) as T
     const body = (await res.json().catch(() => null)) as { error?: string } | null
     failed(path, body?.error ?? `${res.status} ${res.statusText}`)
@@ -103,6 +113,7 @@ export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/ap
 /** built on the first ask, or carried by a static page */
 // held for the life of the page, or every tab switch refetches a megabyte
 const held = new Map<string, Promise<unknown>>()
+const drop = () => held.clear()
 const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
   const found = (held.get(path) ?? made()) as Promise<T>
   held.set(path, found)
@@ -161,6 +172,9 @@ export const keepFaces = (faces: Record<string, string>): Promise<Record<string,
     headers: { "content-type": "application/json" },
     body: JSON.stringify(faces),
   })
+
+/** the repos in the folder this run was pointed at, empty for a single repo */
+export const allRepos = (): Promise<string[]> => ask<string[]>("/api/repos", [])
 
 export const trueCount = (): Promise<number> =>
   ask<{ commits: number }>("/api/count", { commits: 0 }).then((r) => r.commits)

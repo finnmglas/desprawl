@@ -24,7 +24,7 @@ import { importGraph } from "../lib/live.ts"
 import { group as asGroup, holds, useGoing } from "../lib/going.tsx"
 import { useKept } from "../lib/kept.ts"
 import { hands, worked } from "../lib/people.ts"
-import { namesOf } from "../../src/naming.ts"
+import { namesUnder } from "../../src/naming.ts"
 import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/verdict.ts"
 import { shared } from "../lib/tasks.ts"
 import { cn } from "../lib/ui.ts"
@@ -124,7 +124,16 @@ function Some({ children, few = 3 }: { children: React.ReactNode[]; few?: number
 /** the same folder the tasks tab names, said for a reader rather than for a path */
 const rooted = (paths: string[]) => shared(paths).replace(/^\.$/, "the repo root")
 
-export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, string> }) {
+export function Modules({
+  stats,
+  faces,
+  repos = [],
+}: {
+  stats: Stats
+  faces: Record<string, string>
+  /** the repos in a fleet, so a group is named for its place inside its own */
+  repos?: string[]
+}) {
   const going = useGoing()
   const [graph, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
   // set up here, so coming back finds them still set
@@ -192,7 +201,7 @@ export function Modules({ stats, faces }: { stats: Stats; faces: Record<string, 
   const shown = hunted ? units.filter((u) => u.path.toLowerCase().includes(hunted)) : units
   const crowded = shown.length > 50
   // auto names a group for what it is
-  const called = namesOf(units)
+  const called = namesUnder(units, repos)
   const columns: Column<Unit>[] =
     at === AUTO
       ? [

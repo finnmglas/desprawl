@@ -43,7 +43,7 @@ import { loadFaces } from "./lib/faces.ts"
 import { useView } from "./lib/hash.ts"
 import { GoingProvider, type Target } from "./lib/going.tsx"
 import { Picked } from "./components/molecules/picked.tsx"
-import { attach, isLive, onBusy, onConnection, token } from "./lib/live.ts"
+import { allRepos, attach, isLive, onBusy, onConnection, readRepo, token } from "./lib/live.ts"
 import { CopyButton } from "./components/molecules/copy-button.tsx"
 import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
 import "./styles/tokens.css"
@@ -81,6 +81,9 @@ const START = {
   panel: "",
 }
 
+/** past this many repos, the page asks which one before reading them all */
+const MANY = 8
+
 // words that land on a panel every repo has
 const SUGGEST = ["licences", "dead code", "contributors", "coverage", "timeline"]
 
@@ -93,12 +96,19 @@ function App({
   change,
   themed,
   reload,
+  repos = [],
+  only = "",
+  onRepo,
 }: {
   stats: Stats
   prefs: Prefs
   change: (next: Partial<Prefs>) => void
   themed: ReturnType<typeof useTheme>
   reload?: () => void
+  /** the repos in the folder this was pointed at, empty for a single repo */
+  repos?: string[]
+  only?: string
+  onRepo?: (name: string) => void
 }) {
   // view state lives in the url, so back works and a link carries the place
   const [at, go, was] = useView(START)
@@ -212,8 +222,8 @@ function App({
       <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
       <>
-        {wanted("Network") && <Network stats={stats} />}
-        {wanted("Modules") && <Modules stats={stats} faces={faces} />}
+        {wanted("Network") && <Network stats={stats} repos={only ? [] : repos} />}
+        {wanted("Modules") && <Modules stats={stats} faces={faces} repos={only ? [] : repos} />}
         {wanted("Execution") && <Execution stats={stats} />}
         <Onward stats={stats} current="Graph" />
       </>
@@ -223,6 +233,7 @@ function App({
         metadata={prefs.metadata || printing}
         onMetadata={(open) => change({ metadata: open })}
         faces={faces}
+        repos={only ? [] : repos}
       />
     )
 
@@ -380,6 +391,21 @@ function App({
                 />
               )}
               <Find value={typed} onChange={setTyped} placeholder="Search panels" />
+              {repos.length > 0 && onRepo && (
+                <select
+                  value={only}
+                  onChange={(event) => onRepo(event.target.value)}
+                  title="Which repo in this folder"
+                  className="bg-card h-9 max-w-40 shrink-0 rounded-md border px-2 text-sm"
+                >
+                  <option value="">every repo</option>
+                  {repos.map((one) => (
+                    <option key={one} value={one}>
+                      {one}
+                    </option>
+                  ))}
+                </select>
+              )}
               <Settings
                 stats={stats}
                 prefs={prefs}
@@ -458,6 +484,13 @@ function Root() {
   const [stats, setStats] = useState<Stats | null>(window.__DESPRAWL__ ?? null)
   const [error, setError] = useState("")
   const live = isLive()
+  // a folder of repos: the names in it, and which one is being read
+  const [repos, setRepos] = useState<string[]>([])
+  const [only, setOnly] = useState("")
+  const [picked, setPicked] = useState(false)
+  useEffect(() => {
+    if (live) void allRepos().then(setRepos)
+  }, [live])
 
   // here, not in App: a slow read should not spend it in the wrong theme
   const [prefs, setPrefs] = useState<Prefs>(readPrefs)
@@ -481,9 +514,9 @@ function Root() {
   const themed = useTheme(prefs.theme, (theme) => change({ theme }))
   useThemeHotkey(themed)
 
-  const load = () => {
+  const load = (repo = only) => {
     setError("")
-    fetch(`/api/stats?t=${token()}`)
+    fetch(`/api/stats?t=${token()}${repo ? `&repo=${encodeURIComponent(repo)}` : ""}`)
       // server explains itself in body, status code alone says nothing
       .then(async (r) => {
         const body = await r.json().catch(() => null)
@@ -492,7 +525,7 @@ function Root() {
       })
       .then((next) => {
         setStats(next)
-        toast("Reanalysed", next.repo)
+        toast(repo || "Every repo", next.repo)
       })
       .catch((err: Error) => setError(err.message))
   }
@@ -519,14 +552,60 @@ function Root() {
       </div>
     )
   }
+  // past a handful, reading every repo at once is minutes of work for a picture nobody
+  // can follow, so the choice comes first
+  if (live && repos.length > MANY && !only && !picked)
+    return (
+      <>
+        <div className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-4 p-6">
+          <h1 className="text-2xl font-semibold">{repos.length} repos here</h1>
+          <p className="text-muted-foreground text-sm">
+            Reading all of them at once takes a while and draws a picture nobody can follow. Pick
+            one, or take the lot anyway.
+          </p>
+          <div className="flex flex-col gap-1">
+            {repos.map((one) => (
+              <button
+                key={one}
+                onClick={() => {
+                  readRepo(one)
+                  setOnly(one)
+                  setPicked(true)
+                  load(one)
+                }}
+                className="hover:bg-muted/60 hover:border-ring cursor-pointer rounded-md border border-transparent px-3 py-2 text-left text-sm"
+              >
+                {one}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setPicked(true)}
+            className="text-muted-foreground hover:text-foreground w-fit cursor-pointer text-xs underline decoration-dotted"
+          >
+            read all {repos.length} anyway
+          </button>
+        </div>
+        <Toaster />
+      </>
+    )
+
   return (
     <>
       <App
+        key={only}
         stats={stats}
         prefs={prefs}
         change={change}
         themed={themed}
-        reload={live ? load : undefined}
+        reload={live ? () => load() : undefined}
+        repos={repos}
+        only={only}
+        onRepo={(name) => {
+          readRepo(name)
+          setOnly(name)
+          load(name)
+        }}
       />
       <Toaster />
     </>

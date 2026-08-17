@@ -6,10 +6,10 @@ import { SIGNERS } from "./stack.ts"
 import type { Churn, Commit, Contributor, Series } from "./model.ts"
 
 /** letters and digits only, so casing, initials and spacing never split one person in two */
-const norm = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "")
+export const norm = (name: string): string => name.toLowerCase().replace(/[^a-z0-9]/g, "")
 
 /** a prefix, not a substring, and five characters at least */
-const near = (a: string, b: string): boolean =>
+export const near = (a: string, b: string): boolean =>
   Math.min(a.length, b.length) >= 5 && (a.startsWith(b) || b.startsWith(a))
 
 /** what it signs as, so a tool reads apart from a person */

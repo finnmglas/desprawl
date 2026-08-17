@@ -268,7 +268,12 @@ export function net(
   tall: number,
   /** no boxes: one arrangement over the whole frame instead */
   free = false,
+  /** the repos in a fleet, so each keeps its own side of the picture */
+  repos: string[] = [],
 ): Net {
+  // a unit belongs to whichever repo its path starts with, "" for a single repo
+  const repoOf = (path: string) =>
+    repos.length ? (repos.find((one) => path === one || path.startsWith(`${one}/`)) ?? "") : ""
   const unitAt = (path: string) =>
     typeof split === "number" ? unitOf(path, split) : (split[path] ?? unitOf(path, 1))
   const known = new Map(layout.units.map((u) => [u.path, u]))
@@ -368,76 +373,116 @@ export function net(
 
   // a level is a band, deepest at the top
   const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
-  const wide = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
+  const wideAll = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
+  // a fleet is one column per repo, side by side, since nothing imports across them
+  const columns = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
+  const lanes = Math.max(1, columns.length)
+  const wide = lanes > 1 ? Math.max(320, wideAll / lanes) : wideAll
   const per = Math.max(2, Math.min(8, Math.round(wide / 300)))
-  const levels = [...new Set(layout.units.map((u) => u.level))].sort((a, b) => b - a)
-  let y = 0
-  for (const level of levels) {
-    const band = `L${level}`
-    const top = y
-    const mine: Box[] = []
-    if (grain === "module") {
-      const held = (inner.get(band) ?? []).length
-      y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
-    } else {
-      // each language keeps its own side
-      const here = layout.units
-        .filter((u) => u.level === level)
-        .sort(
-          (a, b) =>
-            (langAt.get(a.path) ?? "").localeCompare(langAt.get(b.path) ?? "") ||
-            a.path.localeCompare(b.path),
-        )
-      // a shelf never mixes two languages, so the columns stay one language wide
-      const shelves: (typeof here)[] = []
-      for (let from = 0; from < here.length;) {
-        const lang = langAt.get(here[from].path) ?? ""
-        let to = from
-        while (to < here.length && to - from < per && (langAt.get(here[to].path) ?? "") === lang)
-          to++
-        shelves.push(here.slice(from, to))
-        from = to
+  let deepest = 0
+  const LANE = 28
+  for (const [lane, column] of (lanes > 1 ? columns : [""]).entries()) {
+    const left = lane * (wide + LANE)
+    const ours = lanes > 1 ? layout.units.filter((u) => repoOf(u.path) === column) : layout.units
+    const levels = [...new Set(ours.map((u) => u.level))].sort((a, b) => b - a)
+    let y = 0
+    for (const level of levels) {
+      const band = `L${level}`
+      const top = y
+      const mine: Box[] = []
+      if (grain === "module") {
+        const held = (inner.get(band) ?? []).length
+        y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
+      } else {
+        // each language keeps its own side
+        const here = ours
+          .filter((u) => u.level === level)
+          .sort(
+            (a, b) =>
+              repoOf(a.path).localeCompare(repoOf(b.path)) ||
+              (langAt.get(a.path) ?? "").localeCompare(langAt.get(b.path) ?? "") ||
+              a.path.localeCompare(b.path),
+          )
+        // a shelf mixes neither two languages nor two repos, so the columns stay one of each
+        const shelves: (typeof here)[] = []
+        for (let from = 0; from < here.length;) {
+          const lang = langAt.get(here[from].path) ?? ""
+          const mine = repoOf(here[from].path)
+          let to = from
+          while (
+            to < here.length &&
+            to - from < per &&
+            (langAt.get(here[to].path) ?? "") === lang &&
+            repoOf(here[to].path) === mine
+          )
+            to++
+          shelves.push(here.slice(from, to))
+          from = to
+        }
+        for (const shelf of shelves) {
+          const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
+          const total = weights.reduce((sum, one) => sum + one, 0) || 1
+          const room = wide - 2 * PAD - GAP * (shelf.length - 1)
+          // its share, never wider than twice its height
+          const widths = shelf.map((unit, i) =>
+            Math.max(
+              120,
+              Math.min((room * weights[i]) / total, Math.sqrt(Math.max(1, load(unit.path)) * 2.2)),
+            ),
+          )
+          // the floor can outgrow a narrow lane, and a box past its own border reads as
+          // belonging to the repo beside it, so the shelf is scaled back to fit
+          const asked = widths.reduce((sum, one) => sum + one, 0)
+          if (asked > room) for (const i of widths.keys()) widths[i] *= room / asked
+          const spare = Math.max(0, room - widths.reduce((sum, one) => sum + one, 0))
+          const step = spare / (shelf.length + 1)
+          let x = PAD + step
+          let tall = 0
+          shelf.forEach((unit, i) => {
+            const w = widths[i]
+            const inside = kids.get(unit.path) ?? []
+            const h =
+              grain === "function"
+                ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
+                : Math.max(80, Math.min(460, load(unit.path) / w + 20))
+            mine.push({ id: unit.path, label: unit.path, parent: band, depth: 1, x, y, w, h })
+            x += w + GAP + step
+            tall = Math.max(tall, h)
+          })
+          y += tall + GAP
+        }
       }
-      for (const shelf of shelves) {
-        const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
-        const total = weights.reduce((sum, one) => sum + one, 0) || 1
-        const room = wide - 2 * PAD - GAP * (shelf.length - 1)
-        // its share, never wider than twice its height
-        const widths = shelf.map((unit, i) =>
-          Math.max(
-            120,
-            Math.min((room * weights[i]) / total, Math.sqrt(Math.max(1, load(unit.path)) * 2.2)),
-          ),
-        )
-        const spare = Math.max(0, room - widths.reduce((sum, one) => sum + one, 0))
-        const step = spare / (shelf.length + 1)
-        let x = PAD + step
-        let tall = 0
-        shelf.forEach((unit, i) => {
-          const w = widths[i]
-          const inside = kids.get(unit.path) ?? []
-          const h =
-            grain === "function"
-              ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
-              : Math.max(80, Math.min(460, load(unit.path) / w + 20))
-          mine.push({ id: unit.path, label: unit.path, parent: band, depth: 1, x, y, w, h })
-          x += w + GAP + step
-          tall = Math.max(tall, h)
-        })
-        y += tall + GAP
-      }
+      boxes.push({
+        id: lanes > 1 ? `${column}:${band}` : band,
+        label: lanes > 1 && level === levels[0] ? column : `level ${level}`,
+        parent: "",
+        depth: 0,
+        x: left + PAD / 2,
+        y: top,
+        w: wide - PAD,
+        h: Math.max(y - GAP - top, 40),
+      })
+      boxes.push(
+        ...mine.map((one) => ({
+          ...one,
+          x: one.x + left,
+          parent: lanes > 1 ? `${column}:${one.parent}` : one.parent,
+        })),
+      )
     }
-    boxes.push({
-      id: band,
-      label: `level ${level}`,
-      parent: "",
-      depth: 0,
-      x: PAD / 2,
-      y: top,
-      w: wide - PAD,
-      h: Math.max(y - GAP - top, 40),
-    })
-    boxes.push(...mine)
+    // the lane itself, drawn as a border so two repos never read as one picture
+    if (lanes > 1)
+      boxes.push({
+        id: `repo:${column}`,
+        label: column,
+        parent: "",
+        depth: -1,
+        x: left,
+        y: -LANE / 2,
+        w: wide,
+        h: y + LANE / 2,
+      })
+    deepest = Math.max(deepest, y)
   }
 
   // then the file boxes, inside the unit box that was just placed
@@ -463,13 +508,13 @@ export function net(
     }
 
   // squashing the stack keeps the width
-  const squash = Math.max(0.75, Math.min(1, tall / Math.max(1, y)))
+  const squash = Math.max(0.75, Math.min(1, tall / Math.max(1, deepest)))
   if (squash < 1)
     for (const box of boxes) {
       box.y *= squash
       box.h *= squash
     }
-  y *= squash
+  deepest *= squash
 
   const placed = new Map(boxes.map((b) => [b.id, b]))
   // a pass costs every pair in a box, so the budget decides how many
@@ -520,8 +565,8 @@ export function net(
     spots,
     boxes,
     wires: wired,
-    width: Math.max(wide, width),
-    height: Math.max(y, 200),
+    width: Math.max(wide * lanes + LANE * Math.max(0, lanes - 1), width),
+    height: Math.max(deepest, 200),
     passes,
   }
 }

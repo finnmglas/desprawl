@@ -5,6 +5,7 @@
 import { existsSync, statSync } from "node:fs"
 import { parseArgs } from "node:util"
 import { analyze } from "./analyze.ts"
+import { fleet, many } from "./many.ts"
 import { check } from "./check.ts"
 import { deps } from "./deps.ts"
 import { tests } from "./tests.ts"
@@ -39,6 +40,7 @@ const { values, positionals } = (() => {
         anon: { type: "boolean", default: false },
         out: { type: "string" },
         base: { type: "string" },
+        repo: { type: "string" },
         keep: { type: "boolean", default: false },
         // set by a disconnected tab's own copied reconnect command, never typed by hand
         token: { type: "string" },
@@ -65,6 +67,7 @@ if (values.help) {
       "         [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]",
       `desprawl ${VIEWS.join("|")} [path] [--json]`,
       "desprawl check [path] --base REF [--json]",
+      "         a folder of repos reads as one, --repo NAME picks one of them",
       "         tasks also takes [--kind K] [--impact I] [--limit N] [--offline]",
       "         knowledge also takes [--grain module|file|function]",
       `         any of them takes [--lang ${LANGUAGES.join("|")}]`,
@@ -207,8 +210,19 @@ try {
   if (!existsSync(target)) fail(`no such path as ${target}`)
   // --git-dir passes on bare repo / no commits these not
   if (!statSync(target).isDirectory()) fail(`${target} is a file, and desprawl reads a repo`)
-  git(target, "rev-parse", "--show-toplevel")
-  git(target, "rev-parse", "HEAD")
+  const held = fleet(target)
+  if (values.repo && !held.length) fail("--repo is for a folder of repos, and this is one repo")
+  const one = values.repo
+    ? (held.find((path) => path.endsWith(`/${values.repo}`)) ??
+      fail(
+        `no repo called ${values.repo}. There is ${held.map((p) => p.split("/").pop()).join(", ")}`,
+      ))
+    : ""
+  const reading = one || (held.length ? "" : target)
+  if (reading) {
+    git(reading, "rev-parse", "--show-toplevel")
+    git(reading, "rev-parse", "HEAD")
+  }
 
   // what this branch added, never what the repo holds: a threshold becomes a target
   if (command === "check") {
@@ -268,7 +282,7 @@ try {
       console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
     }
   } else {
-    const stats = analyze(target, cap)
+    const stats = reading ? analyze(reading, cap) : many(target, cap).all
     // licences in disk, advisories network saved in page
     const held = viewing
       ? { deps: await deps(target).catch(() => null), suite: tests(target) }

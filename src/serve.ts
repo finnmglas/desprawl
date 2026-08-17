@@ -16,6 +16,7 @@ import {
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 import { analyze } from "./analyze.ts"
+import { everyCall, fleet, graphs, many } from "./many.ts"
 import { calls } from "./calls.ts"
 import type { Calls } from "./calls.ts"
 import { build } from "./graph.ts"
@@ -155,10 +156,11 @@ export function serve(
   token = randomBytes(16).toString("hex"),
 ): Promise<string> {
   const tabs = new Set<ServerResponse>()
+  const each = new Map<string, { head: string; stats: Stats }>()
+  let whole: Stats | undefined
   let farewell: NodeJS.Timeout | undefined
 
   // hold it until the head moves or a refresh asks
-  let cache: { head: string; stats: Stats } | null = null
   let total = 0
   let allTime: Timeline | null = null
   let sizes: { date: string; bytes: number }[] | null = null
@@ -168,11 +170,42 @@ export function serve(
   let loose: Sprawl | null = null
   let suite: Suite | null = null
 
-  const load = (fresh: boolean): Stats => {
-    const head = git(repo, "rev-parse", "--short", "HEAD").trim()
-    if (!fresh && cache?.head === head) return cache.stats
-    cache = { head, stats: analyze(repo, cap) }
-    return cache.stats
+  // a folder of repos is read as one, and each of them is still readable on its own
+  const held = fleet(repo)
+  const pick = (name: string | null): string =>
+    (name && held.find((one) => one.endsWith(`/${name}`))) || ""
+  /** the repo a request is about: the one named, or this run's single repo */
+  const at = (url: URL): string => pick(url.searchParams.get("repo")) || (held.length ? "" : repo)
+  /** and the readers, per repo, so a fleet never rebuilds another repo's graph */
+  const built = new Map<string, Graph>()
+  const rung = new Map<string, Calls>()
+  const graphOf = (where: string): Graph => {
+    const seen = built.get(where)
+    if (seen) return seen
+    const made = where ? build(where) : graphs(repo)
+    built.set(where, made)
+    return made
+  }
+  const callsOf = (where: string): Calls => {
+    const seen = rung.get(where)
+    if (seen) return seen
+    const made = where ? calls(where, graphOf(where)) : everyCall(repo)
+    rung.set(where, made)
+    return made
+  }
+  const load = (fresh: boolean, name: string | null = null): Stats => {
+    const one = pick(name)
+    if (held.length && !one) {
+      if (!fresh && whole) return whole
+      return (whole = many(repo, cap).all)
+    }
+    const at = one || repo
+    const head = git(at, "rev-parse", "--short", "HEAD").trim()
+    const seen = each.get(at)
+    if (!fresh && seen?.head === head) return seen.stats
+    const stats = analyze(at, cap)
+    each.set(at, { head, stats })
+    return stats
   }
   // the api answers without a built viewer, only the page itself needs one
   const html =
@@ -311,32 +344,37 @@ export function serve(
       try {
         if (url.pathname === "/api/can-print") return json({ can: !!browser() })
 
+        // the repos in this folder, and which one a request is about
+        if (url.pathname === "/api/repos")
+          return json(held.map((one) => one.split("/").filter(Boolean).pop()))
+
         if (url.pathname === "/api/stats") {
-          const stats = load(url.searchParams.has("fresh"))
+          const stats = load(url.searchParams.has("fresh"), url.searchParams.get("repo"))
           return json({ ...stats, tree: prune(stats.tree) })
         }
 
         if (url.pathname === "/api/files") {
-          const at = url.searchParams.get("path") ?? ""
-          const node = find(load(false).tree, at.split("/").filter(Boolean))
+          const asked = url.searchParams.get("path") ?? ""
+          const tree = load(false, url.searchParams.get("repo")).tree
+          const node = find(tree, asked.split("/").filter(Boolean))
           // an empty list would read as an empty folder, which is a different thing
-          if (!node) return json({ error: `no folder at ${at}` }, 404)
+          if (!node) return json({ error: `no folder at ${asked}` }, 404)
           const files = (node.children ?? []).filter((c) => !c.children)
           return json(files)
         }
 
         // the contents behind a row, which only a served run has to hand
         if (url.pathname === "/api/source") {
-          const at = url.searchParams.get("path") ?? ""
-          const found = source(repo, at)
-          if (!found) return json({ error: `no file this repo tracks at ${at}` }, 404)
+          const asked = url.searchParams.get("path") ?? ""
+          const found = source(at(url), asked)
+          if (!found) return json({ error: `no file this repo tracks at ${asked}` }, 404)
           return json(found)
         }
 
         if (url.pathname === "/api/commit") {
           const hash = url.searchParams.get("hash") ?? ""
           if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(400, "bad hash", "text/plain")
-          return json(detail(repo, hash))
+          return json(detail(at(url), hash))
         }
 
         // older commits, walked not read whole
@@ -344,33 +382,30 @@ export function serve(
           const skip = Number(url.searchParams.get("skip")) || 0
           const take = Math.min(Number(url.searchParams.get("count")) || 200, 2000)
           const names = load(false).contributors.map((c) => (c.email || c.name).toLowerCase())
-          return json(page(repo, skip, take, names))
+          return json(page(at(url), skip, take, names))
         }
 
         // slow, so the ui asks after it has painted
         if (url.pathname === "/api/count") {
-          total ||= count(repo)
+          total ||= count(at(url) || held[0])
           return json({ commits: total })
         }
 
         // measured at even points, not accumulated
         if (url.pathname === "/api/size") {
-          allTime ||= timeline(repo)
+          allTime ||= timeline(at(url) || held[0])
           sizes ||= allTime.samples.map((s) => ({ date: s.date, bytes: bytesAt(repo, s.hash) }))
           return json(sizes)
         }
 
         // seconds of work on a big repo, so only on ask
-        if (url.pathname === "/api/graph") {
-          imports ||= build(repo)
-          return json(imports)
-        }
+        if (url.pathname === "/api/graph") return json(graphOf(at(url)))
 
         // slower again than the import graph, since every body is read
         if (url.pathname === "/api/calls") {
-          imports ||= build(repo)
-          called ||= calls(repo, imports)
-          return json(called)
+          const one = at(url)
+          graphOf(one)
+          return json(callsOf(one))
         }
 
         // what moved between two dates, per file, for painting a window on the picture
@@ -380,7 +415,7 @@ export function serve(
           if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
             return send(400, "bad dates", "text/plain")
           const names = load(false).contributors.map((c) => (c.email || c.name).toLowerCase())
-          return json(moved(repo, from, to, names))
+          return json(moved(at(url) || held[0], from, to, names))
         }
 
         // the whole thing as one file, printed by a real browser
@@ -400,12 +435,12 @@ export function serve(
           return
         }
 
-        if (url.pathname === "/api/tests") return json((suite ||= tests(repo)))
+        if (url.pathname === "/api/tests") return json(tests(at(url) || held[0]))
 
-        if (url.pathname === "/api/actions") return json(actions(repo))
+        if (url.pathname === "/api/actions") return json(actions(at(url) || held[0]))
 
         // whether the button is worth offering
-        if (url.pathname === "/api/agent") return json(agent(repo))
+        if (url.pathname === "/api/agent") return json(agent(at(url) || held[0]))
 
         // text, and one argument, never a command
         if (url.pathname === "/api/agent/fix" && req.method === "POST") {
@@ -572,7 +607,7 @@ export function serve(
         }
 
         if (url.pathname === "/api/timeline") {
-          allTime ||= timeline(repo)
+          allTime ||= timeline(at(url) || held[0])
           return json(allTime)
         }
       } catch (err) {

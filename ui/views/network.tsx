@@ -20,7 +20,7 @@ import { callGraph, importGraph } from "../lib/live.ts"
 import { file as asFile, group as asGroup, holds, isFile, symbol, useGoing } from "../lib/going.tsx"
 import { keep, recall, useKept } from "../lib/kept.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
-import { namesOf } from "../../src/naming.ts"
+import { namesUnder } from "../../src/naming.ts"
 import { shapeOf } from "../lib/verdict.ts"
 import { hands, worked } from "../lib/people.ts"
 import { net, type Box, type Grain, type Net, type Spot, type Wire } from "../lib/network.ts"
@@ -61,7 +61,7 @@ const hued = (name: string) => {
 
 const langOf = (file: string) => LANGS[file.split(".").pop()?.toLowerCase() ?? ""] ?? ""
 
-export function Network({ stats }: { stats: Stats }) {
+export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] }) {
   const going = useGoing()
   const [read, setGraph] = useState<Graph | null>(window.__DESPRAWL_GRAPH__ ?? null)
   // a picture somebody set up is the work
@@ -126,7 +126,10 @@ export function Network({ stats }: { stats: Stats }) {
 
   const split = useMemo(() => (graph ? balanced(graph) : null), [graph])
   const layout = useMemo(() => (graph && split ? fold(graph, split) : null), [graph, split])
-  const called = useMemo(() => (layout ? namesOf(layout.units) : new Map()), [layout])
+  const called = useMemo(
+    () => (layout ? namesUnder(layout.units, repos) : new Map()),
+    [layout, repos],
+  )
 
   const size =
     grain === "function"
@@ -139,7 +142,7 @@ export function Network({ stats }: { stats: Stats }) {
   const drawn: Net | null = useMemo(
     () =>
       layout && graph && split && !heavy
-        ? net(layout, graph, calls, grain, split, wide - 24, tall, !bounds)
+        ? net(layout, graph, calls, grain, split, wide - 24, tall, !bounds, repos)
         : null,
     [layout, graph, split, calls, grain, wide, tall, heavy, bounds],
   )
@@ -392,6 +395,17 @@ export function Network({ stats }: { stats: Stats }) {
     if (bounds)
       for (const box of drawn.boxes) {
         const picked = box.id === only
+        if (box.depth === -1) {
+          // a repo lane: a border and its name, so two repos never read as one picture
+          pen.setLineDash([])
+          pen.strokeStyle = `rgba(${PAINT.quiet}, 0.35)`
+          pen.lineWidth = 1 / scale
+          pen.strokeRect(box.x, box.y, box.w, box.h)
+          pen.fillStyle = `rgba(${PAINT.quiet}, 0.9)`
+          pen.font = `600 ${text(13)}px ui-sans-serif, system-ui, sans-serif`
+          pen.fillText(box.label, box.x + 4, box.y - 4)
+          continue
+        }
         if (box.depth === 0) {
           // said once down the side: a box per module is a line to look past
           pen.setLineDash([])

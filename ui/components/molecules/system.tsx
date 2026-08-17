@@ -9,7 +9,7 @@ import { num, plural } from "../../lib/format.ts"
 import { useDisplay } from "../../lib/display.tsx"
 import { MEANS, isClient, isHost } from "../../lib/outside.ts"
 import { hands, handsOf } from "../../lib/people.ts"
-import { isId, namesOf } from "../../../src/naming.ts"
+import { isId, namesUnder } from "../../../src/naming.ts"
 import { BANDS } from "../../../src/system.ts"
 import { REGISTRY_OF } from "../../../src/registries.ts"
 import { shapeOf } from "../../lib/verdict.ts"
@@ -40,6 +40,7 @@ export function System({
   faces,
   chosen,
   onPick,
+  repos = [],
 }: {
   /** the repo, since "this repo" says less than its own name does */
   name: string
@@ -55,6 +56,8 @@ export function System({
   chosen?: string
   /** what the hover would have said, for a tap to show instead */
   onPick?: (path: string, about: React.ReactNode) => void
+  /** the repos in a fleet, so a group is named for its place inside its own */
+  repos?: string[]
 }) {
   const { curve } = useDisplay()
   const peak = Math.max(1, ...units.map((u) => u.lines))
@@ -85,7 +88,7 @@ export function System({
     return shapeOf(internal, out, into, reach).label !== shape.label
   }
 
-  const called = namesOf(units)
+  const called = namesUnder(units, repos)
 
   /** named only for the bubble: the panel a tap opens says the name and path itself */
   const about = (unit: Unit, named = true) => {
