@@ -3,8 +3,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { copied, repeated, talky } from "../src/sprawl.ts"
-import { isEntry, isTest } from "../src/work.ts"
+import { copied, repeated, talky } from "../src/facts/sprawl.ts"
+import { isEntry, isTest } from "../src/facts/work.ts"
 import { repo } from "./repo.ts"
 
 test("a literal typed in three files is one name waiting to be made", () => {

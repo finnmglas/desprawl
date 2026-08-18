@@ -3,10 +3,10 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { build } from "../src/graph.ts"
-import { calls } from "../src/calls.ts"
-import { balanced, fold } from "../src/layers.ts"
-import { asRows, knowledge } from "../src/knowledge.ts"
+import { build } from "../src/read/graph.ts"
+import { calls } from "../src/read/calls.ts"
+import { balanced, fold } from "../src/read/layers.ts"
+import { asRows, knowledge } from "../src/facts/knowledge.ts"
 import { repo } from "./repo.ts"
 
 const source = {

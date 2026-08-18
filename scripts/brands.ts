@@ -2,8 +2,8 @@
 // goal: vendor the few brand marks we show, run by hand when the label set grows
 
 import { writeFileSync } from "node:fs"
-import { NOTES } from "../src/notes.ts"
-import { LANGS, NAMES } from "../src/scan.ts"
+import { NOTES } from "../src/facts/notes.ts"
+import { LANGS, NAMES } from "../src/read/scan.ts"
 
 /** where a slug cannot be guessed from the label */
 // prettier-ignore

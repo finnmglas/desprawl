@@ -4,10 +4,10 @@
 
 import * as React from "react"
 import { ResponsiveContainer, Tooltip } from "recharts"
-import { num } from "../../lib/format.ts"
-import { untransform } from "../../lib/curve.ts"
-import type { Curve } from "../../lib/display.tsx"
-import { cn } from "../../lib/ui.ts"
+import { num } from "../../lib/say/format.ts"
+import { untransform } from "../../lib/draw/curve.ts"
+import type { Curve } from "../../lib/app/display.tsx"
+import { cn } from "../../lib/app/ui.ts"
 
 // key to label and colour, defaults to --chart-1..5 by order
 export type ChartConfig = Record<string, { label: string; color?: string }>

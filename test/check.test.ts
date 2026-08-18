@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { check } from "../src/check.ts"
+import { check } from "../src/facts/check.ts"
 import { repo } from "./repo.ts"
 
 test("a cycle the branch added is named, one it inherited is not", () => {

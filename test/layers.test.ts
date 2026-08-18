@@ -3,9 +3,9 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { scc } from "../src/cycles.ts"
-import { build } from "../src/graph.ts"
-import { balanced, fold, roleOf, unitOf } from "../src/layers.ts"
+import { scc } from "../src/read/cycles.ts"
+import { build } from "../src/read/graph.ts"
+import { balanced, fold, roleOf, unitOf } from "../src/read/layers.ts"
 import { repo } from "./repo.ts"
 
 const at = (layout: ReturnType<typeof fold>, path: string) =>

@@ -3,7 +3,7 @@
 
 import { useEffect } from "react"
 import { createPortal } from "react-dom"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export function Dialog({
   open,

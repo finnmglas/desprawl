@@ -4,7 +4,7 @@
 import assert from "node:assert/strict"
 import { execFileSync } from "node:child_process"
 import { test } from "node:test"
-import { actions } from "../src/actions.ts"
+import { actions } from "../src/serve/actions.ts"
 import { repo } from "./repo.ts"
 
 const git = (cwd: string, ...args: string[]) =>

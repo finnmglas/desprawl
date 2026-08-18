@@ -3,8 +3,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { analyze } from "../src/analyze.ts"
-import { stack } from "../src/stack.ts"
+import { analyze } from "../src/facts/analyze.ts"
+import { stack } from "../src/facts/stack.ts"
 import { repo } from "./repo.ts"
 
 const NEXT = '{"name":"app","dependencies":{"next":"14.0.0","react":"18.2.0"}}'

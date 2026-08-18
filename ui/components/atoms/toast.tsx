@@ -3,10 +3,10 @@
 // inspo: sonner, shadcn
 
 import * as React from "react"
-import { sink, type Toast } from "../../lib/toast.ts"
+import { sink, type Toast } from "../../lib/app/toast.ts"
 // the queue lives in lib, this stays where components look
-export { toast } from "../../lib/toast.ts"
-import { cn } from "../../lib/ui.ts"
+export { toast } from "../../lib/app/toast.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export function Toaster({ timeout = 4000 }: { timeout?: number }) {
   const [items, setItems] = React.useState<Toast[]>([])

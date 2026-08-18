@@ -7,9 +7,9 @@ import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
-import { explain, older } from "../src/needs.ts"
-import { isUrl } from "../src/remote.ts"
-import { VIEWS } from "../src/views.ts"
+import { explain, older } from "../src/facts/needs.ts"
+import { isUrl } from "../src/serve/remote.ts"
+import { VIEWS } from "../src/facts/views.ts"
 import { repo } from "./repo.ts"
 
 /** the real binary, since these are the paths a person actually walks into */
@@ -106,7 +106,11 @@ test("the architecture reads as bands of named modules, not paths", () => {
   const said = run("architecture", ".").out
   assert.match(said, /Consumable Entrypoints/)
   assert.match(said, /Core Fundaments/)
-  assert.match(said, /\(src\) L\d+ \w+, [\d.k]+ lines/, "each row names the folder it came from")
+  assert.match(
+    said,
+    /\(src[\w/*-]*\) L\d+ \w+, [\d.k]+ lines/,
+    "each row names the folder it came from",
+  )
   assert.doesNotMatch(said.split("\n")[0], /\//, "the first line is the repo, not a path")
 })
 

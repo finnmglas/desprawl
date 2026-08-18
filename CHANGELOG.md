@@ -30,6 +30,7 @@ Notable changes per release. Dates are the day the tag shipped.
 - Exports moved out of the ellipsis menu into one dialog; theme moved into it.
 - Timeline offers only the grains its span can draw, and lands on the nearest one it can carry when a zoom outgrows the current one.
 - Controls sit on the panel they change rather than above panels they do not.
+- **The repo is laid out in folders rather than in three piles.** `src` reads as `read`, `facts` and `serve`, `ui/lib` as `draw`, `say` and `app`, and the molecules as `graph`, `agent` and `panels`, with `cli.ts` and `index.ts` left where the package points at them. Nothing about the published api changed: the one entry point is still `desprawl` itself. Every declaration over 300 lines and every file over 700 was split behind that, so desprawl reports no size, shape or cycle work on itself.
 
 ### Fixed
 
@@ -39,6 +40,7 @@ Notable changes per release. Dates are the day the tag shipped.
 - **PHP single quotes were read as character literals**, so half the strings in a php file, its `require` paths among them, were erased before anything read them.
 - **A graph narrower than its panel sat against the left edge**, since the picture reported the frame's width rather than what was drawn in it.
 - **A drag that ended on something opened it.** Moving the picture is not clicking what happens to be under the cursor when you let go.
+- **An `export { a, b }` swallowed the next import.** A re-export with no `from` on it let the import statement below it be read as part of the same clause, so that import bound the re-exported names instead of its own and every call through it read as unresolved. Both scanners now stop a clause at the next import or export.
 - **A folder of repos collapsed to one dot** at module grain with bounds on, since every dot named a band that only existed per repo.
 - **A small repo in a folder of repos read as one module.** Grouping balanced every repo against the fleet's total weight, so anything small enough never opened at all: a phone app of fourteen files was one box beside a backend of fifteen hundred. Every repo now folds exactly as it does alone, and a fleet shows the same module count as opening each repo one at a time.
 - **A repo past thirty thousand files ran out of heap** building its call graph, since node hands a process about 4 GB and v8 will not raise that once it is running. The run now starts again with room, and the call graph itself holds one row per unresolved name rather than one per call site, and reads each file again rather than keeping every file's text at once. The linux kernel reads as 1.4m declarations and 3.9m calls.

@@ -2,7 +2,7 @@
 // goal: show face/initial circle
 
 import { useState } from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 // a noreply address carries the user id, which addresses the avatar directly
 export function faceOf(email: string): string {

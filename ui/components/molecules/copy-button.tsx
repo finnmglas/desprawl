@@ -6,7 +6,7 @@ import { Button } from "../atoms/button.tsx"
 import { Check, Copy } from "../atoms/icons.tsx"
 import { Tip } from "../atoms/tip.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { copy } from "../../lib/export.ts"
+import { copy } from "../../lib/app/export.ts"
 
 export function CopyButton({
   label = "Copy to the clipboard",

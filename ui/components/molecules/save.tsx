@@ -4,10 +4,10 @@
 import { Download } from "../atoms/icons.tsx"
 import { Menu, MenuItem } from "./menu.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { FORMATS, type Matrix } from "../../lib/formats.ts"
-import { download, named } from "../../lib/export.ts"
+import { FORMATS, type Matrix } from "../../lib/say/formats.ts"
+import { download, named } from "../../lib/app/export.ts"
 import { toSvg } from "html-to-image"
-import { shoot } from "../../lib/paper.ts"
+import { shoot } from "../../lib/app/paper.ts"
 
 const PAD = 24
 

@@ -2,7 +2,7 @@
 // goal: card, name, content, controls
 
 import { CardHeader, CardTitle, Note } from "../atoms/card.tsx"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export function CardHead({
   title,

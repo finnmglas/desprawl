@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { deps } from "../src/deps.ts"
+import { deps } from "../src/facts/deps.ts"
 
 /** npm nests, pnpm links out of a store, and a scope is a folder holding neither */
 function installed(): string {

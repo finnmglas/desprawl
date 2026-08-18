@@ -2,7 +2,7 @@
 // goal: repo remote icons
 
 import { HostMark } from "../atoms/icons.tsx"
-import type { Remote } from "../../../src/model.ts"
+import type { Remote } from "../../../src/read/model.ts"
 
 export function RemoteLink({ remote }: { remote: Remote }) {
   return (

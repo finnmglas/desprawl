@@ -2,7 +2,7 @@
 // goal: hover message hint like shadcn but inverted
 
 import { useRef, useState } from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 const EDGE = 8
 

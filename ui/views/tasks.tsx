@@ -3,59 +3,35 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
-import { Face, Hands } from "../components/molecules/hands.tsx"
+import { TOLL, spell, taskColumns } from "../components/molecules/panels/task-rows.tsx"
+import { Face } from "../components/molecules/panels/hands.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { Dialog } from "../components/atoms/dialog.tsx"
 import { Badge } from "../components/atoms/badge.tsx"
-import { DataTable, type Column } from "../components/molecules/data-table.tsx"
-import { Fix } from "../components/molecules/fix.tsx"
+import { DataTable } from "../components/molecules/panels/data-table.tsx"
+import { Fix } from "../components/molecules/agent/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
-import { Agents } from "../components/molecules/agents.tsx"
+import { Agents } from "../components/molecules/agent/agents.tsx"
 import { Section } from "../components/atoms/section.tsx"
-import { Kpi, Kpis } from "../components/molecules/kpi.tsx"
+import { Kpi, Kpis } from "../components/molecules/panels/kpi.tsx"
 import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
-import { Path, Tip } from "../components/atoms/tip.tsx"
-import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/live.ts"
-import { isFile, useGoing } from "../lib/going.tsx"
-import { useKept } from "../lib/kept.ts"
-import { hands, handsOf, worked } from "../lib/people.ts"
-import { num, plural, shortPath } from "../lib/format.ts"
-import { FELT, IMPACTS, KINDS, tasks, type Hits, type Task } from "../lib/tasks.ts"
-import { balanced, fold } from "../../src/layers.ts"
-import { OUTLINE } from "../lib/verdict.ts"
-import { cn } from "../lib/ui.ts"
-import type { Calls } from "../../src/calls.ts"
-import type { Deps } from "../../src/deps.ts"
-import type { Graph } from "../../src/graph.ts"
-import type { Stats } from "../../src/model.ts"
-import type { Sprawl } from "../../src/work.ts"
+import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/app/live.ts"
+import { isFile, useGoing } from "../lib/app/going.tsx"
+import { useKept } from "../lib/app/kept.ts"
+import { hands, handsOf, worked } from "../lib/app/people.ts"
+import { num, plural } from "../lib/say/format.ts"
+import { FELT, IMPACTS, KINDS, tasks, type Task } from "../lib/say/tasks.ts"
+import { balanced, fold } from "../../src/read/layers.ts"
+import { cn } from "../lib/app/ui.ts"
+import type { Calls } from "../../src/read/calls.ts"
+import type { Deps } from "../../src/facts/deps.ts"
+import type { Graph } from "../../src/read/graph.ts"
+import type { Stats } from "../../src/read/model.ts"
+import type { Sprawl } from "../../src/facts/work.ts"
 
 const ALL = "everything"
-
-const TONES: Record<string, string> = {
-  broken: "border-red-500/60",
-  security: "border-red-500/60",
-  licence: "border-amber-500/60",
-  cycle: "border-amber-500/60",
-  dead: "border-sky-500/60",
-  copy: "",
-  prose: "",
-  shape: "",
-  size: "",
-}
-
-/** an hour is not 60 minutes to read, it is "an hour" */
-const spell = (minutes: number) =>
-  minutes < 90 ? `${Math.round(minutes)}m` : `${(minutes / 60).toFixed(1)}h`
-
-const TOLL: Record<Hits, string> = {
-  runtime: OUTLINE.bad,
-  shipping: OUTLINE.warn,
-  "local dev": OUTLINE.cool,
-  maintainability: OUTLINE.quiet,
-}
 
 export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, string> }) {
   const { open } = useGoing()
@@ -141,119 +117,7 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
     ].join("\n")
   }
 
-  const columns: Column<Task>[] = [
-    {
-      key: "title",
-      label: "Task",
-      get: (one) => one.title,
-      cell: (one) => (
-        <Tip className="max-w-96 min-w-0" text={one.why}>
-          <span className="block truncate">{one.title}</span>
-        </Tip>
-      ),
-    },
-    {
-      key: "kind",
-      label: "Found by",
-      get: (one) => one.kind,
-      cell: (one) => (
-        <Badge variant="outline" className={TONES[one.kind]}>
-          {one.kind}
-        </Badge>
-      ),
-      hint: "which reading turned it up",
-    },
-    {
-      key: "where",
-      label: "Where",
-      get: (one) => one.where,
-      cell: (one) => (
-        <Path
-          of={one.where}
-          as={one.where === "." ? "across the repo" : shortPath(one.where, 32)}
-        />
-      ),
-    },
-    {
-      key: "reach",
-      label: "Clears",
-      num: true,
-      get: (one) => one.reach,
-      hint: "what stops being wrong: files in the ring, packages exposed, folders untangled",
-    },
-    {
-      key: "lines",
-      label: "Lines",
-      num: true,
-      get: (one) => one.lines,
-      hint: "the closest thing to a size before starting",
-    },
-    {
-      key: "minutes",
-      label: "Est.",
-      num: true,
-      get: (one) => one.minutes,
-      cell: (one) => (
-        <Tip text="minutes of an agent's time, from the files it opens and the lines it reads. Two plan runs on this machine were timed at 1.2 and 1.9 minutes, and everything here is scaled off those two numbers">
-          <span className="underline decoration-dotted">{spell(one.minutes)}</span>
-        </Tip>
-      ),
-      hint: "an agent's time, off the two runs anybody has timed here. Sort against Clears to pick",
-    },
-    {
-      key: "who",
-      label: "Dev",
-      get: (one) => crewOf(one)[0]?.who.name ?? "",
-      cell: (one) => {
-        const crew = crewOf(one)
-        if (!crew.length) return null
-        return (
-          <Tip
-            className="flex justify-center"
-            side="bottom"
-            text={<Hands of={crew} faces={faces} />}
-          >
-            <Face of={crew} faces={faces} />
-          </Tip>
-        )
-      },
-      hint: "who has committed most where this is",
-    },
-    {
-      key: "hits",
-      label: "Impact",
-      get: (one) => one.hits,
-      cell: (one) => (
-        <Tip text={FELT[one.hits]}>
-          <Badge variant="outline" className={TOLL[one.hits]}>
-            {one.hits}
-          </Badge>
-        </Tip>
-      ),
-      hint: "who feels it if nobody does it. Not severity: a bloated folder and a dead export cost only us",
-    },
-    {
-      key: "how",
-      label: "Cure",
-      get: (one) => (one.mechanical ? "known" : "judgement"),
-      cell: (one) =>
-        one.mechanical ? (
-          <Tip text="the change itself is known, so it is the kind of thing an agent finishes">
-            <span className="underline decoration-dotted">known</span>
-          </Tip>
-        ) : (
-          <span className="text-muted-foreground">judgement</span>
-        ),
-      hint: "mechanical, or a decision somebody makes",
-    },
-    {
-      key: "fix",
-      label: "",
-      flat: true,
-      get: () => "",
-      cell: (one) => <Fix task={one} />,
-    },
-  ]
+  const columns = taskColumns({ crewOf, faces })
 
   return (
     <div className="contents">

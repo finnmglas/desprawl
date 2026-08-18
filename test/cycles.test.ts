@@ -3,8 +3,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { cycles } from "../src/cycles.ts"
-import { build } from "../src/graph.ts"
+import { cycles } from "../src/read/cycles.ts"
+import { build } from "../src/read/graph.ts"
 import { repo } from "./repo.ts"
 
 test("a ring is one group, a chain is none", () => {

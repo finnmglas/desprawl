@@ -2,10 +2,10 @@
 // goal: the brand mark for a label, when we have one
 
 import { File, Folder } from "../atoms/icons.tsx"
-import { BRANDS } from "../../lib/brands.ts"
-import { useDisplay } from "../../lib/display.tsx"
-import { tint } from "../../lib/tint.ts"
-import { cn } from "../../lib/ui.ts"
+import { BRANDS } from "../../lib/draw/brands.ts"
+import { useDisplay } from "../../lib/app/display.tsx"
+import { tint } from "../../lib/draw/tint.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 /** the glyph alone, in whatever colour it inherits */
 export function Glyph({ label, className }: { label: string; className?: string }) {

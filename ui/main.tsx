@@ -3,13 +3,12 @@
 
 import { createRoot } from "react-dom/client"
 import { useEffect, useMemo, useState } from "react"
-import { MARKS, NpmMark } from "./components/atoms/icons.tsx"
+import { MARKS } from "./components/atoms/icons.tsx"
 import { Onward } from "./components/molecules/onward.tsx"
-import { Settings } from "./components/molecules/settings.tsx"
-import { RemoteLink } from "./components/molecules/remote-link.tsx"
+import { Banners } from "./components/molecules/panels/banners.tsx"
+import { Masthead } from "./components/molecules/panels/masthead.tsx"
 import { Waiting } from "./components/atoms/waiting.tsx"
 import { useSlow } from "./components/atoms/working.tsx"
-import { Tabs } from "./components/atoms/tabs.tsx"
 import { Toaster, toast } from "./components/atoms/toast.tsx"
 import { Button } from "./components/atoms/button.tsx"
 import { Card, CardContent } from "./components/atoms/card.tsx"
@@ -18,8 +17,8 @@ import { Network } from "./views/network.tsx"
 import { Tasks } from "./views/tasks.tsx"
 import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
-import { setLocale } from "./lib/locale.ts"
-import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/prefs.ts"
+import { setLocale } from "./lib/say/locale.ts"
+import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/app/prefs.ts"
 import {
   hunt,
   land,
@@ -30,30 +29,28 @@ import {
   useShownCount,
   viewsFor,
   viewsOf,
-} from "./lib/sections.ts"
-import { Find } from "./components/molecules/find.tsx"
-import { copy, describes } from "./lib/export.ts"
-import { num, setSimple } from "./lib/format.ts"
-import { cn } from "./lib/ui.ts"
-import { pdf, pptx } from "./lib/paper.ts"
-import { download, named } from "./lib/export.ts"
-import { canPrint, printed, printing as paperOnly } from "./lib/live.ts"
-import { DisplayProvider } from "./lib/display.tsx"
-import { loadFaces } from "./lib/faces.ts"
-import { useView } from "./lib/hash.ts"
-import { GoingProvider, type Target } from "./lib/going.tsx"
-import { Picked } from "./components/molecules/picked.tsx"
-import { allRepos, attach, isLive, onBusy, onConnection, readRepo, token } from "./lib/live.ts"
-import { CopyButton } from "./components/molecules/copy-button.tsx"
-import { useTheme, useThemeHotkey } from "./lib/theme.tsx"
+} from "./lib/app/sections.ts"
+import { describes } from "./lib/app/export.ts"
+import { setSimple } from "./lib/say/format.ts"
+import { cn } from "./lib/app/ui.ts"
+import { pdf, pptx } from "./lib/app/paper.ts"
+import { download, named } from "./lib/app/export.ts"
+import { canPrint, printed, printing as paperOnly } from "./lib/app/live.ts"
+import { DisplayProvider } from "./lib/app/display.tsx"
+import { loadFaces } from "./lib/app/faces.ts"
+import { useView } from "./lib/app/hash.ts"
+import { GoingProvider, type Target } from "./lib/app/going.tsx"
+import { Picked } from "./components/molecules/panels/picked.tsx"
+import { allRepos, attach, isLive, onBusy, onConnection, readRepo, token } from "./lib/app/live.ts"
+import { useTheme, useThemeHotkey } from "./lib/app/theme.tsx"
 import "./styles/tokens.css"
-import type { Calls as Called } from "../src/calls.ts"
-import type { Deps as Depended } from "../src/deps.ts"
-import type { Suite as Suited } from "../src/tests.ts"
-import type { Graph as Imports } from "../src/graph.ts"
-import type { Api as Routed } from "../src/routes.ts"
-import type { Sprawl as Sprawled } from "../src/work.ts"
-import type { Stats } from "../src/model.ts"
+import type { Calls as Called } from "../src/read/calls.ts"
+import type { Deps as Depended } from "../src/facts/deps.ts"
+import type { Suite as Suited } from "../src/facts/tests.ts"
+import type { Graph as Imports } from "../src/read/graph.ts"
+import type { Api as Routed } from "../src/read/routes.ts"
+import type { Sprawl as Sprawled } from "../src/facts/work.ts"
+import type { Stats } from "../src/read/model.ts"
 
 // desprawl view swaps placeholder for data
 declare global {
@@ -246,178 +243,43 @@ function App({
           data-hunting={said || undefined}
           className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6"
         >
-          {/* a saved file is read by someone who did not run it, so it says what it is */}
-          {!isLive() && (
-            <div
-              data-print="hide"
-              className="bg-card flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:gap-4"
-            >
-              <p className="min-w-0 flex-1 text-sm">
-                <span className="font-medium">
-                  {name === "desprawl"
-                    ? "A static demo of desprawl on its own source."
-                    : `A static desprawl report for ${name}.`}
-                </span>{" "}
-                <span className="text-muted-foreground">Run it on your own project:</span>
-              </p>
-              {/* the command and the button stay one row, whatever the text above them does */}
-              <div className="flex shrink-0 items-center gap-2">
-                <code className="bg-muted flex-1 rounded-md px-3 py-1.5 font-mono text-sm select-all">
-                  npx desprawl
-                </code>
-                <CopyButton
-                  text={() => "npx desprawl"}
-                  message="Copied npx desprawl"
-                  note="Run it in any git repo"
-                />
-              </div>
-            </div>
-          )}
+          <Banners name={name} repo={stats.repo} online={online} />
 
-          {/* Ctrl+C on the terminal it runs in kills this without a word to the tab */}
-          {!online && (
-            <div
-              data-print="hide"
-              className="border-destructive/50 bg-card flex flex-col gap-3 rounded-lg border p-3"
-            >
-              <p className="flex items-center gap-2 text-sm">
-                <span className="bg-destructive size-2 shrink-0 rounded-full" />
-                <span>
-                  <span className="font-medium">Disconnected.</span>{" "}
-                  <span className="text-muted-foreground">
-                    The desprawl server behind this tab stopped answering. This starts it again, on
-                    the same address, so the tab picks back up on its own:
-                  </span>
-                </span>
-              </p>
-              <div className="flex items-center gap-2">
-                <code className="bg-muted min-w-0 flex-1 overflow-x-auto rounded-md px-3 py-1.5 font-mono text-sm text-nowrap select-all">
-                  npx desprawl "{stats.repo}" --token={token()} --port={location.port}
-                </code>
-                <CopyButton
-                  text={() =>
-                    `npx desprawl "${stats.repo}" --token=${token()} --port=${location.port}`
-                  }
-                  message="Copied the reconnect command"
-                  note="This tab reconnects on its own once the server answers again"
-                />
-              </div>
-            </div>
-          )}
-
-          <header className="flex flex-wrap items-center justify-between gap-3">
-            {/* min-w-0 lets a long path truncate */}
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <div className="flex min-w-0 items-center gap-2">
-                {/* folder name is the repo name */}
-                <button
-                  onClick={() => {
-                    setTyped("")
-                    hunt("")
-                    go({
-                      tab: TABS[0],
-                      path: [],
-                      lang: "",
-                      kind: "",
-                      pick: "",
-                      panel: "",
-                      from: "",
-                      to: "",
-                    })
-                  }}
-                  className="hover:text-muted-foreground cursor-pointer truncate text-2xl font-semibold"
-                >
-                  {name}
-                </button>
-                {stats.remotes.map((remote) => (
-                  <RemoteLink key={remote.url} remote={remote} />
-                ))}
-                {/* a manifest that is not private is one npm would take, so its page exists */}
-                {stats.stack.name && !stats.stack.private && (
-                  <a
-                    href={`https://www.npmjs.com/package/${stats.stack.name}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={`${stats.stack.name} on npm, read off package.json rather than the registry`}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    <NpmMark className="size-5" />
-                  </a>
-                )}
-              </div>
-              <button
-                onClick={async () =>
-                  toast(
-                    (await copy(stats.repo)) ? "Path copied" : "Copy blocked by the browser",
-                    stats.repo,
-                  )
-                }
-                title="Copy the path"
-                className="text-muted-foreground hover:text-foreground w-fit max-w-full cursor-pointer truncate text-left font-mono text-xs"
-              >
-                {stats.repo}
-              </button>
-              <p className="text-muted-foreground text-xs">
-                @{stats.head} · {stats.first.slice(0, 10)} to {stats.last.slice(0, 10)} ·{" "}
-                {num(stats.commits)} commits · desprawl {stats.version}
-                {stats.thin && (
-                  <span
-                    className="text-amber-600 dark:text-amber-400"
-                    title="cloned with --filter=blob:none, so git holds no file contents to diff. Commits, authors, dates and renames are right, every added or removed line reads 0"
-                  >
-                    {" "}
-                    · partial clone, no line counts
-                  </span>
-                )}
-                {slow && <span className="text-foreground"> · working…</span>}
-              </p>
-            </div>
-            {/* seven tabs, a theme switch and a menu need most of a laptop, so they keep a
-                row of their own until there is room for the repo name beside them */}
-            <div data-print="hide" className="flex w-full min-w-0 items-center gap-2 xl:w-auto">
-              {said ? (
-                <p className="text-muted-foreground min-w-0 flex-1 truncate text-sm">
-                  {found === 0
-                    ? `nothing here matches ${said}`
-                    : `${found === 1 ? "1 panel" : `${found} panels`} matching ${said}`}
-                </p>
-              ) : (
-                <Tabs
-                  grow
-                  icons={BAR}
-                  className="xl:w-auto"
-                  tabs={TABS}
-                  value={TABS.includes(tab) ? tab : TABS[0]}
-                  // by hand means the whole tab
-                  onChange={(next) => go({ tab: next, panel: "", pick: "" })}
-                />
-              )}
-              <Find value={typed} onChange={setTyped} placeholder="Search panels" />
-              {repos.length > 0 && onRepo && (
-                <select
-                  value={only}
-                  onChange={(event) => onRepo(event.target.value)}
-                  title="Which repo in this folder"
-                  className="bg-card h-9 max-w-40 shrink-0 rounded-md border px-2 text-sm"
-                >
-                  <option value="">every repo</option>
-                  {repos.map((one) => (
-                    <option key={one} value={one}>
-                      {one}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <Settings
-                stats={stats}
-                prefs={prefs}
-                change={change}
-                reload={reload}
-                onPaper={paper}
-                themed={themed}
-              />
-            </div>
-          </header>
+          <Masthead
+            stats={stats}
+            name={name}
+            tabs={TABS}
+            icons={BAR}
+            tab={tab}
+            onTab={(next) => go({ tab: next, panel: "", pick: "" })}
+            typed={typed}
+            setTyped={setTyped}
+            said={said}
+            found={found}
+            slow={slow}
+            repos={repos}
+            only={only}
+            onRepo={onRepo}
+            onHome={() => {
+              setTyped("")
+              hunt("")
+              go({
+                tab: TABS[0],
+                path: [],
+                lang: "",
+                kind: "",
+                pick: "",
+                panel: "",
+                from: "",
+                to: "",
+              })
+            }}
+            prefs={prefs}
+            change={change}
+            reload={reload}
+            onPaper={paper}
+            themed={themed}
+          />
 
           {/* searching answers with panels, so every tab is mounted and each one shows
               only what matched */}

@@ -5,7 +5,7 @@ import { useRef, useState } from "react"
 import { Button } from "../atoms/button.tsx"
 import { Input } from "../atoms/input.tsx"
 import { Search } from "../atoms/icons.tsx"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export function Find({
   value,

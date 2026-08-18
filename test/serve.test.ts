@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { after, test } from "node:test"
-import { serve } from "../src/serve.ts"
+import { serve } from "../src/serve/serve.ts"
 import { repo } from "./repo.ts"
 
 const dir = repo({ "a.ts": "const a = 1\n", "src/b.ts": "const b = 2\n" })

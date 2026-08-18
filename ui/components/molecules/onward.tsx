@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "../atoms/card.tsx"
 import { Back } from "../atoms/back.tsx"
 import { Eye, MARKS } from "../atoms/icons.tsx"
 import { Waiting } from "../atoms/waiting.tsx"
-import { useGoing } from "../../lib/going.tsx"
-import { TAB_SECTIONS, useHidden, useHunt } from "../../lib/sections.ts"
-import type { Stats } from "../../../src/model.ts"
+import { useGoing } from "../../lib/app/going.tsx"
+import { TAB_SECTIONS, useHidden, useHunt } from "../../lib/app/sections.ts"
+import type { Stats } from "../../../src/read/model.ts"
 
 /** what a graph view shows until its graph arrives */
 export function Loading({

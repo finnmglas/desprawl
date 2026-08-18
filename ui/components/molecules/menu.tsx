@@ -4,7 +4,7 @@
 import { Note } from "../atoms/card.tsx"
 import { useEffect, useRef, useState } from "react"
 import { Button } from "../atoms/button.tsx"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export interface MenuProps {
   children: React.ReactNode

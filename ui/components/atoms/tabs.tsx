@@ -3,7 +3,7 @@
 // inspo: shadcn
 
 import { useEffect, useRef } from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 export interface TabsProps {
   /** Tab keys in display order, rendered as their own labels. */

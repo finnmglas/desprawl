@@ -1,8 +1,8 @@
 // owner: finn
 // goal: returning to where you actually came from
 
-import { useGoing } from "../../lib/going.tsx"
-import { useHunt } from "../../lib/sections.ts"
+import { useGoing } from "../../lib/app/going.tsx"
+import { useHunt } from "../../lib/app/sections.ts"
 
 const said = (view: { tab: string; path: string[] }, tab: string) =>
   view.tab === tab ? (view.path.length ? view.path.join("/") : "where you were") : view.tab

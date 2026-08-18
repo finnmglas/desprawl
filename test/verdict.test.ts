@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import test from "node:test"
-import { familyOf } from "../src/licence.ts"
+import { familyOf } from "../src/facts/licence.ts"
 
 test("the families every licence sorts into", () => {
   for (const [said, want] of [

@@ -14,6 +14,7 @@ repo
 
 - Loc/RepoHealth https://ghloc.vercel.app/finnmglas/desprawl
 - DeepWiki by Devin ai https://deepwiki.com/finnmglas/desprawl
+- random ai generated page https://clihub.pages.dev/pt/tools/finnmglas-desprawl
 
 npm
 

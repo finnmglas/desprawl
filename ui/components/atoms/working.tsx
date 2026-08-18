@@ -2,7 +2,7 @@
 // goal: this part is refreshing
 
 import { useEffect, useState } from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 // a stall looks different from a finish
 const STEPS = [1, 2, 3, 2]

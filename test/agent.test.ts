@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { agent, ask, fix, installs } from "../src/agent.ts"
+import { agent, ask, fix, installs } from "../src/serve/agent.ts"
 import { repo } from "./repo.ts"
 
 test("the prompt carries the task, why it was raised, and where to look", () => {

@@ -3,8 +3,9 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { analyze } from "../src/analyze.ts"
-import { detail, timeline } from "../src/history.ts"
+import { analyze } from "../src/facts/analyze.ts"
+import { detail } from "../src/facts/history.ts"
+import { timeline } from "../src/facts/samples.ts"
 import { child, inRepo, repo } from "./repo.ts"
 
 test("a path git quotes still gets its commits and churn", () => {

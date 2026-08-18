@@ -2,7 +2,7 @@
 // goal: waiting, visibly
 
 import { useEffect, useState } from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 /** ticking, so a still page is not read as stuck */
 export function useWaited(): number {

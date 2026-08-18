@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import test from "node:test"
-import { close, read } from "../src/talk.ts"
+import { close, read } from "../src/serve/talk.ts"
 
 const stream = [
   `{"type":"system","subtype":"init","session_id":"abc-123","model":"claude-opus-5"}`,

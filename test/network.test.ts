@@ -3,11 +3,11 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { build } from "../src/graph.ts"
-import { calls } from "../src/calls.ts"
-import { fold } from "../src/layers.ts"
-import { api } from "../src/routes.ts"
-import { net } from "../ui/lib/network.ts"
+import { build } from "../src/read/graph.ts"
+import { calls } from "../src/read/calls.ts"
+import { fold } from "../src/read/layers.ts"
+import { api } from "../src/read/routes.ts"
+import { net } from "../ui/lib/draw/network.ts"
 import { repo } from "./repo.ts"
 
 const source = {

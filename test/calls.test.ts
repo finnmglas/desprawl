@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { calls } from "../src/calls.ts"
+import { calls } from "../src/read/calls.ts"
 import { repo } from "./repo.ts"
 
 test("a call across files follows the import that brought the name in", () => {

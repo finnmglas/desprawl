@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { analyze } from "../src/analyze.ts"
+import { analyze } from "../src/facts/analyze.ts"
 import { child, inRepo, repo } from "./repo.ts"
 
 const line = "const a = 1\n"

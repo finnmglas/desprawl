@@ -7,12 +7,12 @@ import { Dialog } from "../atoms/dialog.tsx"
 import { Download } from "../atoms/icons.tsx"
 import { Note } from "../atoms/card.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { download, named } from "../../lib/export.ts"
-import { num } from "../../lib/format.ts"
-import { callGraph, importGraph, isLive, staticPage } from "../../lib/live.ts"
-import { notes } from "../../lib/paper.ts"
-import { slides } from "../../lib/slides.ts"
-import type { Stats } from "../../../src/model.ts"
+import { download, named } from "../../lib/app/export.ts"
+import { num } from "../../lib/say/format.ts"
+import { callGraph, importGraph, isLive, staticPage } from "../../lib/app/live.ts"
+import { notes } from "../../lib/app/paper.ts"
+import { slides } from "../../lib/app/slides.ts"
+import type { Stats } from "../../../src/read/model.ts"
 
 /** one file on offer */
 function Row({

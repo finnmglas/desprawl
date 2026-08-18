@@ -3,7 +3,7 @@
 // inspo: shadcn
 
 import * as React from "react"
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 /** this box is the scrolling ancestor, so sticky children stick to it */
 type Sheet = React.HTMLAttributes<HTMLTableElement> & {

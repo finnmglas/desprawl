@@ -3,10 +3,10 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { build } from "../src/graph.ts"
-import { calls } from "../src/calls.ts"
-import { candidates, dialectOf } from "../src/dialects.ts"
-import { foreign, scrub } from "../src/specifiers.ts"
+import { build } from "../src/read/graph.ts"
+import { calls } from "../src/read/calls.ts"
+import { candidates, dialectOf } from "../src/read/dialects.ts"
+import { foreign, scrub } from "../src/read/specifiers.ts"
 import { repo } from "./repo.ts"
 
 test("a comment, a string and a char are read the way each language writes them", () => {

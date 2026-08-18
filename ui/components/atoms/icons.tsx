@@ -1,7 +1,7 @@
 // owner: finn
 // goal: icons, every one we draw by hand. brands are generated instead
 
-import { cn } from "../../lib/ui.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 /** outline, for chrome: follows the text colour, and the hover state with it */
 const Line = ({ d, circle, className }: { d?: string; circle?: boolean; className?: string }) => (

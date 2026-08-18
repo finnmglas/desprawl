@@ -5,7 +5,7 @@ import assert from "node:assert/strict"
 import { spawn, spawnSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { after, test } from "node:test"
-import { serve } from "../src/serve.ts"
+import { serve } from "../src/serve/serve.ts"
 
 const VIEWER = "dist/index.html"
 const CHROMES = [

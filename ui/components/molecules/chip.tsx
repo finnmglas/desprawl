@@ -4,12 +4,12 @@
 import { Badge } from "../atoms/badge.tsx"
 import { Glyph } from "./mark.tsx"
 import { Tip } from "../atoms/tip.tsx"
-import { BRANDS } from "../../lib/brands.ts"
-import { useDisplay } from "../../lib/display.tsx"
-import { cn } from "../../lib/ui.ts"
-import { SITES } from "../../lib/sites.ts"
-import { REGISTRIES, linkTo } from "../../../src/registries.ts"
-import { NOTES } from "../../../src/notes.ts"
+import { BRANDS } from "../../lib/draw/brands.ts"
+import { useDisplay } from "../../lib/app/display.tsx"
+import { cn } from "../../lib/app/ui.ts"
+import { SITES } from "../../lib/app/sites.ts"
+import { REGISTRIES, linkTo } from "../../../src/facts/registries.ts"
+import { NOTES } from "../../../src/facts/notes.ts"
 
 /** "Next.js" and "Claude Code 658" both find the note, and the mark, for Claude Code */
 export function Chip({

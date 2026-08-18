@@ -3,8 +3,8 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { build, jsonc, packageOf } from "../src/graph.ts"
-import { scrub, specifiers, symbols } from "../src/specifiers.ts"
+import { build, jsonc, packageOf } from "../src/read/graph.ts"
+import { scrub, specifiers, symbols } from "../src/read/specifiers.ts"
 import { repo } from "./repo.ts"
 
 const count = (text: string, pattern: RegExp) => (text.match(pattern) ?? []).length
@@ -260,4 +260,14 @@ test("a file that names bundler markers is not a bundle, it is a tool", () => {
   assert.ok(g.modules["detect.ts"], "a file that only mentions them is still source")
   assert.deepEqual(to(g, "detect.ts"), ["real.ts"], "and its imports are still read")
   assert.equal(g.modules["bundle.js"], undefined, "while one that runs them is not a module")
+})
+
+test("a re-export with no from does not swallow the import after it", () => {
+  const [found] = specifiers('export { a, b }\n\nimport { one, two } from "./m.ts"\n')
+  assert.equal(found.text, "./m.ts", "the specifier is the one that has a from")
+  assert.deepEqual(
+    found.names.map((n) => n.local),
+    ["one", "two"],
+    "and it binds its own names, not the ones handed back out",
+  )
 })

@@ -25,8 +25,8 @@ import {
 } from "../components/atoms/chart.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Working, useSlow } from "../components/atoms/working.tsx"
-import { untransform } from "../lib/curve.ts"
-import { useDisplay } from "../lib/display.tsx"
+import { untransform } from "../lib/draw/curve.ts"
+import { useDisplay } from "../lib/app/display.tsx"
 import {
   defaultGrain,
   endsAt,
@@ -35,14 +35,14 @@ import {
   num,
   stamp,
   startsAt,
-} from "../lib/format.ts"
+} from "../lib/say/format.ts"
 
-import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/live.ts"
-import { GROUPS, SERIES, expand, rows } from "../lib/series.ts"
-import { cn } from "../lib/ui.ts"
-import type { Grain } from "../lib/format.ts"
-import type { Hours, Timeline } from "../../src/history.ts"
-import type { Stats } from "../../src/model.ts"
+import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/app/live.ts"
+import { GROUPS, SERIES, expand, rows } from "../lib/draw/series.ts"
+import { cn } from "../lib/app/ui.ts"
+import type { Grain } from "../lib/say/format.ts"
+import type { Hours, Timeline } from "../../src/facts/samples.ts"
+import type { Stats } from "../../src/read/model.ts"
 
 export function OverTime({
   stats,

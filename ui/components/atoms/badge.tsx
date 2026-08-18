@@ -3,7 +3,7 @@
 // inspo: shadcn
 
 import * as React from "react"
-import { cn, Slot, variants, type VariantProps } from "../../lib/ui.ts"
+import { cn, Slot, variants, type VariantProps } from "../../lib/app/ui.ts"
 
 export const badgeVariants = variants(
   "inline-flex w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium [&>svg]:size-3",

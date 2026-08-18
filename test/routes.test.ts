@@ -3,11 +3,11 @@
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { build } from "../src/graph.ts"
-import { calls } from "../src/calls.ts"
-import { api, filled, pathy, reading } from "../src/routes.ts"
-import { normal } from "../src/specs.ts"
-import { joined } from "../src/routes.ts"
+import { build } from "../src/read/graph.ts"
+import { calls } from "../src/read/calls.ts"
+import { api, filled, pathy, reading } from "../src/read/routes.ts"
+import { normal } from "../src/read/specs.ts"
+import { joined } from "../src/read/routes.ts"
 import { repo } from "./repo.ts"
 
 /** every endpoint as "VERB path", sorted, so a test says what it means */

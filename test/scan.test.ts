@@ -4,7 +4,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { execFileSync } from "node:child_process"
-import { scan } from "../src/scan.ts"
+import { scan } from "../src/read/scan.ts"
 import { repo } from "./repo.ts"
 
 const langs = (dir: string) => Object.fromEntries(scan(dir).map((f) => [f.name, f]))

@@ -16,8 +16,8 @@ import {
   showing,
   useHidden,
   useOrder,
-} from "../../lib/sections.ts"
-import { cn } from "../../lib/ui.ts"
+} from "../../lib/app/sections.ts"
+import { cn } from "../../lib/app/ui.ts"
 
 const control =
   "text-muted-foreground hover:text-foreground flex size-6 items-center justify-center rounded-full disabled:pointer-events-none disabled:opacity-30"
