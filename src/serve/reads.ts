@@ -172,6 +172,7 @@ export function reads(one: Asked): boolean {
 
   if (url.pathname === "/api/static") {
     const made = onePage(kept.stats(false), {
+      root: at(url) || repo,
       graph: kept.graph(at(url)),
       called: kept.read.calls,
       deps: kept.read.deps,

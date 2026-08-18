@@ -12,7 +12,7 @@ import type { Suite } from "../facts/tests.ts"
 import { build } from "../read/graph.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
 import type { Graph } from "../read/graph.ts"
-import type { Stats } from "../read/model.ts"
+import type { Contributor, Stats } from "../read/model.ts"
 
 export function open(target: string): void {
   // windows start is a shell builtin, and the "" is the window title
@@ -48,18 +48,21 @@ export function page(
     deps?: Deps | null
     suite?: Suite | null
     viewer?: string
+    /** where to read from, when the payload's own path was hidden */
+    root?: string
   },
 ): { html: string; skipped: number } {
   // < escaped so a path holding </script> cannot close the tag
   const inline = (data: unknown) => JSON.stringify(data).replaceAll("<", "\\u003c")
-  const graph = held?.graph ?? build(stats.repo)
+  const root = held?.root ?? stats.repo
+  const graph = held?.graph ?? build(root)
   const heavy = graph.stats.files > HEAVY
-  const said = held?.called ?? (heavy ? null : calls(stats.repo, graph))
+  const said = held?.called ?? (heavy ? null : calls(root, graph))
   const paths = Object.keys(graph.modules)
   const loose = {
-    repeated: repeated(stats.repo, paths),
-    copied: copied(stats.repo, paths),
-    talky: talky(stats.repo, paths),
+    repeated: repeated(root, paths),
+    copied: copied(root, paths),
+    talky: talky(root, paths),
   }
 
   const data =
@@ -78,15 +81,52 @@ export function page(
 }
 
 /** blanking the addresses takes the faces with them */
+/** the folder's own name: a path names the machine it was read on */
+export const named = (path: string): string => path.split("/").filter(Boolean).pop() ?? path
+
+/** every address out, folded ones included, and the path down to the folder name */
+const nameless = (one: Contributor): Contributor => ({ ...one, email: "", also: undefined })
+
+/** the same, for a payload that is not the whole of Stats: a view prints its own shape */
+export function hidden(data: unknown): unknown {
+  if (!data || typeof data !== "object") return data
+  const held = { ...(data as Record<string, unknown>) }
+  if (Array.isArray(held.contributors))
+    held.contributors = (held.contributors as Contributor[]).map(nameless)
+  if (Array.isArray(held.identities))
+    held.identities = (held.identities as Contributor[]).map(nameless)
+  if (typeof held.repo === "string") held.repo = named(held.repo)
+  return held
+}
+
+// what git and the forges write for you, which names the account, the remote and the
+// branch it came from. Prose a person typed is left alone: no tool can promise to read that
+const FORGE = [
+  [/^(Merge (?:pull request #\d+|(?:remote-tracking )?branch '[^']*')).*$/, "$1"],
+  [/https?:\/\/\S+/g, ""],
+  [/[\w.-]+\.[a-z]{2,}[:/][\w.-]+\/\S+/g, ""],
+] as const
+
+const plainly = (subject: string): string =>
+  FORGE.reduce((held, [look, by]) => held.replace(look, by), subject)
+    .replace(/\s+/g, " ")
+    .trim()
+
 export const anonymous = (stats: Stats): Stats => ({
   ...stats,
-  contributors: stats.contributors.map((one) => ({ ...one, email: "" })),
+  repo: named(stats.repo),
+  contributors: stats.contributors.map(nameless),
+  // the unfolded list carries one row per address, which is the whole of what is hidden
+  identities: stats.identities.map(nameless),
+  // a remote names the account it is hosted under, and an ssh one is an address itself
+  remotes: [],
+  log: stats.log.map((one) => ({ ...one, subject: plainly(one.subject) })),
 })
 
 export function view(
   stats: Stats,
   into?: string,
-  held?: { deps?: Deps | null; suite?: Suite | null },
+  held?: { deps?: Deps | null; suite?: Suite | null; root?: string },
 ): string {
   const { html, skipped } = page(stats, held)
   if (skipped)

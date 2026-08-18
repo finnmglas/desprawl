@@ -8,7 +8,9 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
 import { explain, older } from "../src/facts/needs.ts"
+import { anonymous } from "../src/serve/view.ts"
 import { isUrl } from "../src/serve/remote.ts"
+import type { Stats } from "../src/read/model.ts"
 import { VIEWS } from "../src/facts/views.ts"
 import { repo } from "./repo.ts"
 
@@ -121,4 +123,55 @@ test("the knowledge graph comes out at whichever grain is asked for", () => {
   assert.ok(rows("function") > rows("file"))
   const head = run("knowledge", ".").out.split("\n")[0]
   assert.match(head, /kind\tid\tlabel/, "tab separated, so a sheet or a script can take it")
+})
+
+test("--anon leaves every address out, whichever way the numbers come out", () => {
+  const ADDRESS = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/
+  const plain = JSON.parse(run("cli", ".", "--json").out) as {
+    repo: string
+    contributors: { email: string; also?: string[] }[]
+    identities: { email: string }[]
+  }
+  assert.ok(
+    plain.identities.some((one) => one.email),
+    "the plain read has the addresses",
+  )
+
+  const said = run("cli", ".", "--json", "--anon").out
+  assert.doesNotMatch(said, ADDRESS, "and --anon has none of them, folded ones included")
+  const hidden = JSON.parse(said) as typeof plain
+  assert.equal(hidden.contributors.length, plain.contributors.length, "the people are still there")
+  assert.ok(!hidden.repo.includes("/"), "and the path is the folder, not this machine")
+
+  // the panels print their own shapes, and history carries the people
+  const past = run("history", ".", "--json", "--anon").out
+  assert.doesNotMatch(past, ADDRESS, "a view payload is anonymous too")
+
+  // a remote names the account this is hosted under, and an ssh one is an address
+  assert.ok(JSON.parse(run("cli", ".", "--json").out).remotes.length, "the plain read has them")
+  assert.deepEqual((JSON.parse(said) as { remotes: unknown[] }).remotes, [], "and --anon has none")
+  assert.doesNotMatch(said, /github\.com\//, "nor the url anywhere else in the payload")
+})
+
+test("what a forge wrote is scrubbed, what a person wrote is not", () => {
+  const said = (subject: string) =>
+    anonymous({
+      repo: "/home/someone/repo",
+      contributors: [],
+      identities: [],
+      remotes: [],
+      log: [{ subject }],
+    } as unknown as Stats).log[0].subject
+
+  assert.equal(said("Merge pull request #400 from acme/jane/feat-thing"), "Merge pull request #400")
+  assert.equal(
+    said("Merge branch 'dev' of github.com:acme/app into jane/feat-thing"),
+    "Merge branch 'dev'",
+  )
+  assert.equal(said("see https://acme.example/docs for why"), "see for why", "a url goes")
+  assert.equal(
+    said("fix model.ts:12, thanks acme"),
+    "fix model.ts:12, thanks acme",
+    "and prose is left as it was written",
+  )
 })

@@ -16,7 +16,7 @@ import { blank, git, merge } from "./read/model.ts"
 import { explain, needs } from "./facts/needs.ts"
 import { isUrl, local } from "./serve/remote.ts"
 import { serve } from "./serve/serve.ts"
-import { anonymous, open, view } from "./serve/view.ts"
+import { anonymous, hidden, open, view } from "./serve/view.ts"
 import { GRAINS, IMPACTS, KINDS, LANGUAGES, VIEWS, views } from "./facts/views.ts"
 import type { Grain, Hits, Sort, View } from "./facts/views.ts"
 import type { Node, Split, Stats } from "./read/model.ts"
@@ -294,13 +294,14 @@ try {
       lang: values.lang,
     })
     // never process.exit here: it drops whatever of a large payload has not been written
-    console.log(values.json ? JSON.stringify(made.data, null, 2) : made.text)
+    const data = values.anon ? hidden(made.data) : made.data
+    console.log(values.json ? JSON.stringify(data, null, 2) : made.text)
   }
 
   // analyses live not static
   else if (viewing && !values.static) {
     const port = Number(values.port) >= 1 ? Math.floor(Number(values.port)) : undefined
-    const live = await serve(target, cap, values.keep, port, undefined, values.token)
+    const live = await serve(target, cap, values.keep, port, undefined, values.token, values.anon)
     // a reconnect command names the tab already waiting for it, so it opens nothing new
     if (values.token) console.log("Reconnected. The tab that was open picks this up on its own.")
     else {
@@ -308,12 +309,13 @@ try {
       console.log(`Interface is live, if it doesn't open, click the link:\n\n${live}`)
     }
   } else {
-    const stats = reading ? analyze(reading, cap) : many(target, cap).all
+    const read_ = reading ? analyze(reading, cap) : many(target, cap).all
+    const stats = values.anon ? anonymous(read_) : read_
     // licences in disk, advisories network saved in page
     const held = viewing
-      ? { deps: await deps(target).catch(() => null), suite: tests(target) }
+      ? { deps: await deps(target).catch(() => null), suite: tests(target), root: target }
       : undefined
-    if (viewing) console.log(view(values.anon ? anonymous(stats) : stats, values.out, held))
+    if (viewing) console.log(view(stats, values.out, held))
     else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
   }
 } catch (err) {

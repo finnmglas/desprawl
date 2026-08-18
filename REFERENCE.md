@@ -79,19 +79,19 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 | `desprawl --json`            | whole cli report, tree + time series       |
 | `desprawl check --base main` | what this branch added, exit 1 if anything |
 
-| flag          |                                                         |
-| ------------- | ------------------------------------------------------- |
-| `--depth N`   | how deep tree goes, default 1                           |
-| `--top N`     | contributors shown, default 10                          |
-| `--commits N` | commits read from the log, default 10,000               |
-| `--digits N`  | digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`) |
-| `--static`    | write standalone file rather than server                |
-| `--anon`      | leave every commit address out, and avatars with them   |
-| `--out FILE`  | write the file there, rather than a temporary name      |
-| `--keep`      | keep server after the tab closes                        |
-| `--raw`       | exact numbers instead of scaled ones                    |
-| `--json`      | machine readable, numbers exact                         |
-| `--base REF`  | what `check` compares against                           |
+| flag          |                                                                                                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--depth N`   | how deep tree goes, default 1                                                                                                                                                                                                                                                        |
+| `--top N`     | contributors shown, default 10                                                                                                                                                                                                                                                       |
+| `--commits N` | commits read from the log, default 10,000                                                                                                                                                                                                                                            |
+| `--digits N`  | digits, default 3 (eg `1`, `10`, `0.1k`, `1.0k`, `10k`)                                                                                                                                                                                                                              |
+| `--static`    | write standalone file rather than server                                                                                                                                                                                                                                             |
+| `--anon`      | every commit address out and avatars with them, no remote urls, the folder named rather than its path, and the branch and account a merge commit was written with. Prose a person typed is left as they wrote it. Holds for the page, the json, the report, a panel and a served run |
+| `--out FILE`  | write the file there, rather than a temporary name                                                                                                                                                                                                                                   |
+| `--keep`      | keep server after the tab closes                                                                                                                                                                                                                                                     |
+| `--raw`       | exact numbers instead of scaled ones                                                                                                                                                                                                                                                 |
+| `--json`      | machine readable, numbers exact                                                                                                                                                                                                                                                      |
+| `--base REF`  | what `check` compares against                                                                                                                                                                                                                                                        |
 
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 

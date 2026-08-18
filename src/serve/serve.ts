@@ -73,11 +73,12 @@ export function serve(
   viewer?: string,
   // the token is the barrier, not the port, and it survives a restart
   token = randomBytes(16).toString("hex"),
+  anon = false,
 ): Promise<string> {
   const tabs = new Set<ServerResponse>()
   let farewell: NodeJS.Timeout | undefined
   // every reader this run answers with, each built the first time it is asked for
-  const kept = holds(repo, cap)
+  const kept = holds(repo, cap, anon)
   const held = kept.fleet
   /** the repo a request is about: the one it named, or this run's single one */
   const at = (url: URL): string => kept.at(url.searchParams.get("repo"))
@@ -251,7 +252,7 @@ export function serve(
     // port taken, take any free one
     server.on("error", (err: NodeJS.ErrnoException) => {
       if (err.code === "EADDRINUSE" && port === PORT)
-        serve(repo, cap, keep, 0, viewer, token).then(resolve, reject)
+        serve(repo, cap, keep, 0, viewer, token, anon).then(resolve, reject)
       else reject(err)
     })
     server.listen(port, HOST, () => {

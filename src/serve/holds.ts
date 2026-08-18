@@ -9,6 +9,7 @@ import { everyApi, everyCall, fleet, graphs, many } from "../facts/many.ts"
 import { git } from "../read/model.ts"
 import { api as apiOf } from "../read/routes.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
+import { anonymous } from "./view.ts"
 import { tests } from "../facts/tests.ts"
 import { count } from "../facts/history.ts"
 import { bytesAt, timeline } from "../facts/samples.ts"
@@ -44,7 +45,7 @@ export interface Holds {
   read: { graph: Graph | null; calls: Calls | null; deps: Deps | null; tests: Suite | null }
 }
 
-export function holds(repo: string, cap?: number): Holds {
+export function holds(repo: string, cap?: number, anon = false): Holds {
   const each = new Map<string, { head: string; stats: Stats }>()
   const built = new Map<string, Graph>()
   const rung = new Map<string, Calls>()
@@ -85,18 +86,19 @@ export function holds(repo: string, cap?: number): Holds {
     at,
     read,
     stats: (fresh, name = null) => {
+      const said = (one: Stats) => (anon ? anonymous(one) : one)
       const mine = pick(name)
       if (many_.length && !mine) {
-        if (!fresh && whole) return whole
-        return (whole = many(repo, cap).all)
+        if (!fresh && whole) return said(whole)
+        return said((whole = many(repo, cap).all))
       }
       const where = mine || repo
       const head = git(where, "rev-parse", "--short", "HEAD").trim()
       const seen = each.get(where)
-      if (!fresh && seen?.head === head) return seen.stats
+      if (!fresh && seen?.head === head) return said(seen.stats)
       const made = analyze(where, cap)
       each.set(where, { head, stats: made })
-      return made
+      return said(made)
     },
     graph: (where) => (read.graph = graph(where)),
     calls: (where) => (read.calls = rang(where)),
