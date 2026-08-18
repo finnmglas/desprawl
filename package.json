@@ -1,6 +1,6 @@
 {
   "name": "desprawl",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "npx desprawl: visually browse any codebase. Scope and deliver cleanup work on legacy projects, tech debt and agentic-coding sprawl. Understand unfamiliar repos faster.",
   "license": "MIT",
   "type": "module",

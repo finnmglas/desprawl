@@ -23,4 +23,4 @@ npm
 
 - Sec issues https://security.snyk.io/package/npm/desprawl
 - Dependency risk viewer https://socket.dev/npm/package/desprawl
-- Compatibility https://publint.dev/desprawl@0.5.0
+- Compatibility https://publint.dev/desprawl@0.6.0

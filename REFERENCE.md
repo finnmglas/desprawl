@@ -157,7 +157,7 @@ Every json desprawl prints carries the same envelope, so a file found later can 
 without guessing which version wrote it or what it was about:
 
 ```json
-{ "desprawl": "0.5.0", "kind": "modules", "repo": "/path/to/repo", "made": "2026-08-19T09:12:00.000Z", "data": ... }
+{ "desprawl": "0.6.0", "kind": "modules", "repo": "/path/to/repo", "made": "2026-08-19T09:12:00.000Z", "data": ... }
 ```
 
 `kind` is the view it came from, or `stats` for the whole report and `check` for a branch
