@@ -280,7 +280,24 @@ export interface Sprawl {
 
 function fromText(text: Sprawl): Task[] {
   const found: Task[] = []
-  const said = text.repeated.filter((one) => one.times >= NAMED)
+  const said = text.repeated.filter((one) => one.times >= NAMED && !one.styled)
+  const looks = text.repeated.filter((one) => one.styled)
+  if (looks.length) {
+    const worst = looks.slice(0, 3).map((one) => `"${one.text.slice(0, 40)}" in ${one.times}`)
+    found.push({
+      id: "named:styles",
+      title: `Make a component for ${looks.length} class lists repeated across files`,
+      kind: "copy",
+      where: looks[0].files[0],
+      // the same copy as a literal, but naming this one hides what the element looks like
+      why: `the same run of classes styles elements in several files, which is a component nobody made rather than a string to name: ${worst.join(", ")}`,
+      lines: looks.reduce((sum, one) => sum + one.times, 0),
+      reach: looks.length,
+      minutes: timed(looks.length * 1.5),
+      mechanical: false,
+      hits: "maintainability",
+    })
+  }
   if (said.length) {
     const worst = said.slice(0, 3).map((one) => `"${one.text.slice(0, 40)}" in ${one.times}`)
     found.push({

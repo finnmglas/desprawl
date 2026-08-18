@@ -9,9 +9,9 @@ import { repo } from "./repo.ts"
 
 test("a literal typed in three files is one name waiting to be made", () => {
   const dir = repo({
-    "a.ts": 'export const a = "flex items-center justify-between gap-2"\n',
-    "b.ts": 'export const b = "flex items-center justify-between gap-2"\n',
-    "c.ts": 'export const c = "flex items-center justify-between gap-2"\n',
+    "a.ts": 'export const a = "no such commit in this repository"\n',
+    "b.ts": 'export const b = "no such commit in this repository"\n',
+    "c.ts": 'export const c = "no such commit in this repository"\n',
     "d.ts": 'export const d = "short"\nexport const e = "./a/relative/path/that/is/long"\n',
   })
   const found = repeated(dir, ["a.ts", "b.ts", "c.ts", "d.ts"])
@@ -19,10 +19,36 @@ test("a literal typed in three files is one name waiting to be made", () => {
   assert.equal(found[0].times, 3)
 })
 
+test("a class list is judged as a component, not as a name", () => {
+  const dir = repo({
+    "a.tsx": 'export const a = "flex items-center gap-2"\n',
+    "b.tsx": 'export const b = "flex items-center gap-2"\n',
+    "c.tsx":
+      'import { cn } from "class-variance-authority-x"\nexport const c = cn("flex items-center gap-2")\n',
+  })
+  const few = repeated(dir, ["a.tsx", "b.tsx", "c.tsx"])
+  assert.deepEqual(few, [], "three files of two classes is how tailwind is written")
+
+  const wide = repo(
+    Object.fromEntries(
+      Array.from({ length: 5 }, (_, i) => [
+        `p${i}.tsx`,
+        `export const p${i} = "rounded-lg border border-border bg-card px-4 py-3 shadow-sm"\n`,
+      ]),
+    ),
+  )
+  const found = repeated(
+    wide,
+    Array.from({ length: 5 }, (_, i) => `p${i}.tsx`),
+  )
+  assert.equal(found.length, 1, "six classes across five files is a component nobody made")
+  assert.equal(found[0].styled, true, "and it is marked as styling, since the cure differs")
+})
+
 test("two files, one literal, is not yet worth a name", () => {
   const dir = repo({
-    "a.ts": 'export const a = "flex items-center justify-between gap-2"\n',
-    "b.ts": 'export const b = "flex items-center justify-between gap-2"\n',
+    "a.ts": 'export const a = "no such commit in this repository"\n',
+    "b.ts": 'export const b = "no such commit in this repository"\n',
   })
   assert.deepEqual(repeated(dir, ["a.ts", "b.ts"]), [])
 })

@@ -50,10 +50,11 @@ export function useWindowing<T>(what: What<T>) {
     setTall(Math.round(head.getBoundingClientRect().height + holds * one))
   }, [pinned, sorted.length, columns.length, open])
 
-  // read on the first paint, then left alone
+  // read on the first paint that has rows in it, then left alone: a table whose data has
+  // not landed is as wide as its own headings, and freezing that overlaps every column
   useEffect(() => {
     const head = sheet.current?.querySelector("thead tr")
-    if (!head || widths.length === columns.length) return
+    if (!head || !rows.length || widths.length === columns.length) return
     const found = [...head.children].map(
       (th, i) => columns[i]?.width ?? Math.round(th.getBoundingClientRect().width),
     )

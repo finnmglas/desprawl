@@ -4,11 +4,14 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { VENDORED } from "../read/graph.ts"
+import { specifiers } from "../read/specifiers.ts"
 
 export interface Said {
   text: string
   files: string[]
   times: number
+  /** a class list rather than words: same copy, but the cure is a component */
+  styled?: true
 }
 
 export interface Twice {
@@ -21,6 +24,9 @@ export interface Twice {
 const LONG = 24
 // in this many files before one name is worth it
 const SPREAD = 3
+// a class list is how tailwind is written, so it has to be longer and wider to mean anything
+const WIDE = 5
+const FEW = 4
 // a run this long is a decision repeated, not two lines that rhyme
 const RUN = 5
 // past this a line is boilerplate rather than a place a copy begins
@@ -31,13 +37,27 @@ const CODE = /\.(tsx?|jsx?|mts|cts)$/
 const ours = (path: string) =>
   CODE.test(path) && !VENDORED.test(path) && !/\.min\.[jt]s$/.test(path)
 
+// what a utility class is spelled like: a variant or two, then a property and its value
+// prettier-ignore
+const UTILITY =
+  /^(?:(?:hover|focus|focus-visible|active|group|group-hover|peer|peer-focus|dark|first|last|odd|even|disabled|checked|open|sm|md|lg|xl|2xl|print|motion-safe|motion-reduce|rtl|ltr|data-\[[^\]]*\]|aria-\[[^\]]*\]|has-\[[^\]]*\]|max-\w+|min-\w+):)*-?(?:flex|grid|table|block|inline|inline-block|inline-flex|contents|hidden|absolute|relative|fixed|sticky|static|truncate|italic|underline|uppercase|lowercase|capitalize|antialiased|sr-only|group|text|bg|from|via|to|border|divide|ring|outline|shadow|rounded|opacity|font|leading|tracking|decoration|line|list|placeholder|caret|accent|fill|stroke|caption|p|px|py|pt|pb|pl|pr|ps|pe|m|mx|my|mt|mb|ml|mr|ms|me|w|h|size|min|max|gap|space|items|justify|content|self|place|order|col|row|basis|grow|shrink|flex-1|top|left|right|bottom|inset|z|overflow|overscroll|object|aspect|cursor|pointer|select|resize|transition|duration|delay|ease|animate|fade|zoom|slide|spin|transform|translate|rotate|scale|skew|origin|whitespace|break|tabular|align|indent|columns|backdrop|blur|brightness|container|touch|scroll)(?:-|$)/
+
+/** a class list is what an element looks like, not a decision written out twice */
+const styled = (text: string): boolean => {
+  const parts = text.split(/\s+/)
+  return parts.length > 1 && parts.every((one) => UTILITY.test(one))
+}
+
 function saidIn(text: string): string[] {
   const found: string[] = []
+  // an import already names the module it asks for
+  const asked = new Set(specifiers(text).map((one) => one.text))
   for (const m of text.matchAll(/(["'`])((?:(?!\1)[^\\\n])*)\1/g)) {
     const one = m[2]
     if (one.length < LONG) continue
     // a path or a url is already the name of the thing
     if (/^[./~@]|^https?:|^node:/.test(one)) continue
+    if (asked.has(one)) continue
     found.push(one)
   }
   return found
@@ -61,8 +81,13 @@ export function repeated(repo: string, paths: string[]): Said[] {
     }
   }
   return [...seen]
-    .filter(([, files]) => files.length >= SPREAD)
-    .map(([text, files]) => ({ text, files, times: files.length }))
+    .map(([text, files]) => ({ text, files, times: files.length, styled: styled(text) }))
+    .filter(({ text, times, styled: look }) =>
+      look ? times >= WIDE && text.split(/\s+/).length >= FEW : times >= SPREAD,
+    )
+    .map(({ text, files, times, styled: look }) =>
+      look ? { text, files, times, styled: true as const } : { text, files, times },
+    )
     .sort((a, b) => b.times * b.text.length - a.times * a.text.length)
 }
 
