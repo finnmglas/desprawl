@@ -39,6 +39,8 @@ export interface Missing {
 
 export interface Graph {
   modules: Record<string, Module>
+  /** the repos it was read from, when a folder of them was read as one */
+  repos?: string[]
   packages: Record<string, string[]> // package to its importers
   missing: Missing[]
   stats: {

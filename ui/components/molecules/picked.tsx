@@ -20,6 +20,7 @@ const WHAT: Record<Target["kind"], string> = {
   folder: "folder",
   module: "module group",
   symbol: "declaration",
+  link: "connection",
 }
 
 interface Deed {
@@ -106,14 +107,17 @@ export function Picked({
     run: () => setReading(file),
   }
 
+  // an edge is its two ends, and those are the list below rather than a move of their own
   const deeds: Deed[] =
-    target.kind === "symbol"
-      ? [...(live ? [readIt] : []), inCalls, inGraph, inFiles]
-      : target.kind === "file"
-        ? [...(live ? [readIt] : []), inFiles, inCalls, inModules, inGraph]
-        : target.kind === "folder"
-          ? [inFiles, inModules, inGraph]
-          : [inModules, inGraph, inFiles]
+    target.kind === "link"
+      ? []
+      : target.kind === "symbol"
+        ? [...(live ? [readIt] : []), inCalls, inGraph, inFiles]
+        : target.kind === "file"
+          ? [...(live ? [readIt] : []), inFiles, inCalls, inModules, inGraph]
+          : target.kind === "folder"
+            ? [inFiles, inModules, inGraph]
+            : [inModules, inGraph, inFiles]
 
   // the detail below says all of this already
   const facts = target.detail

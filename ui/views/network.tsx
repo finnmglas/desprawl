@@ -19,7 +19,15 @@ import { LANGS } from "../../src/langs.ts"
 import { onlyIn } from "../../src/dialects.ts"
 import { PAINT, fit, plain } from "../lib/canvas.ts"
 import { apiGraph, callGraph, importGraph } from "../lib/live.ts"
-import { file as asFile, group as asGroup, holds, isFile, symbol, useGoing } from "../lib/going.tsx"
+import {
+  file as asFile,
+  group as asGroup,
+  holds,
+  isFile,
+  link,
+  symbol,
+  useGoing,
+} from "../lib/going.tsx"
 import { keep, recall, useKept } from "../lib/kept.ts"
 import { num, plural, shortPath } from "../lib/format.ts"
 import { namesUnder } from "../../src/naming.ts"
@@ -73,8 +81,8 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   const [lang, setLang] = useKept("net.lang", "")
   const [calls, setCalls] = useState<Calls | null>(window.__DESPRAWL_CALLS__ ?? null)
   const [routes, setRoutes] = useState<Api | null>(window.__DESPRAWL_ROUTES__ ?? null)
-  const [grain, setGrain] = useKept<Grain>("net.grain", "file")
-  const [imports, setImports] = useKept("net.imports", false)
+  const [grain, setGrain] = useKept<Grain>("net.grain", "module")
+  const [imports, setImports] = useKept("net.imports", true)
   const [wired, setWired] = useKept("net.calls", true)
   const [http, setHttp] = useKept("net.http", true)
   const [bounds, setBounds] = useKept("net.bounds", true)
@@ -86,6 +94,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   const [edges, setEdges] = useKept("net.edges", WIRED[0])
   const [only, setOnly] = useKept("net.only", "")
   const [near, setNear] = useState<Spot | null>(null)
+  const [edge, setEdge] = useState<(Wire & { held: number }) | null>(null)
   const [go, setGo] = useState(false)
   const [moves, setMoves] = useKept("net.moves", true)
   const [plan, setPlan] = useKept("net.plan", false)
@@ -357,6 +366,158 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       .sort((a, b) => (b.reaches ? 1 : 0) - (a.reaches ? 1 : 0) || a.path.localeCompare(b.path))
   }, [routes])
 
+  // the module a node belongs to, which is what a bundled line is drawn between
+  const unitOfNode = (id: string) => {
+    const spot = at.get(id)
+    if (!spot) return boxAt.get(id)?.parent ?? id
+    return grain === "function" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
+  }
+  // the wires as they are drawn, which is what a cursor can land on
+  const shown: (Wire & { held: number })[] = useMemo(
+    () =>
+      !drawn
+        ? []
+        : bundle || plan
+          ? [
+              ...drawn.wires
+                .reduce((held, wire) => {
+                  const a = unitOfNode(wire.from)
+                  const b = unitOfNode(wire.to)
+                  const key = a === b ? `${wire.from} ${wire.to}` : `${a} ${b}`
+                  const found = held.get(key) ?? {
+                    from: a === b ? wire.from : a,
+                    to: a === b ? wire.to : b,
+                    imports: 0,
+                    calls: 0,
+                    http: 0,
+                    types: true,
+                    held: 0,
+                  }
+                  found.imports += wire.imports
+                  found.calls += wire.calls
+                  found.http += wire.http
+                  found.held++
+                  if (!wire.types) found.types = false
+                  return held.set(key, found)
+                }, new Map<string, Wire & { held: number }>())
+                .values(),
+            ]
+          : drawn.wires.map((wire) => ({ ...wire, held: 1 })),
+    [drawn, bundle, plan, grain],
+  )
+
+  /** where a wire runs: its ends, and the point its bow bends around */
+  const runs = (wire: Wire, bow: number) => {
+    const seat = (id: string) => {
+      const spot = at.get(id)
+      if (spot) return { x: spot.x, y: spot.y, r: spot.r }
+      const box = boxAt.get(id)
+      return box ? { x: box.x + box.w / 2, y: box.y + box.h / 2, r: 0 } : null
+    }
+    const from = seat(wire.from)
+    const to = seat(wire.to)
+    if (!from || !to) return null
+    const dx = to.x - from.x
+    const dy = to.y - from.y
+    const long = Math.hypot(dx, dy) || 1
+    const lift = Math.min(26, long / 7) * bow
+    return {
+      from,
+      to,
+      cx: (from.x + to.x) / 2 - (dy / long) * lift,
+      cy: (from.y + to.y) / 2 + (dx / long) * lift,
+    }
+  }
+
+  /** the wire under the cursor, sampled along its bow */
+  const wireAt = (px: number, py: number) => {
+    if (!drawn) return null
+    const { scale, x, y } = view.current
+    const gx = (px - x) / scale
+    const gy = (py - y) / scale
+    // in screen pixels: wide in the middle of a line, narrow at its ends, where a node
+    // is what the cursor is aiming at and the line only passes through
+    const WIDE = 14
+    const TIP = 4
+    const reach = (at: number) => (TIP + (WIDE - TIP) * Math.sin(Math.PI * at)) / scale
+    let best: (Wire & { held: number }) | null = null
+    // scored, not measured: the middle of a line beats the end of another one nearby
+    let closest = 0
+    for (const wire of shown) {
+      for (const [on, bow] of [
+        [imports && wire.imports, 1],
+        [wired && wire.calls, -1],
+        [http && wire.http, 0],
+      ] as [number | boolean, number][]) {
+        if (!on) continue
+        const held = runs(wire, bow)
+        if (!held) continue
+        const { from, to, cx, cy } = held
+        const most = WIDE / scale
+        // the box a curve lives in, cheap enough to skip most of them on
+        if (
+          gx < Math.min(from.x, to.x, cx) - most ||
+          gx > Math.max(from.x, to.x, cx) + most ||
+          gy < Math.min(from.y, to.y, cy) - most ||
+          gy > Math.max(from.y, to.y, cy) + most
+        )
+          continue
+        // a point every twenty pixels or so, and the line between two of them counts,
+        // or only the handful of sampled points on a long curve can be hit at all
+        const long = Math.hypot(to.x - from.x, to.y - from.y) * scale
+        const steps = Math.max(8, Math.min(64, Math.round(long / 20)))
+        const on_ = (at: number) => ({
+          x: (1 - at) ** 2 * from.x + 2 * (1 - at) * at * cx + at ** 2 * to.x,
+          y: (1 - at) ** 2 * from.y + 2 * (1 - at) * at * cy + at ** 2 * to.y,
+        })
+        let last = on_(0)
+        for (let i = 1; i <= steps; i++) {
+          const next = on_(i / steps)
+          const dx = next.x - last.x
+          const dy = next.y - last.y
+          const span = dx * dx + dy * dy
+          // where on this piece of the line the cursor is, clamped to its ends
+          const along = span
+            ? Math.max(0, Math.min(1, ((gx - last.x) * dx + (gy - last.y) * dy) / span))
+            : 0
+          const away = Math.hypot(last.x + along * dx - gx, last.y + along * dy - gy)
+          const room = reach((i - 1 + along) / steps)
+          // 1 where the cursor sits on the line, 0 where it is as far as this piece allows
+          const score = 1 - away / room
+          if (score > closest) {
+            closest = score
+            best = wire
+          }
+          last = next
+        }
+      }
+    }
+    return best
+  }
+
+  /** what a wire carries, and which requests run along it */
+  const carries = (wire: Wire & { held: number }) => {
+    const said = [
+      wire.imports && `${plural(wire.imports, wire.types ? "type only import" : "import")}`,
+      wire.calls && `${plural(wire.calls, "call")}`,
+      wire.http && `${plural(wire.http, "request")}`,
+    ].filter(Boolean) as string[]
+    const held = (file: string) =>
+      grain === "module"
+        ? split && typeof split === "object"
+          ? (split[file] ?? file)
+          : file
+        : file
+    const asked = (routes?.links ?? []).filter(
+      (one) =>
+        (one.from === wire.from ||
+          held(one.from) === wire.from ||
+          unitOfNode(one.from) === wire.from) &&
+        (one.to === wire.to || held(one.to) === wire.to || unitOfNode(one.to) === wire.to),
+    )
+    return { said, asked }
+  }
+
   const hunted = find.trim().toLowerCase()
   const at = useMemo(() => new Map((drawn?.spots ?? []).map((s) => [s.id, s])), [drawn])
 
@@ -415,6 +576,16 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       return box ? { x: box.x + box.w / 2, y: box.y + box.h / 2, r: 0 } : null
     }
 
+    const lit = near ? new Set([near.id]) : null
+    const touching = new Set<string>()
+    if (near)
+      for (const wire of drawn.wires) {
+        if (wire.from === near.id) touching.add(wire.to)
+        if (wire.to === near.id) touching.add(wire.from)
+      }
+    // a hovered line lights both of its ends, since a line means nothing without them
+    const ends = edge && !near ? new Set([edge.from, edge.to]) : null
+
     if (bounds)
       for (const box of drawn.boxes) {
         const picked = box.id === only
@@ -437,25 +608,38 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
           pen.fillText(box.label.replace("level ", "L"), box.x + 2, box.y + text(12))
           continue
         }
-        if (plan && box.depth === 1) {
+        // hovered, or touched by what is hovered, since a module box has no dot to light
+        const near_ =
+          (!!near && (box.id === near.id || touching.has(box.id))) || !!ends?.has(box.id)
+        if ((plan || grain === "module") && box.depth === 1) {
           const unit = units.get(box.id)
           pen.setLineDash([])
-          pen.fillStyle = `rgba(${PAINT.quiet}, 0.09)`
+          pen.fillStyle = `rgba(${picked ? PAINT.down : PAINT.quiet}, ${picked ? 0.2 : near_ ? 0.18 : 0.09})`
           pen.fillRect(box.x, box.y, box.w, box.h)
-          pen.strokeStyle = picked ? `rgba(${PAINT.down}, 0.9)` : `rgba(${PAINT.quiet}, 0.5)`
-          pen.lineWidth = (picked ? 2 : 1) / scale
+          pen.strokeStyle = picked
+            ? `rgba(${PAINT.down}, 0.9)`
+            : `rgba(${PAINT.quiet}, ${near_ ? 0.85 : 0.5})`
+          pen.lineWidth = (picked || near_ ? 2 : 1) / scale
           pen.strokeRect(box.x, box.y, box.w, box.h)
           if (unit) {
             const out = Object.values(unit.out).reduce((sum, n) => sum + n, 0)
             const into = Object.values(unit.in).reduce((sum, n) => sum + n, 0)
             const shape = shapeOf(unit.internal, out, into, Object.keys(unit.out).length)
-            const said = [
-              [called.get(box.id) ?? box.label, 15, 0.95],
-              [`${num(unit.files)} files · ${num(unit.lines)} loc · L${unit.level}`, 11, 0.6],
-              [shape.label, 11, 0.6],
-              [owner(box.id) && `mostly ${owner(box.id)}`, 11, 0.45],
-            ] as [string, number, number][]
-            let line = box.y + text(16)
+            const said = (
+              plan
+                ? [
+                    [called.get(box.id) ?? box.label, 15, 0.95],
+                    [`${num(unit.files)} files · ${num(unit.lines)} loc · L${unit.level}`, 11, 0.6],
+                    [shape.label, 11, 0.6],
+                    [owner(box.id) && `mostly ${owner(box.id)}`, 11, 0.45],
+                  ]
+                : [
+                    [called.get(box.id) ?? box.label, 13, 0.95],
+                    [`${num(unit.files)} files · ${num(unit.lines)} loc`, 10, 0.6],
+                    [shape.label, 10, 0.5],
+                  ]
+            ) as [string, number, number][]
+            let line = box.y + text(plan ? 16 : 13)
             for (const [say, size, alpha] of said) {
               // too small for a line says nothing rather than saying it over itself
               if (!say || line > box.y + box.h - 2 || box.w * scale < 90) continue
@@ -470,20 +654,25 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
         pen.setLineDash([3, 3])
         pen.strokeStyle = picked
           ? `rgba(${PAINT.down}, 0.9)`
-          : `rgba(${PAINT.quiet}, ${box.depth === 1 ? 0.4 : 0.24})`
-        pen.lineWidth = (picked ? 2 : 1) / scale
+          : near_
+            ? `rgba(${PAINT.quiet}, 0.85)`
+            : `rgba(${PAINT.quiet}, ${box.depth === 1 ? 0.4 : 0.24})`
+        pen.lineWidth = (picked || near_ ? 2 : 1) / scale
         pen.strokeRect(box.x, box.y, box.w, box.h)
         // its own strip, so there is always somewhere to click
         if (box.depth === 1) {
           pen.setLineDash([])
-          pen.fillStyle = `rgba(${picked ? PAINT.down : PAINT.quiet}, ${picked ? 0.22 : 0.1})`
-          pen.fillRect(box.x, box.y, box.w, STRIP)
+          pen.fillStyle = `rgba(${picked ? PAINT.down : PAINT.quiet}, ${picked ? 0.22 : near_ ? 0.18 : 0.1})`
+          pen.fillRect(box.x, box.y, box.w, grain === "module" ? box.h : STRIP)
         }
         if (names && box.depth > 0 && box.w * scale > 46) {
           pen.setLineDash([])
           pen.fillStyle = `rgba(${PAINT.quiet}, 0.75)`
           pen.font = `${text(box.depth === 1 ? 14 : 11)}px ui-sans-serif, system-ui, sans-serif`
-          const held = drawn.spots.filter((s) => s.box === box.id).length
+          const held =
+            grain === "module"
+              ? (units.get(box.id)?.files ?? 0)
+              : drawn.spots.filter((s) => s.box === box.id).length
           pen.fillText(
             (box.depth === 1 ? (called.get(box.id) ?? box.label) : box.label) +
               (numbers && held ? ` ${held}` : ``),
@@ -502,14 +691,6 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     }
     const chosen = (id: string) => !only || unitOfSpot(id) === only || id === only
 
-    const lit = near ? new Set([near.id]) : null
-    const touching = new Set<string>()
-    if (near)
-      for (const wire of drawn.wires) {
-        if (wire.from === near.id) touching.add(wire.to)
-        if (wire.to === near.id) touching.add(wire.from)
-      }
-
     // one path per colour: forty thousand strokes is what makes a canvas crawl
     const lines = new Map<string, Path2D>()
     const heads = new Map<string, Path2D>()
@@ -526,33 +707,6 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     const styles = new Map<string, string>()
 
     // one wire per module pair: at this size the lines are the noise
-    const shown =
-      bundle || plan
-        ? [
-            ...drawn.wires
-              .reduce((held, wire) => {
-                const a = unitOfSpot(wire.from)
-                const b = unitOfSpot(wire.to)
-                const key = a === b ? `${wire.from} ${wire.to}` : `${a} ${b}`
-                const found = held.get(key) ?? {
-                  from: a === b ? wire.from : a,
-                  to: a === b ? wire.to : b,
-                  imports: 0,
-                  calls: 0,
-                  http: 0,
-                  types: true,
-                  held: 0,
-                }
-                found.imports += wire.imports
-                found.calls += wire.calls
-                found.http += wire.http
-                found.held++
-                if (!wire.types) found.types = false
-                return held.set(key, found)
-              }, new Map<string, Wire & { held: number }>())
-              .values(),
-          ]
-        : drawn.wires.map((wire) => ({ ...wire, held: 1 }))
 
     for (const wire of shown) {
       // no dots here, so a line staying inside one has nothing to join
@@ -562,6 +716,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       if (!from || !to) continue
       const quiet =
         (lit && !lit.has(wire.from) && !lit.has(wire.to)) ||
+        (!!ends && (wire.from !== edge?.from || wire.to !== edge?.to)) ||
         (!!only && !chosen(wire.from) && !chosen(wire.to))
       // by kind, by the module it leaves, or by whether it leaves one
       const leaves = unitOfSpot(wire.from) !== unitOfSpot(wire.to)
@@ -607,36 +762,70 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
         const cy = my + (dx / away) * lift
         line.moveTo(from.x, from.y)
         line.quadraticCurveTo(cx, cy, to.x, to.y)
-        if (!rough && (shown.length <= HEADS || lit)) {
-          // the head sits where the curve arrives
+        if (!rough && (request || shown.length <= HEADS || lit)) {
+          // sized on screen like its line, or zoom grows fans instead of arrows
+          const back = 8 / scale
+          const arrow = (tipX: number, tipY: number, ax: number, ay: number) => {
+            const long = Math.hypot(ax, ay) || 1
+            head.moveTo(tipX, tipY)
+            head.lineTo(
+              tipX - (ax / long) * back + (ay / long) * back * 0.5,
+              tipY - (ay / long) * back - (ax / long) * back * 0.5,
+            )
+            head.lineTo(
+              tipX - (ax / long) * back - (ay / long) * back * 0.5,
+              tipY - (ay / long) * back + (ax / long) * back * 0.5,
+            )
+            head.closePath()
+          }
+          // one where the curve arrives, and one halfway along it, since the end of a
+          // long line is nowhere near the dot a reader is looking at
           const ax = to.x - cx
           const ay = to.y - cy
           const long = Math.hypot(ax, ay) || 1
-          const tipX = to.x - (ax / long) * (to.r + 1)
-          const tipY = to.y - (ay / long) * (to.r + 1)
-          // sized on screen like its line, or zoom grows fans instead of arrows
-          const back = 5 / scale
-          head.moveTo(tipX, tipY)
-          head.lineTo(
-            tipX - (ax / long) * back + (ay / long) * back * 0.5,
-            tipY - (ay / long) * back - (ax / long) * back * 0.5,
-          )
-          head.lineTo(
-            tipX - (ax / long) * back - (ay / long) * back * 0.5,
-            tipY - (ay / long) * back + (ax / long) * back * 0.5,
-          )
-          head.closePath()
+          arrow(to.x - (ax / long) * (to.r + 1), to.y - (ay / long) * (to.r + 1), ax, ay)
+          // the middle of a quadratic, where the tangent is the straight line between the ends
+          if (away > back * 6)
+            arrow(
+              (from.x + 2 * cx + to.x) / 4,
+              (from.y + 2 * cy + to.y) / 4,
+              to.x - from.x,
+              to.y - from.y,
+            )
         }
       }
     }
+    if (edge)
+      for (const [on, colour, bow] of [
+        [imports && edge.imports, IMPORT, 1],
+        [wired && edge.calls, CALL, -1],
+        [http && edge.http, REQUEST, 0],
+      ] as [number | boolean, string, number][]) {
+        if (!on) continue
+        const held = runs(edge, bow)
+        if (!held) continue
+        const path = new Path2D()
+        path.moveTo(held.from.x, held.from.y)
+        path.quadraticCurveTo(held.cx, held.cy, held.to.x, held.to.y)
+        pen.setLineDash(colour === REQUEST ? [7 / scale, 5 / scale] : [])
+        pen.strokeStyle = ink(colour, 1)
+        pen.lineWidth = 2.6 / scale
+        pen.stroke(path)
+      }
+    pen.setLineDash([])
+
     for (const [key, path] of lines) {
+      const request = key.startsWith(REQUEST)
       pen.strokeStyle = styles.get(key)!
-      // the red ones are the point of the picture when they are there at all
-      pen.lineWidth = ((bundle ? 1.6 : 1) * (key.startsWith(REQUEST) ? 1.8 : 1)) / scale
+      // the red ones are the point of the picture when they are there at all, and dashed:
+      // an import binds two files together, a request only agrees with one about a path
+      pen.setLineDash(request ? [7 / scale, 5 / scale] : [])
+      pen.lineWidth = ((bundle ? 1.6 : 1) * (request ? 1.8 : 1)) / scale
       pen.stroke(path)
       pen.fillStyle = styles.get(key)!
       pen.fill(heads.get(key)!)
     }
+    pen.setLineDash([])
 
     // what a bundled line stands for, which is the only number worth writing on one
     if (numbers && bundle)
@@ -650,31 +839,36 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
         pen.fillText(String(wire.held), (from.x + to.x) / 2, (from.y + to.y) / 2)
       }
 
-    if (!plan)
+    if (!plan && grain !== "module")
       for (const spot of drawn.spots) {
         const hit =
           hunted &&
           (spot.label.toLowerCase().includes(hunted) || spot.id.toLowerCase().includes(hunted))
+        const held = ends?.has(spot.id)
         const quiet =
           (lit && !lit.has(spot.id) && !touching.has(spot.id)) ||
+          (!!ends && !held) ||
           (hunted && !hit) ||
           !chosen(spot.id)
         const own = colourOf(spot)
         const now = seat(spot)
-        pen.globalAlpha = quiet ? 0.16 : lit?.has(spot.id) ? 1 : 0.9
+        pen.globalAlpha = quiet ? 0.16 : lit?.has(spot.id) || held ? 1 : 0.9
         pen.fillStyle = hit ? `rgba(${PAINT.cut}, 0.95)` : (own ?? `rgb(${plain()})`)
         pen.beginPath()
-        pen.arc(now.x, now.y, spot.r + (lit?.has(spot.id) ? 2 : 0), 0, Math.PI * 2)
+        pen.arc(now.x, now.y, spot.r + (lit?.has(spot.id) || held ? 2 : 0), 0, Math.PI * 2)
         pen.fill()
         pen.globalAlpha = 1
       }
 
-    if (names && !rough && !plan)
+    if (names && !rough && !plan && grain !== "module")
       for (const spot of drawn.spots) {
-        // a name waits for the zoom that fits it
-        if (!lit?.has(spot.id) && spot.r * scale < 4.5) continue
-        pen.fillStyle = `rgba(${PAINT.quiet}, 0.8)`
-        pen.font = `${text(13)}px ui-sans-serif, system-ui, sans-serif`
+        // a name waits for the zoom that fits it, unless it is what the cursor is on or near
+        if (ends && !ends.has(spot.id)) continue
+        if (!lit?.has(spot.id) && !touching.has(spot.id) && !ends && spot.r * scale < 4.5) continue
+        // the two ends of a hovered line are the only thing on screen worth reading
+        const held = lit?.has(spot.id) || ends?.has(spot.id)
+        pen.fillStyle = held ? `rgb(${plain()})` : `rgba(${PAINT.quiet}, 0.8)`
+        pen.font = `${held ? 600 : 400} ${text(13)}px ui-sans-serif, system-ui, sans-serif`
         const put = seat(spot)
         pen.fillText(shortPath(spot.label, 18), put.x + spot.r + 3, put.y + 4)
       }
@@ -692,12 +886,13 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   drawing.current = render
   useEffect(schedule)
 
-  /** the smallest box under the cursor, and whether the cursor is on its name */
-  const boxUnder = (px: number, py: number, strip = false) => {
+  /** the smallest box under the cursor, down to as far into it as the caller wants */
+  const boxUnder = (px: number, py: number, deep?: number) => {
     if (!drawn) return null
     const { scale, x, y } = view.current
     const gx = (px - x) / scale
     const gy = (py - y) / scale
+    const room = deep === undefined ? Infinity : deep / scale
     return (
       drawn.boxes
         .filter(
@@ -706,7 +901,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
             gx >= b.x &&
             gx <= b.x + b.w &&
             gy >= b.y &&
-            gy <= b.y + (strip ? STRIP : b.h),
+            gy <= b.y + Math.min(b.h, room),
         )
         .sort((a, b) => a.w * a.h - b.w * b.h)[0] ?? null
     )
@@ -725,13 +920,16 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     }
   }
 
+  /** the dot under the cursor, and only a dot: a module box is a target of its own */
   const spotAt = (px: number, py: number) => {
     if (!drawn) return null
     const { scale, x, y } = view.current
     const gx = (px - x) / scale
     const gy = (py - y) / scale
     let best: Spot | null = null
-    let close = 14 / scale
+    // its own size and a little around it, since a wider claim than that leaves a line
+    // nowhere to be hovered at all
+    let close = 8 / scale
     for (const spot of drawn.spots) {
       const away = Math.hypot(spot.x - gx, spot.y - gy)
       if (away < close + spot.r) {
@@ -740,6 +938,16 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       }
     }
     return best
+  }
+
+  // the writing on a module card, which is where a reader aims for the card itself
+  const SAYS = 34
+
+  /** a module draws no dot, so its box stands for it: by its writing, or anywhere in it */
+  const boxSpot = (px: number, py: number, said = false) => {
+    if (!drawn || grain !== "module") return null
+    const box = boxUnder(px, py, said ? SAYS : undefined)
+    return box ? (drawn.spots.find((one) => one.id === box.id) ?? null) : null
   }
 
   if (!graph)
@@ -886,7 +1094,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
               !bounds
                 ? "no bounds, so the whole graph arranges itself and the modules show as colour"
                 : grain === "module"
-                  ? "every module a dot, sitting on the level its imports put it on"
+                  ? "every module a box, sitting on the level its imports put it on"
                   : grain === "file"
                     ? "every file a dot, bounded by the module holding it"
                     : "every declaration a dot, bounded by its file, bounded by its module"
@@ -984,6 +1192,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                   onMouseLeave={() => {
                     drag.current = null
                     setNear(null)
+                    setEdge(null)
                   }}
                   onMouseMove={(event) => {
                     const box = board.current!.getBoundingClientRect()
@@ -993,17 +1202,56 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                       drag.current = { x: event.clientX, y: event.clientY }
                       return rushed()
                     }
-                    const found = spotAt(event.clientX - box.left, event.clientY - box.top)
+                    const px = event.clientX - box.left
+                    const py = event.clientY - box.top
+                    // a dot first, since it is the smallest target, then the writing on a
+                    // module card, then a line, and the rest of that card last: it covers
+                    // everything under it, every line crossing it included
+                    const dot = spotAt(px, py)
+                    const said = dot ? null : boxSpot(px, py, true)
+                    const line = dot || said ? null : wireAt(px, py)
+                    const found = dot ?? said ?? (line ? null : boxSpot(px, py))
                     if (found?.id !== near?.id) setNear(found)
+                    if (line?.from !== edge?.from || line?.to !== edge?.to) setEdge(line ?? null)
                   }}
                   onClick={(event) => {
                     const box = board.current!.getBoundingClientRect()
                     const px = event.clientX - box.left
                     const py = event.clientY - box.top
                     // its name is always the module, whatever sits under the rest of it
-                    const named = boxUnder(px, py, true)
-                    const under = named ?? (near ? null : boxUnder(px, py))
-                    if (!under) return near ? walk(near) : setOnly("")
+                    const named = boxUnder(px, py, STRIP)
+                    const under = named ?? (near || edge ? null : boxUnder(px, py))
+                    if (!under) {
+                      if (near) return walk(near)
+                      // a line opens as itself, with both of its ends to open in turn
+                      if (edge) {
+                        const { said, asked } = carries(edge)
+                        const naming = (id: string) =>
+                          called.get(id) ?? shortPath(id.split("#")[0], 30)
+                        return going.open(
+                          link(
+                            edge.from,
+                            edge.to,
+                            said.join(" · "),
+                            asked.length ? (
+                              <span className="flex flex-col gap-1">
+                                <span>{said.join(" · ")}</span>
+                                <span className="flex flex-col gap-0.5 font-mono">
+                                  {asked.slice(0, 12).map((one, i) => (
+                                    <span key={`${one.call}:${i}`}>
+                                      {one.method} {one.path}
+                                    </span>
+                                  ))}
+                                  {asked.length > 12 && <span>… and {asked.length - 12} more</span>}
+                                </span>
+                              </span>
+                            ) : undefined,
+                            [naming(edge.from), naming(edge.to)],
+                          ),
+                        )
+                      }
+                      return setOnly("")
+                    }
                     const same = under.id === only
                     setOnly(same ? "" : under.id)
                     if (same) whole()
@@ -1017,7 +1265,14 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
 
         {/* fixed height: a caption that grows on hover moves the graph under the cursor */}
         <p className="text-muted-foreground min-h-10 text-xs">
-          {near ? (
+          {edge && !near ? (
+            <>
+              <span className="text-foreground font-mono">{shortPath(edge.from, 42)}</span> to{" "}
+              <span className="text-foreground font-mono">{shortPath(edge.to, 42)}</span> ·{" "}
+              {carries(edge).said.join(" · ")}
+              {edge.held > 1 && <> · {plural(edge.held, "pair")} bundled</>} · click to open it
+            </>
+          ) : near ? (
             <>
               <span className="text-foreground font-mono">{near.label}</span>
               {near.box && <> in {called.get(near.box) ?? near.box}</>} ·{" "}
@@ -1037,9 +1292,9 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
               {!!routes?.links.length && (
                 <>
                   {" "}
-                  <span style={{ color: `rgb(${REQUEST})` }}>Red</span> is an http request from a
-                  call site to the file serving that path, which is the one edge here that crosses a
-                  repo.{" "}
+                  <span style={{ color: `rgb(${REQUEST})` }}>Red and dashed</span> is an http
+                  request from a call site to the file serving that path: the one edge here that
+                  crosses a repo, and the one nothing in either repo binds together.{" "}
                 </>
               )}
               A faint line is a type only import, and{" "}

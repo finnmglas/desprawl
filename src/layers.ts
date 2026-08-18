@@ -116,6 +116,28 @@ export function balanced(
   graph: Graph,
   { ideal = 10, least = 4, max = 128, share = 6 } = {},
 ): Record<string, string> {
+  // every repo balances as if it were alone: against a fleet's total weight a small one
+  // never opens at all, and reads as the single dot its own folder would never be
+  if (graph.repos?.length) {
+    const all: Record<string, string> = {}
+    for (const repo of graph.repos) {
+      const under = `${repo}/`
+      // the repo's own name comes off first, so a repo folds exactly as it does alone
+      const mine = Object.fromEntries(
+        Object.entries(graph.modules)
+          .filter(([path]) => path.startsWith(under))
+          .map(([path, module]) => [
+            path.slice(under.length),
+            { ...module, path: module.path.slice(under.length) },
+          ]),
+      )
+      if (!Object.keys(mine).length) continue
+      const held = balanced({ ...graph, modules: mine, repos: [] }, { ideal, least, max, share })
+      for (const [file, group] of Object.entries(held)) all[under + file] = under + group
+    }
+    return all
+  }
+
   // a file is one node however long it is, and both matter
   const files = Object.keys(graph.modules).length || 1
   const lines = Object.values(graph.modules).reduce((sum, m) => sum + m.lines, 0) || 1

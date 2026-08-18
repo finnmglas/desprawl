@@ -214,6 +214,7 @@ export function graphs(path: string): Graph {
     stats: { files: 0, edges: 0, external: 0, generated: 0, assets: 0, coverage: 0 },
   }
   const repos = fleet(path)
+  all.repos = repos.map(named)
   for (const one of repos) {
     const under = named(one)
     const graph = build(one)

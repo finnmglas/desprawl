@@ -303,18 +303,13 @@ export function net(
   // a fleet draws one column per repo, and every band inside it is that repo's own
   const columns = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
   const lanes = Math.max(1, columns.length)
-  const band = (path: string) =>
-    lanes > 1
-      ? `${repoOf(path)}:L${known.get(path)?.level ?? 0}`
-      : `L${known.get(path)?.level ?? 0}`
-
-  // module grain draws the unit itself, so the level band is the only box it needs
+  // a module is drawn as the box holding its name, and its dot only says where it sits
   const spots: Spot[] = (
     grain === "module"
       ? layout.units.map((u) => ({
           id: u.path,
           label: u.path,
-          box: band(u.path),
+          box: u.path,
           weight: u.lines,
           kind: u.role,
           x: 0,
@@ -379,6 +374,7 @@ export function net(
       kids.set(unit, [...(kids.get(unit) ?? []), file])
     }
   }
+  const sizes = new Map(layout.units.map((u) => [u.path, u]))
 
   // a file box never grows past the module box holding it, whatever it holds itself
   const fitted = (files: string[], room: number) =>
@@ -391,13 +387,17 @@ export function net(
           const size = sized.get(file)!
           return sum + size.w * size.h
         }, 0) * 1.3
-      : (inner.get(path) ?? []).length * ROW * ROW
+      : // a module box holds a name rather than dots, so its own files are what size it
+        grain === "module"
+        ? Math.max(3, sizes.get(path)?.files ?? 1) * ROW * ROW
+        : (inner.get(path) ?? []).length * ROW * ROW
 
   // a level is a band, deepest at the top
   const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
   const wideAll = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
   const wide = lanes > 1 ? Math.max(320, wideAll / lanes) : wideAll
-  const per = Math.max(2, Math.min(8, Math.round(wide / 300)))
+  // one module box holds four lines of writing, so fewer of them fit across a lane
+  const per = Math.max(2, Math.min(8, Math.round(wide / (grain === "module" ? 420 : 300))))
   let deepest = 0
   const LANE = 28
   for (const [lane, column] of (lanes > 1 ? columns : [""]).entries()) {
@@ -409,11 +409,7 @@ export function net(
       const band = `L${level}`
       const top = y
       const mine: Box[] = []
-      if (grain === "module") {
-        // the dots in this band, which in a fleet is this repo's band and not the whole row
-        const held = (inner.get(lanes > 1 ? `${column}:${band}` : band) ?? []).length
-        y += Math.max(90, Math.min(460, (held * ROW * ROW) / (wide - 2 * PAD) + 24)) + GAP
-      } else {
+      {
         // each language keeps its own side
         const here = ours
           .filter((u) => u.level === level)
@@ -443,10 +439,11 @@ export function net(
           const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
           const total = weights.reduce((sum, one) => sum + one, 0) || 1
           const room = wide - 2 * PAD - GAP * (shelf.length - 1)
-          // its share, never wider than twice its height
+          // its share, never wider than twice its height, and never narrower than the
+          // name a module box carries, since at that grain the box is all there is to read
           const widths = shelf.map((unit, i) =>
             Math.max(
-              120,
+              grain === "module" ? 184 : 120,
               Math.min((room * weights[i]) / total, Math.sqrt(Math.max(1, load(unit.path)) * 2.2)),
             ),
           )
@@ -464,7 +461,7 @@ export function net(
             const h =
               grain === "function"
                 ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
-                : Math.max(80, Math.min(460, load(unit.path) / w + 20))
+                : Math.max(grain === "module" ? 88 : 80, Math.min(460, load(unit.path) / w + 20))
             mine.push({ id: unit.path, label: unit.path, parent: band, depth: 1, x, y, w, h })
             x += w + GAP + step
             tall = Math.max(tall, h)

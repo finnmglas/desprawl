@@ -6,7 +6,7 @@ import type { View } from "./hash.ts"
 
 /** clicking one asks what to do with it rather than guessing */
 export interface Target {
-  kind: "file" | "folder" | "module" | "symbol"
+  kind: "file" | "folder" | "module" | "symbol" | "link"
   /** the repo path, or file#name for a declaration */
   id: string
   /** what to call it, when the id is not what a reader would read */
@@ -78,6 +78,24 @@ export const group = (path: string, name?: string, note?: React.ReactNode): Targ
   id: path,
   name,
   note,
+})
+
+/** one edge of the picture: what it carries, and both ends openable in turn */
+export const link = (
+  from: string,
+  to: string,
+  note?: React.ReactNode,
+  detail?: React.ReactNode,
+  /** what each end is called, when its path is not what a reader would read */
+  names?: [string, string],
+): Target => ({
+  kind: "link",
+  id: `${from} \u2192 ${to}`,
+  name: `${names?.[0] ?? from.split("/").pop()} \u2192 ${names?.[1] ?? to.split("/").pop()}`,
+  note,
+  detail,
+  related: [from, to],
+  relation: "both ends of it",
 })
 
 export const symbol = (id: string, line?: number, note?: React.ReactNode): Target => ({
