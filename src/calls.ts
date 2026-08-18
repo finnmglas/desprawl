@@ -31,8 +31,8 @@ export interface Symbol {
 
 export interface Calls {
   symbols: Record<string, Symbol>
-  /** resolved to nothing: a global, or dynamic */
-  unresolved: { from: string; name: string }[]
+  /** resolved to nothing: a global, or dynamic. One row per name, not per call site */
+  unresolved: { name: string; sites: number; from: string[] }[]
   stats: {
     files: number
     symbols: number
@@ -44,8 +44,9 @@ export interface Calls {
     external: number
     /** into what the runtime provides */
     builtin: number
-    /** call sites we could place */
+    /** call sites we could place, and the ones we could not */
     coverage: number
+    unresolved: number
     /** called by nothing here, which an entry point is */
     uncalled: number
     lines: number
@@ -251,7 +252,6 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   const symbols: Record<string, Symbol> = {}
   const bodies = new Map<string, [number, number]>()
   const mine = new Map<string, string[]>()
-  const tops = new Map<string, string>()
   // sets: includes() on a hub is quadratic
   const reaches = new Map<string, Set<string>>()
   const reached = new Map<string, Set<string>>()
@@ -259,9 +259,26 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     ;(reaches.get(from) ?? reaches.set(from, new Set()).get(from)!).add(to)
     ;(reached.get(to) ?? reached.set(to, new Set()).get(to)!).add(from)
   }
-  const unresolved: { from: string; name: string }[] = []
+  // one row per name: a kernel leaves a million call sites unplaced and holds them all
+  const unplaced = new Map<string, { sites: number; from: string[] }>()
+  let unnamed = 0
+  const lost = (from: string, name: string) => {
+    unnamed++
+    const held = unplaced.get(name) ?? { sites: 0, from: [] }
+    held.sites++
+    if (held.from.length < 4 && !held.from.includes(from)) held.from.push(from)
+    unplaced.set(name, held)
+  }
   let builtin = 0
-  const sources = new Map<string, string>()
+  // the files that were readable, not what was in them: a kernel is a gigabyte of text
+  const read_: string[] = []
+  const reading = (path: string): string => {
+    try {
+      return scrub(readFileSync(join(repo, path), "utf8"), dialectOf(path)?.flavour).code
+    } catch {
+      return ""
+    }
+  }
   // file to local name, to where that name came from
   const bindings = new Map<
     string,
@@ -280,7 +297,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const dialect = dialectOf(module.path)
     const read = scrub(text, dialect?.flavour)
     const { code } = read
-    sources.set(module.path, code)
+    read_.push(module.path)
     const starts = breaks(code)
 
     const local = new Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>()
@@ -388,8 +405,10 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       }
   }
 
-  // or every entry point reads as dead
-  for (const [file, code] of sources) {
+  for (const file of read_) {
+    // read again rather than held: every file's text at once is most of the memory
+    const code = reading(file)
+    // what is left when every body is taken out runs on import, or an entry point reads as dead
     const spans = (mine.get(file) ?? []).map((id) => bodies.get(id)!).sort((a, b) => a[0] - b[0])
     let outside = ""
     let at = 0
@@ -399,10 +418,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     }
     outside += code.slice(at)
     // an import names a thing without calling it, so the statements themselves go
-    if (outside.trim()) tops.set(file, outside.replace(BROUGHT, " "))
-  }
-
-  for (const [file, code] of sources) {
+    const top_ = outside.trim() ? outside.replace(BROUGHT, " ") : ""
     const local = bindings.get(file)!
     // its own language owns its own words: a `when` is not a call to something missing
     const lang = graph.modules[file]?.lang ?? ""
@@ -411,7 +427,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const walking = [...(mine.get(file) ?? []), `${file}#${TOP}`]
     for (const id of walking) {
       const top = id.endsWith(`#${TOP}`)
-      if (top && !tops.has(file)) continue
+      if (top && !top_) continue
       const symbol =
         symbols[id] ??
         (symbols[id] = {
@@ -428,7 +444,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
           packages: [],
         })
       const [from, to] = top ? [0, 0] : bodies.get(id)!
-      const body = top ? tops.get(file)! : code.slice(from, to)
+      const body = top ? top_ : code.slice(from, to)
       // defaults stripped: `isEqual = defaultIsEqual` declares one and reaches the other
       const takes = new Set(
         (body.match(/\(([^)]*)\)/)?.[1] ?? "").replace(/=[^,]*/g, "").match(/[A-Za-z_$][\w$]*/g) ??
@@ -500,15 +516,35 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
             continue
           }
         }
-        if (shaped) unresolved.push({ from: symbol.id, name })
+        if (shaped) lost(symbol.id, name)
       }
     }
   }
 
+  // what each pass held is dropped as the next one takes it over, since on a kernel every
+  // one of these is hundreds of megabytes and holding two copies at once is what runs out
+  bodies.clear()
+  bindings.clear()
+  locals.clear()
+  mine.clear()
+  declares.clear()
   for (const symbol of Object.values(symbols)) {
-    symbol.calls = [...(reaches.get(symbol.id) ?? [])]
-    symbol.callers = [...(reached.get(symbol.id) ?? [])]
+    const out = reaches.get(symbol.id)
+    if (out) {
+      symbol.calls = [...out]
+      reaches.delete(symbol.id)
+    }
+    const into = reached.get(symbol.id)
+    if (into) {
+      symbol.callers = [...into]
+      reached.delete(symbol.id)
+    }
   }
+
+  const unresolved = [...unplaced]
+    .map(([name, one]) => ({ name, sites: one.sites, from: one.from }))
+    .sort((a, b) => b.sites - a.sites)
+  unplaced.clear()
 
   const all = Object.values(symbols)
   const edges = all.reduce((sum, s) => sum + s.calls.length, 0)
@@ -518,7 +554,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     symbols,
     unresolved,
     stats: {
-      files: sources.size,
+      files: read_.length,
       symbols: all.length,
       functions: all.filter((s) => s.kind === "function").length,
       classes: all.filter((s) => s.kind === "class").length,
@@ -526,7 +562,8 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
       edges,
       external,
       builtin,
-      coverage: placed + unresolved.length ? placed / (placed + unresolved.length) : 1,
+      coverage: placed + unnamed ? placed / (placed + unnamed) : 1,
+      unresolved: unnamed,
       uncalled: all.filter((s) => !s.callers.length).length,
       lines: all.reduce((sum, s) => sum + s.lines, 0),
     },

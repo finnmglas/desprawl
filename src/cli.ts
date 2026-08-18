@@ -2,8 +2,10 @@
 // owner: finn
 // goal: render stats
 
+import { spawnSync } from "node:child_process"
 import { existsSync, statSync } from "node:fs"
 import { parseArgs } from "node:util"
+import { getHeapStatistics } from "node:v8"
 import { analyze } from "./analyze.ts"
 import { fleet, many } from "./many.ts"
 import { check } from "./check.ts"
@@ -93,6 +95,30 @@ const target = (() => {
     return fail(err)
   }
 })()
+
+// A call graph of a repo this size outgrows the heap node hands a process by default,
+// and v8 will not raise that once it is running, so the run starts again with room
+const ROOM = 30_000
+if (!process.env.DESPRAWL_ROOM && getHeapStatistics().heap_size_limit < 6e9) {
+  const held = fleet(target)
+  let files = 0
+  try {
+    files = (held.length ? held : [target]).reduce(
+      (sum, one) => sum + git(one, "ls-files").split("\n").length,
+      0,
+    )
+  } catch {
+    /* not a repo yet: whatever runs below says so properly */
+  }
+  if (files > ROOM) {
+    const again = spawnSync(
+      process.execPath,
+      ["--max-old-space-size=8192", ...process.argv.slice(1)],
+      { stdio: "inherit", env: { ...process.env, DESPRAWL_ROOM: "1" } },
+    )
+    process.exit(again.status ?? 1)
+  }
+}
 
 // the terminal report is asked for by name or by --json
 const viewing = (!command || command === "view") && !values.json

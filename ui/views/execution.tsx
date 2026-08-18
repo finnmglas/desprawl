@@ -74,16 +74,8 @@ export function Execution({ stats }: { stats: Stats }) {
   const declaredLines = declared.reduce((sum, s) => sum + s.lines, 0)
   const busiest = [...declared].sort((a, b) => b.callers.length - a.callers.length)[0]
 
-  const lost = [
-    ...calls.unresolved
-      .reduce((held, one) => {
-        const found = held.get(one.name) ?? { name: one.name, sites: 0, from: [] as string[] }
-        found.sites++
-        if (found.from.length < 4) found.from.push(one.from)
-        return held.set(one.name, found)
-      }, new Map<string, { name: string; sites: number; from: string[] }>())
-      .values(),
-  ].sort((a, b) => b.sites - a.sites)
+  // already one row per name, most call sites first
+  const lost = calls.unresolved
 
   // two languages are two pictures
   const langs = [...new Set(declared.map((s) => s.lang).filter(Boolean))].sort()
@@ -152,8 +144,8 @@ export function Execution({ stats }: { stats: Stats }) {
             label="Resolution"
             value={`${(calls.stats.coverage * 100).toFixed(calls.stats.coverage === 1 ? 0 : 1)}%`}
             sub={
-              calls.unresolved.length
-                ? `${plural(calls.unresolved.length, "call")} land nowhere we can name`
+              calls.stats.unresolved
+                ? `${plural(calls.stats.unresolved, "call")} land nowhere we can name`
                 : "every call site placed"
             }
             verdict={

@@ -1,11 +1,13 @@
-// owner: julia
+// owner: finn
 // goal: which file serves an http endpoint, and which file calls one
 
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { candidates, dialectOf } from "./dialects.ts"
 import { MARK, foreign, scrub, specifiers } from "./specifiers.ts"
-import { build, type Graph } from "./graph.ts"
+import { VENDORED, build, type Graph } from "./graph.ts"
+import { git } from "./model.ts"
+import { URL, normal, specs, under, verbOf } from "./specs.ts"
 import { calls as callGraph, type Calls } from "./calls.ts"
 
 export interface Endpoint {
@@ -77,6 +79,10 @@ const marks = (src: string): RegExp =>
 
 const VERBS = "get|post|put|patch|delete|head|options"
 
+// a request is more than a url, and this is what stands beside one
+const ASKS =
+  /\b(method|headers|body|params|payload|responseType|withCredentials|credentials|signal|timeout|auth|onUploadProgress)\s*:/
+
 interface Rule {
   /** the library, or the shape when several share one */
   id: string
@@ -88,8 +94,8 @@ interface Rule {
   method?: string
   /** a route may name no path of its own, and take the one its class holds */
   bare?: boolean
-  /** only where the rest of the object says a request, since a url alone is often a link */
-  asked?: boolean
+  /** what has to stand within a couple of lines, for a rule a bare path would fool */
+  near?: RegExp
   /** an annotation a class can carry, where it is a prefix and not a route of its own */
   onClass?: boolean
   files?: RegExp
@@ -116,18 +122,24 @@ const RULES: Rule[] = [
   // a url built by hand names the host it is going to
   { id: "url", langs: ["ts"], side: "client", strict: "host",
     re: String.raw`new\s+URL\s*\(\s*§p` },
-  { id: "http", langs: ["ts"], side: "client", asked: true,
+  { id: "http", langs: ["ts"], side: "guess", near: ASKS,
     re: String.raw`\b(?:url|baseURL|endpoint|uri)\s*:\s*§p` },
+  // hapi, fastify and convex all write the whole route as one object
+  { id: "object", langs: ["ts"], side: "server", near: /\bhandler\s*:|\bpreHandler\s*:/,
+    re: String.raw`\bpath\s*:\s*§p` },
   // a node server with no framework at all dispatches on the path itself
   // only where the file took a server off the runtime, or a nav highlight reads as a route
   { id: "node", langs: ["ts", "go", "python"], side: "server",
     needs: /node:http|node:https|net\/http|http\.server|BaseHTTPRequestHandler/i,
     re: String.raw`(?:pathname|\breq\.url|\brequest\.url|\bpath)\s*===?\s*§p` },
+  // bun and deno hand the runtime a table of paths rather than calling a router
+  { id: "bun", langs: ["ts"], side: "server", near: /\broutes\s*:|Bun\.serve|Deno\.serve/,
+    re: String.raw`§p\s*:\s*(?:\{|async\b|\(|[A-Za-z_$][\w$.]*\s*[,}])` },
   { id: "websocket", langs: ["ts"], side: "client", method: "WS",
     re: String.raw`new\s+(?:WebSocket|EventSource|ReconnectingWebSocket|SockJS)\s*\(\s*¶` },
-  // xhr.open("GET", "/x")
+  // xhr.open("GET", "/x"), and angular's request object written the same way round
   { id: "http", langs: ["ts"], side: "client",
-    re: String.raw`\.open\s*\(\s*§q\s*,\s*§p` },
+    re: String.raw`(?:\.open|new\s+HttpRequest)\s*\(\s*§q\s*,\s*§p` },
 
   // ---- python ----
   // @app.get("/x") serves, requests.get("/x") calls, and both are the one shape
@@ -139,6 +151,15 @@ const RULES: Rule[] = [
     re: String.raw`(?<!\w)(?:Route|WebSocketRoute|Mount)\s*\(\s*§p` },
   { id: "django", langs: ["python"], side: "server",
     re: String.raw`(?<!\w)(?:path|re_path|url)\s*\(\s*§p` },
+  // flask-restful names the class first and the path second
+  { id: "flask", langs: ["python"], side: "server",
+    re: String.raw`add_resource\s*\(\s*[\w.]+\s*,\s*§p` },
+  // tornado writes its table as tuples, and the handler class is what says so
+  { id: "tornado", langs: ["python"], side: "server",
+    re: String.raw`\(\s*§p\s*,\s*[A-Za-z_]\w*Handler` },
+  // bottle and sanic decorate with no router in front. Not patch: that is mock's word
+  { id: "bottle", langs: ["python"], side: "server",
+    re: String.raw`@\s*(?<m>route|get|post|put|delete)\s*\(\s*§p` },
   { id: "requests", langs: ["python"], side: "client",
     re: String.raw`(?<!\w)(?:requests|httpx|aiohttp|urllib3)\s*\.\s*(?<m>${VERBS}|request)\s*\(\s*¶` },
   { id: "http", langs: ["python"], side: "client",
@@ -163,6 +184,11 @@ const RULES: Rule[] = [
     re: String.raw`(?<!\w)(?<who>[A-Za-z_][\w.]*\s*\.\s*)?(?<m>${VERBS})\s*(?:<[^<>()]*>)?\s*\(\s*§p` },
   { id: "okhttp", langs: ["jvm"], side: "client",
     re: String.raw`\.url\s*\(\s*¶` },
+  // spring writes its own client two ways, and neither of them is a route
+  { id: "spring", langs: ["jvm"], side: "client",
+    re: String.raw`\.uri\s*\(\s*§p` },
+  { id: "spring", langs: ["jvm"], side: "client",
+    re: String.raw`\.(?<m>get|post|put|delete|patch)For(?:Object|Entity)\s*\(\s*§p` },
 
   // ---- go ----
   { id: "http", langs: ["go"], side: "guess",
@@ -189,6 +215,9 @@ const RULES: Rule[] = [
     re: String.raw`\[Route\s*\(\s*§p` },
   { id: "aspnet", langs: ["csharp"], side: "server",
     re: String.raw`\.Map(?<m>Get|Post|Put|Patch|Delete)\s*\(\s*§p` },
+  // refit declares a client the way retrofit does, in attributes on an interface
+  { id: "refit", langs: ["csharp"], side: "client",
+    re: String.raw`\[(?<m>Get|Post|Put|Patch|Delete)\s*\(\s*§p\s*\)\]` },
   { id: "http", langs: ["csharp"], side: "client",
     re: String.raw`\.(?<m>Get|Post|Put|Patch|Delete)(?:Async|StringAsync|JsonAsync|FromJsonAsync|AsJsonAsync)?\s*\(\s*§p` },
 
@@ -197,6 +226,8 @@ const RULES: Rule[] = [
     re: String.raw`Route::(?<m>get|post|put|patch|delete|any|options)\s*\(\s*§p` },
   { id: "symfony", langs: ["php"], side: "server", onClass: true,
     re: String.raw`[#@]\[?Route\s*\(\s*(?:path\s*:\s*)?§p` },
+  { id: "guzzle", langs: ["php"], side: "client",
+    re: String.raw`->\s*(?:request|requestAsync)\s*\(\s*§q\s*,\s*§p` },
   { id: "http", langs: ["php"], side: "guess",
     re: String.raw`(?<who>\$\w+)\s*->\s*(?<m>${VERBS})\s*\(\s*§p` },
 
@@ -211,6 +242,8 @@ const RULES: Rule[] = [
   // ---- swift ----
   { id: "vapor", langs: ["swift"], side: "guess",
     re: String.raw`\b(?<who>[A-Za-z_][\w.]*)\s*\.\s*(?<m>${VERBS})\s*\(\s*§p` },
+  { id: "alamofire", langs: ["swift"], side: "client",
+    re: String.raw`(?:AF|Alamofire|session)\s*\.\s*request\s*\(\s*§p` },
   { id: "url", langs: ["swift"], side: "client",
     re: String.raw`URL\s*\(\s*string\s*:\s*§p` },
 
@@ -261,20 +294,20 @@ const SERVES = /^(app|router|routers|server|route|routes|mux|srv|blueprint|bp|we
 const CLASSY =
   /^\s*\)?[^\n]*(?:\n\s*@[\w.]+(?:\([^)]*\))?[^\n]*)*\n\s*(?:(?:export|default|declare|public|private|protected|internal|open|final|abstract|sealed|data|static|partial|record)\s+)*(?:class|interface|object|enum|record)\s/
 
-// a request is more than a url, and this is what stands beside one
-const ASKS =
-  /\b(method|headers|body|params|payload|responseType|withCredentials|credentials|signal|timeout|auth|onUploadProgress|data)\s*:/
-
 // a path, not a sentence, a file beside this one, or a picture
 const ASSET =
   /\.(tsx?|jsx?|mjs|cjs|css|scss|less|png|jpe?g|gif|svg|webp|ico|woff2?|ttf|md|mdx|html?|txt|map|wasm|zip|pdf|mp[34]|csv|ya?ml|toml|lock|sh|py|rb|go|rs|java|kt)$/i
 const RELATIVE = /^\.{1,2}\//
 const MIME = /^(text|image|audio|video|application|multipart|font|model|message)\//i
-const URL = /^(?:(?:https?|wss?):)?\/\/([^/?#\s]+)(\/[^\s]*)?$/i
 
 /** a route a framework named itself, where the path may be one parameter or nothing */
 const soft = (text: string): boolean =>
-  text.length < 300 && !/[\s\\]/.test(text) && !RELATIVE.test(text) && !ASSET.test(text)
+  text.length < 300 &&
+  !/[\s\\]/.test(text) &&
+  !RELATIVE.test(text) &&
+  !ASSET.test(text) &&
+  // `@patch("app.module.thing")` is mock reaching into a module, not a route
+  (text.includes("/") || !/\w\.\w/.test(text))
 
 /** whether a string is worth reading as a route at all */
 export function pathy(text: string): boolean {
@@ -288,11 +321,7 @@ export function pathy(text: string): boolean {
   return true
 }
 
-// what stands in for a value: :id, {id}, <int:id>, [id], $id, \(id), a hole, (?P<id>\d+)
-const HOLE =
-  /\(\?P?<[^>]*>[^)]*\)|\\\([^)]*\)|\([^)]*\)|\$?\{[^{}]*\}|\$[A-Za-z_]\w*|<[^>/]*>|:[A-Za-z_]\w*|\[[^\]/]*\]|%[sdv]/g
-
-// the same, as the languages that interpolate with a dollar or a backslash write it
+// the same holes, as the languages that interpolate with a dollar or a backslash write them
 const HOLES = /\$\{([^{}]*)\}|\{([^{}]*)\}|\$([A-Za-z_]\w*)|\\\(([^()]*)\)/g
 
 // a name bound to one string, which is what a base url is usually held in
@@ -313,43 +342,21 @@ export function filled(raw: string, consts: Map<string, string>): string {
   return text
 }
 
-/** the path as it is matched on, and the host it named if it named one */
-export function normal(raw: string): { path: string; host: string } {
-  let text = raw.trim()
-  let host = ""
-  const url = URL.exec(text)
-  if (url) {
-    host = url[1]
-    text = url[2] ?? "/"
-  }
-  // a regex route holds a question mark of its own, so the holes go before the query does
-  text = text.replace(/\\\//g, "/").replace(HOLE, "*")
-  text = text.split(/[?#]/)[0]
-  text = text.replace(/[\^$\\]/g, "").replace(/\.[*+]/g, "*")
-  const parts = text
-    .split("/")
-    .filter(Boolean)
-    .map((one) => (one.includes("*") ? (/\*\*|\.\.\./.test(one) ? "**" : "*") : one))
-  return { path: `/${parts.join("/")}`, host }
-}
-
 const segments = (path: string) => path.split("/").filter(Boolean)
-
-/** two prefixes and a path, joined without a doubled or a missing slash */
-const under = (...parts: string[]) =>
-  `/${parts.flatMap((one) => segments(one)).join("/")}`.replace(/\/+$/, "") || "/"
 
 const HOSTLESS = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|\*[\w.*-]*|[\w-]+\.local)(:\d+)?$/i
 
 /** the call sites and the endpoints matched up, the longest literal run winning */
-export function link(endpoints: Endpoint[], clients: Client[]): Link[] {
+export function link(endpoints: Endpoint[], clients: Client[], ours: string[] = []): Link[] {
+  const own = new Set(ours.map((one) => one.toLowerCase()))
   const held = endpoints.map((one) => ({ one, segs: segments(one.path) }))
   const links: Link[] = []
   for (const client of clients) {
     const want = segments(client.path)
     // a call that names a host is a call to that host, since nothing here knows what this
-    // fleet deploys as: api.openai.com/v1/chat/completions matched a repo's own openai route
-    if (client.host && !HOSTLESS.test(client.host)) continue
+    // fleet deploys as, unless a spec in it says that host is where the fleet answers
+    const host = client.host.replace(/:\d+$/, "").toLowerCase()
+    if (host && !HOSTLESS.test(client.host) && !own.has(host)) continue
     let best: { score: number; end: Endpoint; how: Link["how"] } | null = null
     // what a client holds as a base url is leading segments this repo never wrote
     for (let from = 0; from < Math.max(1, Math.min(5, want.length)); from++) {
@@ -380,7 +387,12 @@ export function link(endpoints: Endpoint[], clients: Client[]): Link[] {
           literal++
         }
         if (!ok || !literal || literal < (loose ? 2 : 1)) continue
-        const score = literal * 4 - from - (one.method === client.method ? 0 : 1)
+        const score =
+          literal * 4 -
+          from -
+          (one.method === client.method ? 0 : 1) -
+          // a document lists an endpoint, code answers one, so a tie goes to the code
+          (one.framework === "openapi" ? 1 : 0)
         if (!best || score > best.score) best = { score, end: one, how: from ? "tail" : "exact" }
       }
       if (best) break
@@ -468,19 +480,6 @@ const lineAt = (starts: number[], index: number): number => {
   return low + 1
 }
 
-/** one verb, whatever the library called it */
-function verbOf(said: string): string {
-  const word = said.replace(/^add_/, "").toUpperCase()
-  if (["ROUTE", "URL", "REQUEST", "HANDLE", "HANDLEFUNC", "ALL", "ANY", "MATCH"].includes(word))
-    return "ANY"
-  if (word === "WEBSOCKET") return "WS"
-  if (word === "DEL") return "DELETE"
-  if (["FETCH", "$FETCH", "OFETCH", "USESWR", "USESWRMUTATION", "PRELOAD"].includes(word))
-    return "ANY"
-  if (word === "SENDBEACON") return "POST"
-  return /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS|WS)$/.test(word) ? word : "ANY"
-}
-
 /** a file based router: the folders themselves are the path */
 function routed(path: string): { path: string; framework: string } | null {
   const parts = path.split("/")
@@ -560,7 +559,11 @@ const CONTROLLER = marks(
   String.raw`[#@\[]\s*\[?(?:Controller|RestController|RequestMapping|ApiController|Path|Route)\s*\(\s*(?:value\s*=\s*|path\s*=\s*)?§`,
 )
 // the whole word, or `sort_prefix = "-"` reads as one
-const PREFIX = marks(String.raw`\b(?:prefix|url_prefix|basePath|base_url|baseURL)\s*[=:]\s*§`)
+const PREFIX = marks(String.raw`\b(?:prefix|url_prefix|basePath|base_url|baseURL)\s*[=:(]\s*§`)
+// go and gin hold a prefix in whatever the group was assigned to
+const GROUP = marks(String.raw`([A-Za-z_]\w*)\s*:?=\s*[\w.]+\.(?:Group|Party)\s*\(\s*§`)
+// rails nests with a word and an indent, and closes with an end no regex can see
+const NESTS = /^([^\S\n]*)(?:namespace|scope)\s+[:"']([\w/-]+)/gm
 const INCLUDE = marks(
   String.raw`(?:path|re_path|url)\s*\(\s*§\s*,\s*include\s*\(\s*(?:\(\s*)?(?:§|([A-Za-z_][\w.]*))`,
 )
@@ -665,6 +668,27 @@ function collect(repo: string, graph: Graph = build(repo), calls?: Calls): Found
           consts.set(key, value)
     }
 
+    // a group is a prefix held in a name, so the routes hung on that name sit under it
+    const grouped = new Map<string, string>()
+    if (lang === "go")
+      for (const m of code.matchAll(GROUP)) {
+        const raw = said(m[2])
+        if (pathy(raw)) grouped.set(m[1], raw)
+      }
+    // and rails nests by indentation, which is the one thing a line number cannot say
+    const nests: { indent: number; at: number; path: string }[] = []
+    if (lang === "ruby")
+      for (const m of code.matchAll(NESTS))
+        nests.push({ indent: m[1].length, at: m.index, path: m[2] })
+    const nesting = (index: number) => {
+      const line = code.slice(0, index).split("\n").pop() ?? ""
+      const mine = /^[^\S\n]*/.exec(line)![0].length
+      return nests
+        .filter((one) => one.at < index && one.indent < mine)
+        .map((one) => one.path)
+        .join("/")
+    }
+
     // the folders are the path, and the file says which verbs answer on it
     const own = routed(path)
     if (own) {
@@ -698,22 +722,53 @@ function collect(repo: string, graph: Graph = build(repo), calls?: Calls): Found
         if (rule.strict === "host" && !URL.test(raw)) continue
         const line = at(m.index)
         // a url beside a method and a body is a request, and beside a date it is a sitemap
-        if (rule.asked && !ASKS.test(code.slice(Math.max(0, m.index - 200), m.index + 200)))
-          continue
-        const method = verbOf(groups.m || said(groups.q) || rule.method || "ANY")
+        const around = code.slice(Math.max(0, m.index - 240), m.index + 240)
+        if (rule.near && !rule.near.test(around)) continue
+        let method = verbOf(groups.m || said(groups.q) || rule.method || "ANY")
+        // spring puts the verb in an argument and jax-rs in the annotation above
+        if (method === "ANY")
+          method = verbOf(
+            /RequestMethod\.(\w+)/.exec(around)?.[1] ||
+              /@(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*(?:\n|$)/.exec(around)?.[1] ||
+              sent(code, m.index, after, strings) ||
+              "ANY",
+          )
         const side =
-          rule.side === "guess" ? guess(groups, raw, after, module.packages, lang) : rule.side
+          rule.side === "guess"
+            ? guess(groups, raw, after, around, module.packages, lang)
+            : rule.side
         if (!side) continue
+        // a route only guessed at is a real one when it is written from the root:
+        // `config.get("js/ts.implicitProjectConfig.checkJs")` is a settings lookup
+        if (side === "server" && rule.side === "guess" && !raw.startsWith("/")) continue
         // a mount is not a route, and an annotation over a class is a prefix
         if (side === "server" && /^\s*,\s*include\s*\(/.test(after)) continue
         if (rule.onClass && CLASSY.test(after)) continue
-        const { path: clean, host } = normal(raw || "/")
+        const { path: said_, host } = normal(raw || "/")
+        // a channels router holds sockets, whatever verb the pattern that found it implies
+        if (/websocket_urlpatterns/.test(code) && /^\/ws(\/|$)/.test(said_)) method = "WS"
+        // a group it was hung on, and whatever it is nested inside
+        const clean =
+          side === "server"
+            ? under(
+                grouped.get((groups.who ?? "").replace(/[\s.]+$/, "")) ?? "",
+                nesting(m.index),
+                said_,
+              )
+            : said_
         if (side === "server") {
           const wants = METHODS.exec(after)
           const listed = wants
             ? [...wants[1].matchAll(marks("§"))].map((one) => verbOf(said(one[1])))
             : []
-          for (const verb of listed.length ? listed : [method])
+          // a runtime table writes the verb as the key of what answers on that path
+          const keyed = method === "ANY" ? /^\s*(?::\s*\{)?([^}]*)\}/.exec(after) : null
+          const keys = keyed
+            ? [...keyed[1].matchAll(/\b(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\s*:/g)].map(
+                (one) => one[1],
+              )
+            : []
+          for (const verb of listed.length ? listed : keys.length ? keys : [method])
             all.endpoints.push({
               id: `${path}:${line}:${verb}:${clean}`,
               file: path,
@@ -725,13 +780,11 @@ function collect(repo: string, graph: Graph = build(repo), calls?: Calls): Found
               handler: handlerOf(after, path, holds),
             })
         } else {
-          // fetch keeps its verb in the options object
-          const said = method === "ANY" ? verbOf(sent(after, strings)) : method
           all.clients.push({
-            id: `${path}:${line}:${said}:${clean}`,
+            id: `${path}:${line}:${method}:${clean}`,
             file: path,
             line,
-            method: said,
+            method,
             path: clean,
             raw,
             framework: rule.id,
@@ -864,9 +917,13 @@ function stretch(after: string, strings: string[]): string {
 
 const SENT = marks(String.raw`\bmethod\s*[=:]\s*§`)
 
-/** the verb an options object holds, for a call that names none itself */
-function sent(after: string, strings: string[]): string {
-  const found = SENT.exec(after)
+/** the verb the object around a path holds, whichever side of it that verb was written */
+function sent(code: string, index: number, after: string, strings: string[]): string {
+  // the object this path sits in, not the one before it
+  const open = code.lastIndexOf("{", index)
+  const from = Math.max(index - 240, open === -1 ? 0 : open)
+  const before = [...code.slice(from, index).matchAll(SENT)].at(-1)
+  const found = before ?? SENT.exec(after)
   SENT.lastIndex = 0
   return found ? (strings[Number(found[1])] ?? "") : ""
 }
@@ -876,9 +933,13 @@ function guess(
   groups: Record<string, string | undefined>,
   raw: string,
   after: string,
+  around: string,
   packages: string[],
   lang: string,
 ): "server" | "client" | "" {
+  // an options object holding a handler is a route, and one holding a body is a call
+  if (/\bhandler\s*:|\bpreHandler\s*:|\bschema\s*:\s*\{/.test(around) && !/\bbody\s*:/.test(around))
+    return "server"
   const who =
     (groups.who ?? "")
       .replace(/[\s.]+$/, "")
@@ -1038,20 +1099,37 @@ export function reading(
   graph: Graph = build(repo),
   // a route names the thing that answers it, and only the call graph knows where that is
   calls: Calls = callGraph(repo, graph),
-): Omit<Api, "links" | "stats"> {
+): Omit<Api, "links" | "stats"> & { hosts: string[] } {
   const found = collect(repo, graph, calls)
-  return { endpoints: once(serving(found)), clients: once(found.clients) }
+  // a spec, a collection and a proto file each list endpoints without holding any code
+  const said = specs(repo, tracked(repo))
+  return {
+    endpoints: once([...serving(found), ...said.endpoints]),
+    clients: once([...found.clients, ...said.clients]),
+    hosts: said.hosts,
+  }
+}
+
+/** every file the repo has, since a document is not a module and holds no imports */
+function tracked(repo: string): string[] {
+  try {
+    return git(repo, "ls-files", "-z")
+      .split("\0")
+      .filter((one) => one && !VENDORED.test(one))
+  } catch {
+    return []
+  }
 }
 
 /** one repo's endpoints, its call sites, and every edge between them */
 export function api(repo: string, graph?: Graph, calls?: Calls): Api {
-  const { endpoints, clients } = reading(repo, graph, calls)
-  return joined(endpoints, clients)
+  const { endpoints, clients, hosts } = reading(repo, graph, calls)
+  return joined(endpoints, clients, hosts)
 }
 
 /** the same, once several repos have been read into one list */
-export function joined(endpoints: Endpoint[], clients: Client[]): Api {
-  const links = link(endpoints, clients)
+export function joined(endpoints: Endpoint[], clients: Client[], hosts: string[] = []): Api {
+  const links = link(endpoints, clients, hosts)
   const reached = new Set(links.map((one) => one.call))
   return {
     endpoints,

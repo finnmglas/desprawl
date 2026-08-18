@@ -1,11 +1,12 @@
-// owner: julia
+// owner: finn
 // goal: an endpoint is found wherever a framework hides one, and a call site lands on it
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { build } from "../src/graph.ts"
 import { calls } from "../src/calls.ts"
-import { api, filled, normal, pathy, reading } from "../src/routes.ts"
+import { api, filled, pathy, reading } from "../src/routes.ts"
+import { normal } from "../src/specs.ts"
 import { joined } from "../src/routes.ts"
 import { repo } from "./repo.ts"
 
@@ -286,6 +287,90 @@ test("a server with no framework at all is still a server, and a nav check is no
   assert.equal(found.links[0].to, "serve.ts")
 })
 
+test("a group, a nesting and an options object all put a route somewhere else", () => {
+  const found = served(
+    repo({
+      "go/api.go":
+        'package main\nimport "github.com/gin-gonic/gin"\nfunc routes(r *gin.Engine) {\n' +
+        '\tapi := r.Group("/api/v2")\n\tapi.GET("/things", list)\n\tapi.POST("/things", make)\n' +
+        '\tr.GET("/health", up)\n}\n',
+      "rb/config/routes.rb":
+        "Rails.application.routes.draw do\n" +
+        "  namespace :api do\n    namespace :v1 do\n      get 'things', to: 'things#index'\n" +
+        "    end\n  end\n  get 'health', to: 'up#show'\nend\n",
+      "srv/hapi.ts":
+        "import Hapi from '@hapi/hapi'\nconst server = Hapi.server({})\n" +
+        "server.route({ method: 'GET', path: '/hapi/things', handler: () => [] })\n",
+      "srv/call.ts":
+        "import axios from 'axios'\n" +
+        "export const one = () => axios({ url: '/api/v2/things', method: 'POST', data: {} })\n",
+    }),
+  )
+  const said = ends(found)
+  assert.ok(said.includes("GET /api/v2/things"), `a group is a prefix: ${said.join(", ")}`)
+  assert.ok(said.includes("GET /health"), "and it stops where the group does")
+  assert.ok(said.includes("GET /api/v1/things"), "rails nests by indentation")
+  assert.ok(said.includes("GET /health"), "and closes again")
+  assert.ok(said.includes("GET /hapi/things"), "an options object holding a handler is a route")
+  assert.deepEqual(sites(found), ["POST /api/v2/things"], "and one holding a body is a call")
+  assert.equal(found.links.length, 1)
+})
+
+test("a document that lists endpoints is read as endpoints", () => {
+  const found = served(
+    repo({
+      "docs/openapi.yaml":
+        "openapi: 3.0.0\ninfo:\n  title: things\nservers:\n  - url: https://api.example.com/v3\n" +
+        "paths:\n  /things:\n    get:\n      summary: list\n    post:\n      summary: make\n" +
+        "  /things/{id}:\n    delete:\n      summary: drop\n" +
+        "components:\n  schemas:\n    Thing:\n      type: object\n",
+      "docs/other.json": JSON.stringify({
+        openapi: "3.1.0",
+        paths: { "/v2/orders": { get: {}, put: {} } },
+      }),
+      "serverless.yml":
+        "service: things\nprovider:\n  name: aws\nfunctions:\n  list:\n    handler: h.list\n" +
+        "    events:\n      - http:\n          path: /lambda/things\n          method: get\n" +
+        "  make:\n    handler: h.make\n    events:\n      - http:\n          path: /lambda/things\n" +
+        "          method: post\n",
+      "proto/orders.proto":
+        'syntax = "proto3";\npackage shop.v1;\n\nservice Orders {\n' +
+        "  rpc List (ListRequest) returns (ListReply);\n  rpc Drop (DropRequest) returns (Empty);\n}\n",
+      "collection/list.bru": "meta {\n  name: list\n}\n\nget {\n  url: {{host}}/v3/things\n}\n",
+      "collection/api.http":
+        "### list them\nGET https://api.example.com/v3/things\n\nPOST /v2/orders\n",
+      "collection/x.postman_collection.json": JSON.stringify({
+        item: [
+          { name: "drop", request: { method: "DELETE", url: { raw: "{{base}}/v3/things/7" } } },
+          { item: [{ name: "put", request: { method: "PUT", url: "{{base}}/v2/orders" } }] },
+        ],
+      }),
+    }),
+  )
+  const said = ends(found)
+  assert.ok(said.includes("GET /v3/things"), `servers: is a prefix: ${said.join(", ")}`)
+  assert.ok(said.includes("POST /v3/things"))
+  assert.ok(said.includes("DELETE /v3/things/*"), "a parameter is a parameter in yaml too")
+  assert.ok(said.includes("GET /v2/orders") && said.includes("PUT /v2/orders"), "json as well")
+  assert.ok(said.includes("POST /shop.v1.Orders/List"), "a proto service is a path on the wire")
+  assert.ok(said.includes("GET /lambda/things"), "an http event is a route the cloud serves")
+  assert.ok(said.includes("POST /lambda/things"))
+  assert.ok(said.includes("POST /shop.v1.Orders/Drop"))
+  assert.ok(!said.includes("GET /components"), "nothing below the paths block is a path")
+  // every collection entry lands on the endpoint the spec described
+  const asked = sites(found)
+  assert.ok(asked.includes("GET /*/v3/things"), asked.join(", "))
+  assert.ok(asked.includes("DELETE /*/v3/things/7"))
+  assert.ok(asked.includes("PUT /*/v2/orders"))
+  // the spec says which host it answers on, so a request naming that host lands here
+  assert.ok(
+    found.links.some((one) => one.call.includes("api.http") && one.path === "/v3/things"),
+    "a host the spec declares is this fleet's own",
+  )
+  // and POST /v2/orders is nobody's: the document lists a get and a put on that path
+  assert.equal(found.links.length, 4, `every request but one: ${found.links.length}`)
+})
+
 test("a niche framework is still a framework: every family, one file each", () => {
   const found = served(
     repo({
@@ -334,6 +419,22 @@ test("a niche framework is still a framework: every family, one file each", () =
       // ---- ruby ----
       "rb/config/routes.rb":
         "Rails.application.routes.draw do\n  get 'rails/things', to: 'things#index'\nend\n",
+      // ---- a runtime with a table, and the frameworks that decorate bare ----
+      "srv/bun.ts":
+        "const server = Bun.serve({\n  routes: {\n    '/bun/things': { GET: () => new Response('') },\n" +
+        "    '/bun/things/:id': (req) => new Response(''),\n  },\n})\n",
+      "py/tornado_app.py":
+        "import tornado.web\napp = tornado.web.Application([\n" +
+        "    (r'/tornado/things', ThingsHandler),\n])\n",
+      "py/bottle_app.py":
+        "from bottle import route, get\n@route('/bottle/things')\ndef things():\n    return {}\n" +
+        "@patch('py.thing.helper')\ndef test_it():\n    pass\n",
+      "py/restful.py":
+        "from flask_restful import Api\napi = Api(app)\napi.add_resource(Todo, '/restful/things/<id>')\n",
+      // ---- clients that declare rather than call ----
+      "cs/Client.cs":
+        'public interface IThings {\n  [Get("/refit/things")]\n  Task<string> List();\n}\n',
+      "swift/Net.swift": 'func load() {\n  AF.request("https://api.swift.dev/v1/things")\n}\n',
       // ---- the boards ----
       "ino/sketch.ino":
         '#include <HTTPClient.h>\nvoid setup() {\n  server.on("/board/status", handleStatus);\n' +
@@ -349,7 +450,7 @@ test("a niche framework is still a framework: every family, one file each", () =
     "POST /api/nuxt/things",
     "GET /aio/things",
     "GET /star/things",
-    "ANY /jax/things",
+    "GET /jax/things",
     "GET /ktor/things",
     "GET /gin/things",
     "ANY /plain/things",
@@ -359,9 +460,14 @@ test("a niche framework is still a framework: every family, one file each", () =
     "GET /laravel/things",
     "GET /rails/things",
     "ANY /board/status",
+    "GET /bun/things",
+    "ANY /bun/things/*",
+    "ANY /tornado/things",
+    "ANY /bottle/things",
+    "ANY /restful/things/*",
   ])
     assert.ok(said.includes(one), `${one} missing from ${said.join(", ")}`)
   const asked = sites(found)
-  for (const one of ["POST /v1/things", "ANY /v1/telemetry"])
+  for (const one of ["POST /v1/things", "ANY /v1/telemetry", "GET /refit/things", "ANY /v1/things"])
     assert.ok(asked.includes(one), `${one} missing from ${asked.join(", ")}`)
 })

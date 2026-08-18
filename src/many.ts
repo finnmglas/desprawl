@@ -243,6 +243,7 @@ export function graphs(path: string): Graph {
 export function everyApi(path: string): Api {
   const endpoints: Endpoint[] = []
   const clients: Client[] = []
+  const hosts: string[] = []
   for (const one of fleet(path)) {
     const under = named(one)
     const at = (file: string) => `${under}/${file}`
@@ -259,8 +260,10 @@ export function everyApi(path: string): Api {
     clients.push(
       ...found.clients.map((held) => ({ ...held, id: at(held.id), file: at(held.file) })),
     )
+    // a host one repo says it serves is that host for every repo beside it
+    hosts.push(...found.hosts)
   }
-  return joined(endpoints, clients)
+  return joined(endpoints, clients, hosts)
 }
 
 /** and every call graph, on the same prefixed keys */
@@ -269,7 +272,7 @@ export function everyCall(path: string): Calls {
     symbols: {},
     unresolved: [],
     // prettier-ignore
-    stats: { files: 0, symbols: 0, functions: 0, classes: 0, components: 0, edges: 0, external: 0, builtin: 0, coverage: 0, uncalled: 0, lines: 0 },
+    stats: { files: 0, symbols: 0, functions: 0, classes: 0, components: 0, edges: 0, external: 0, builtin: 0, coverage: 0, unresolved: 0, uncalled: 0, lines: 0 },
   }
   for (const one of fleet(path)) {
     const under = named(one)
@@ -283,11 +286,11 @@ export function everyCall(path: string): Calls {
         calls: symbol.calls.map(at),
         callers: symbol.callers.map(at),
       }
-    all.unresolved.push(...found.unresolved.map((one) => ({ ...one, from: at(one.from) })))
+    all.unresolved.push(...found.unresolved.map((one) => ({ ...one, from: one.from.map(at) })))
     for (const key of Object.keys(all.stats) as (keyof Calls["stats"])[])
       if (key !== "coverage") all.stats[key] += found.stats[key]
   }
-  const seen = all.stats.edges + all.stats.external + all.stats.builtin + all.unresolved.length
+  const seen = all.stats.edges + all.stats.external + all.stats.builtin + all.stats.unresolved
   all.stats.coverage = seen ? (all.stats.edges + all.stats.external + all.stats.builtin) / seen : 1
   return all
 }
