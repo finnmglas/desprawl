@@ -18,14 +18,14 @@ const source = {
   "lib/two.ts": "import { one } from './one.ts'\nexport function two() { return one() }\n",
 }
 
-const laid = (grain: "module" | "file" | "function") => {
+const laid = (grain: "module" | "file" | "declaration") => {
   const dir = repo(source)
   const graph = build(dir)
   return net(fold(graph, 1), graph, calls(dir, graph), api(dir, graph), grain, 1, 900, 600)
 }
 
 test("every node sits inside the box drawn around it, whatever the grain", () => {
-  for (const grain of ["module", "file", "function"] as const) {
+  for (const grain of ["module", "file", "declaration"] as const) {
     const drawn = laid(grain)
     const boxes = new Map(drawn.boxes.map((b) => [b.id, b]))
     assert.ok(drawn.spots.length > 0, `${grain} drew nothing`)
@@ -43,7 +43,7 @@ test("every node sits inside the box drawn around it, whatever the grain", () =>
 test("a box is drawn once, since a second copy of one takes the nodes with it", () => {
   // two boxes of the same id read as one holding everything and one holding nothing, and a
   // map of them hides it: the second silently wins and the first is what gets drawn
-  for (const grain of ["module", "file", "function"] as const) {
+  for (const grain of ["module", "file", "declaration"] as const) {
     const drawn = laid(grain)
     const seen = new Set<string>()
     for (const box of drawn.boxes) {
@@ -54,7 +54,7 @@ test("a box is drawn once, since a second copy of one takes the nodes with it", 
 })
 
 test("a file box stays inside its module box, so the nesting is real and not drawn on", () => {
-  const drawn = laid("function")
+  const drawn = laid("declaration")
   const boxes = new Map(drawn.boxes.map((b) => [b.id, b]))
   const files = drawn.boxes.filter((b) => b.depth === 2)
   assert.ok(files.length > 1, "a repo of four files should draw more than one file box")
@@ -84,7 +84,7 @@ test("a grain decides what a node is, and the module grain has no file in it", (
     "file grain draws files",
   )
   assert.ok(
-    laid("function").spots.every((s) => s.id.includes("#")),
+    laid("declaration").spots.every((s) => s.id.includes("#")),
     "function grain draws declarations",
   )
 })

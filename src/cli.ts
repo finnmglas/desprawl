@@ -19,7 +19,8 @@ import { isUrl, local } from "./serve/remote.ts"
 import { serve } from "./serve/serve.ts"
 import { anonymous, hidden, open, view } from "./serve/view.ts"
 import { GRAINS, IMPACTS, KINDS, LANGUAGES, VIEWS, views } from "./facts/views.ts"
-import type { Grain, Hits, Sort, View } from "./facts/views.ts"
+import { grainOf } from "./facts/knowledge.ts"
+import type { Hits, Sort, View } from "./facts/views.ts"
 import type { Node, Split, Stats } from "./read/model.ts"
 
 const fail = (err: unknown): never => {
@@ -72,7 +73,7 @@ if (values.help) {
       "desprawl check [path] --base REF [--json]",
       "         a folder of repos reads as one, --repo NAME picks one of them",
       "         tasks also takes [--kind K] [--impact I] [--limit N] [--offline]",
-      "         knowledge also takes [--grain module|file|function]",
+      "         knowledge also takes [--grain module|file|declaration]",
       `         any of them takes [--lang ${LANGUAGES.join("|")}]`,
     ].join("\n"),
   )
@@ -286,7 +287,9 @@ try {
       fail(`no such kind as ${values.kind}. There is ${KINDS.join(", ")}`)
     if (values.impact && !IMPACTS.includes(values.impact as Hits))
       fail(`no such impact as ${values.impact}. There is ${IMPACTS.join(", ")}`)
-    if (values.grain && !GRAINS.includes(values.grain as Grain))
+    // function was what the declaration grain was called, and old scripts still say it
+    const grain = values.grain ? grainOf(values.grain) : ""
+    if (values.grain && !grain)
       fail(`no such grain as ${values.grain}. There is ${GRAINS.join(", ")}`)
     if (values.lang && !LANGUAGES.includes(values.lang))
       fail(`no such language as ${values.lang}. There is ${LANGUAGES.join(", ")}`)
@@ -295,7 +298,7 @@ try {
       impact: values.impact,
       limit: values.limit ? int(values.limit, 0) : undefined,
       offline: values.offline,
-      grain: values.grain,
+      grain: grain || undefined,
       lang: values.lang,
     })
     // never process.exit here: it drops whatever of a large payload has not been written

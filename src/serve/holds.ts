@@ -89,7 +89,8 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
   const graph = (name: string | null): Graph => {
     const seen = built.get(key(name))
     if (seen) return seen
-    const one = pick(name)
+    // one repo, whether it was named or is all this run holds, and "" for several of them
+    const one = at(name)
     const made = one ? build(one) : graphs(repo, mine(name))
     built.set(key(name), made)
     return made
@@ -97,7 +98,7 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
   const rang = (name: string | null): Calls => {
     const seen = rung.get(key(name))
     if (seen) return seen
-    const one = pick(name)
+    const one = at(name)
     const made = one ? calls(one, graph(name)) : everyCall(repo, mine(name))
     rung.set(key(name), made)
     return made
@@ -137,7 +138,7 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
     api: (name) => {
       const seen = wired.get(key(name))
       if (seen) return seen
-      const one = pick(name)
+      const one = at(name)
       const made = one ? apiOf(one, graph(name), rang(name)) : everyApi(repo, mine(name))
       wired.set(key(name), made)
       return made

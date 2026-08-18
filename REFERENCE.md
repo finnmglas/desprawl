@@ -124,6 +124,33 @@ Reads the base ref in a worktree of its own and reports what this branch **added
 
 A threshold on a total becomes a target, and "this repo has 3 loops" is not actionable on a repo that is already a mess. "Your diff added a loop that was not on main" is local, cheap and unarguable.
 
+## The knowledge graph
+
+One word per thing, the same word the grain is called: a thing's `kind` is `module`, `file`,
+`declaration` or `package`, and a link's `kind` is `imports`, `calls` or `installs`. What
+holds what is said once, as `Thing.inside`, and never again as a link. Every thing says the
+`lang` it was read as, so a polyglot repo comes apart again, and a package is named for the
+registry it is published in: `crates.io:tokio`, `PyPI:fastapi`, `npm:react`.
+
+`--grain function` still works and means `declaration`, which is what it always produced.
+
+## What absent looks like
+
+Text that is not there is `""`, never missing and never null: a folder's `lang`, a group's
+`loudest`. A whole thing that is not there is `null`: a `coverage` nobody wrote. A count that
+is not there is `0`, since 0 is the true count. The one place a number stands for absence is
+`Unit.tangle`, which is `-1` when a group is in no loop, because 0 is a loop's number. An
+optional field is absent only when it does not apply, like `also` on a person who committed
+under one address.
+
+## Who a number means
+
+Every index in a payload names a `Contributor.id`, and `contributors` is in id order, so
+`log[].who`, the keys of a folder's `by`, and each day in `active` all resolve the same way.
+`identities` is one row per address rather than per person, and each of those carries the id
+of the person it was folded into, so the two lists can be read together without matching
+names.
+
 ## What a file says about itself
 
 Every json desprawl prints carries the same envelope, so a file found later can be read

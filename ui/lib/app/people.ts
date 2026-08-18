@@ -11,8 +11,8 @@ export interface Hand {
 }
 
 /** folder path to the commits each contributor made inside it */
-export function worked(tree: Node): Map<string, Record<number, number>> {
-  const found = new Map<string, Record<number, number>>()
+export function worked(tree: Node): Map<string, Record<string, number>> {
+  const found = new Map<string, Record<string, number>>()
   const walk = (node: Node, path: string[]) => {
     if (path.length) found.set(path.join("/"), node.by)
     for (const kid of node.children ?? []) walk(kid, [...path, kid.name])
@@ -24,12 +24,12 @@ export function worked(tree: Node): Map<string, Record<number, number>> {
 /** who committed there, most first. A remainder answers for its folder */
 export const hands = (
   at: string,
-  where: Map<string, Record<number, number>>,
+  where: Map<string, Record<string, number>>,
   people: Contributor[],
 ): Hand[] => handsOf(where.get(at.replace(/\/?\*$/, "")), people)
 
 /** the same, from a tally already in hand */
-export function handsOf(by: Record<number, number> | undefined, people: Contributor[]): Hand[] {
+export function handsOf(by: Record<string, number> | undefined, people: Contributor[]): Hand[] {
   const found = Object.entries(by ?? {})
     .map(([seat, commits]) => ({ who: people[Number(seat)], commits }))
     .filter((one) => one.who)

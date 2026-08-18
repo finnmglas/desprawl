@@ -1,21 +1,29 @@
 // owner: finn
 // goal: the graphs as typed things and typed relations, for whatever reads them next
 
+import { REGISTRY_BY_LANG } from "./registries.ts"
 import type { Made } from "../read/model.ts"
 import { unitOf } from "../read/layers.ts"
 import type { Calls } from "../read/calls.ts"
 import type { Graph } from "../read/graph.ts"
 import type { Layout } from "../read/layers.ts"
 
-/** module, file or declaration: how fine the things are */
-export const GRAINS = ["module", "file", "function"] as const
+/** how fine the things are, which is the one word a thing of that grain is called */
+export const GRAINS = ["module", "file", "declaration"] as const
 export type Grain = (typeof GRAINS)[number]
+
+/** what the declaration grain was called before it was named after what it holds */
+export const grainOf = (said: string): Grain | "" =>
+  said === "function" ? "declaration" : GRAINS.includes(said as Grain) ? (said as Grain) : ""
 
 export interface Thing {
   id: string
-  sort: "module" | "file" | "declaration" | "package"
+  /** the same word as the grain it was read at, and package for what it installs */
+  kind: Grain | "package"
   label: string
-  /** the thing holding it, so the whole is a tree with edges across it */
+  /** the language it was read as, so a polyglot repo can be taken apart again */
+  lang: string
+  /** the thing holding it: the tree, said once, rather than as a link as well */
   inside: string
   lines: number
 }
@@ -23,8 +31,8 @@ export interface Thing {
 export interface Link {
   from: string
   to: string
-  /** contains is the tree, imports and calls are the graph over it */
-  sort: "contains" | "imports" | "calls" | "installs"
+  /** what one thing does to another, never what holds it: that is Thing.inside */
+  kind: "imports" | "calls" | "installs"
   weight: number
 }
 
@@ -51,10 +59,20 @@ export interface Asking {
 export function knowledge(repo: string, asking: Asking): Knowledge {
   const { graph, layout } = asking
   const calls = asking.calls ?? null
-  const grain = asking.grain ?? "file"
+  const grain = asking.grain ?? "module"
   const split = asking.split ?? 1
   const unitAt = (path: string) =>
     typeof split === "number" ? unitOf(path, split) : (split[path] ?? unitOf(path, 1))
+  // a module is written in whatever most of its files are
+  const spoken = new Map<string, Map<string, number>>()
+  for (const module of Object.values(graph.modules)) {
+    const held = spoken.get(unitAt(module.path)) ?? new Map<string, number>()
+    held.set(module.lang, (held.get(module.lang) ?? 0) + 1)
+    spoken.set(unitAt(module.path), held)
+  }
+  const langOf = (unit: string): string =>
+    [...(spoken.get(unit) ?? new Map<string, number>())].sort((a, b) => b[1] - a[1])[0]?.[0] ?? ""
+
   const things: Thing[] = []
   const links: Link[] = []
   const held = new Set<string>()
@@ -65,7 +83,14 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
   }
 
   for (const unit of layout.units)
-    keep({ id: unit.path, sort: "module", label: unit.path, inside: "", lines: unit.lines })
+    keep({
+      id: unit.path,
+      kind: "module",
+      label: unit.path,
+      lang: langOf(unit.path),
+      inside: "",
+      lines: unit.lines,
+    })
 
   const files = grain !== "module"
   if (files)
@@ -75,36 +100,50 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
       if (unit === module.path) continue
       keep({
         id: module.path,
-        sort: "file",
+        kind: "file",
         label: module.path.split("/").pop() ?? module.path,
+        lang: module.lang,
         inside: unit,
         lines: module.lines,
       })
-      links.push({ from: unit, to: module.path, sort: "contains", weight: 1 })
     }
 
-  if (grain === "function")
+  if (grain === "declaration")
     for (const one of Object.values(calls?.symbols ?? {})) {
       if (one.kind === "module" || !graph.modules[one.file]) continue
       keep({
         id: one.id,
-        sort: "declaration",
+        kind: "declaration",
         label: one.name,
+        lang: one.lang,
         inside: one.file,
         lines: one.lines,
       })
-      links.push({ from: one.file, to: one.id, sort: "contains", weight: 1 })
     }
 
-  // an install is a thing too
+  // an install is a thing too, named for where it is published rather than always npm
+  const asked = new Map<string, string>()
+  for (const module of Object.values(graph.modules))
+    for (const name of module.packages) if (!asked.has(name)) asked.set(name, module.lang)
+  const where = (name: string): string => {
+    const lang = asked.get(name) ?? ""
+    return REGISTRY_BY_LANG[lang] || lang || "npm"
+  }
   for (const name of Object.keys(graph.packages))
-    keep({ id: `npm:${name}`, sort: "package", label: name, inside: "", lines: 0 })
+    keep({
+      id: `${where(name)}:${name}`,
+      kind: "package",
+      label: name,
+      lang: asked.get(name) ?? "",
+      inside: "",
+      lines: 0,
+    })
   for (const module of Object.values(graph.modules))
     for (const name of module.packages)
       links.push({
         from: files ? module.path : unitAt(module.path),
-        to: `npm:${name}`,
-        sort: "installs",
+        to: `${where(name)}:${name}`,
+        kind: "installs",
         weight: 1,
       })
 
@@ -113,7 +152,7 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
     for (const edge of module.out) {
       const from = at(module.path)
       const to = at(edge.to)
-      if (from !== to) links.push({ from, to, sort: "imports", weight: 1 })
+      if (from !== to) links.push({ from, to, kind: "imports", weight: 1 })
     }
 
   // a file's top level is the file, not a declaration
@@ -123,15 +162,15 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
     for (const target of one.calls) {
       const other = calls?.symbols[target]
       if (!other || !graph.modules[one.file] || !graph.modules[other.file]) continue
-      const from = grain === "function" ? idOf(one) : at(one.file)
-      const to = grain === "function" ? idOf(other) : at(other.file)
-      if (from !== to) links.push({ from, to, sort: "calls", weight: 1 })
+      const from = grain === "declaration" ? idOf(one) : at(one.file)
+      const to = grain === "declaration" ? idOf(other) : at(other.file)
+      if (from !== to) links.push({ from, to, kind: "calls", weight: 1 })
     }
 
   // one line per pair and sort, carrying how many of them there were
   const merged = new Map<string, Link>()
   for (const link of links) {
-    const key = `${link.sort} ${link.from} ${link.to}`
+    const key = `${link.kind} ${link.from} ${link.to}`
     const found = merged.get(key)
     if (found) found.weight++
     else merged.set(key, { ...link })
@@ -148,7 +187,16 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
 
 /** the same thing as rows, for whatever opens a table rather than a document */
 export const asRows = (found: Knowledge): (string | number)[][] => [
-  ["kind", "id", "label", "inside", "lines", "to", "relation", "weight"],
-  ...found.things.map((one) => [one.sort, one.id, one.label, one.inside, one.lines, "", "", ""]),
-  ...found.links.map((one) => ["link", one.from, "", "", "", one.to, one.sort, one.weight]),
+  ["kind", "id", "label", "lang", "inside", "lines", "to", "weight"],
+  ...found.things.map((one) => [
+    one.kind,
+    one.id,
+    one.label,
+    one.lang,
+    one.inside,
+    one.lines,
+    "",
+    "",
+  ]),
+  ...found.links.map((one) => [one.kind, one.from, "", "", "", "", one.to, one.weight]),
 ]

@@ -191,7 +191,7 @@ function loose(
 
 /** every file that is its own node, and the box it belongs to at this grain */
 const members = (graph: Graph, calls: Calls | null, grain: Grain) =>
-  grain === "function"
+  grain === "declaration"
     ? Object.values(calls?.symbols ?? {})
         .filter((s) => s.kind !== "module" && graph.modules[s.file])
         .map((s) => ({ id: s.id, label: s.name, file: s.file, weight: s.lines, kind: s.kind }))
@@ -227,7 +227,7 @@ function wires(
     for (const target of symbol.calls) {
       const other = calls?.symbols[target]
       if (!other) continue
-      if (grain === "function") add(symbol.id, target, "calls", false)
+      if (grain === "declaration") add(symbol.id, target, "calls", false)
       else add(of(symbol.file), of(other.file), "calls", false)
     }
   // a request is between files, whatever grain is drawn: at function grain that is two boxes
@@ -307,7 +307,7 @@ export function net(
       : held.map((one) => ({
           id: one.id,
           label: one.label,
-          box: grain === "function" ? one.file : unitAt(one.file),
+          box: grain === "declaration" ? one.file : unitAt(one.file),
           weight: one.weight,
           kind: one.kind,
           x: 0,
@@ -354,7 +354,7 @@ export function net(
   const sized = new Map<string, { w: number; h: number }>()
   const kids = new Map<string, string[]>()
 
-  if (grain === "function") {
+  if (grain === "declaration") {
     for (const [file, mine] of inner) {
       const side = rounded(mine.length) * ROW
       sized.set(file, { w: side + 2 * PAD, h: side + 2 * PAD + 12 })
@@ -370,7 +370,7 @@ export function net(
 
   // square pixels: ten times the files, ten times the room
   const load = (path: string) =>
-    grain === "function"
+    grain === "declaration"
       ? (kids.get(path) ?? []).reduce((sum, file) => {
           const size = sized.get(file)!
           return sum + size.w * size.h
@@ -418,7 +418,7 @@ export function net(
   let deepest = down
 
   // then the file boxes, inside the unit box that was just placed
-  if (grain === "function")
+  if (grain === "declaration")
     for (const box of boxes.filter((b) => b.depth === 1)) {
       const mine = kids.get(box.id) ?? []
       const room = fitted(mine, box.w - 2 * PAD)

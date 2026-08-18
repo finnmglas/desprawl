@@ -39,7 +39,7 @@ const sortOf = (graph: Graph | null, file: string) =>
       : "source"
 
 const unitOf = (what: Painting, spot: Spot) =>
-  what.grain === "function" ? (what.boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
+  what.grain === "declaration" ? (what.boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
 
 /** the unit a colour is read off: a module is its own, anything else belongs to one */
 const owning = (what: Painting, spot: Spot) =>
@@ -57,7 +57,7 @@ export const colouring = (what: Painting) => (spot: Spot) => {
   const { painted, grain, graph } = what
   if (painted === "one colour") return null
   if (painted === "language") {
-    const brand = BRANDS[langOf(grain === "function" ? spot.box : spot.id)]
+    const brand = BRANDS[langOf(grain === "declaration" ? spot.box : spot.id)]
     return brand ? `#${brand[0]}` : null
   }
   if (painted === "kind") return hued(grain === "file" ? sortOf(graph, spot.id) : spot.kind)
@@ -85,7 +85,7 @@ export const legendOf = (what: Painting, drawn: Net | null) => {
   for (const spot of drawn.spots) {
     const label =
       painted === "language"
-        ? langOf(grain === "function" ? spot.box : spot.id)
+        ? langOf(grain === "declaration" ? spot.box : spot.id)
         : painted === "kind"
           ? grain === "file"
             ? sortOf(graph, spot.id)

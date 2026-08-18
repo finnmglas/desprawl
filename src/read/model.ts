@@ -36,13 +36,15 @@ export interface Churn {
   deletions: number
   last: string // newest touch
   /** commits per contributor index, so a folder can name who works in it */
-  by: Record<number, number>
+  /** commits per contributor id */
+  by: Record<string, number>
 }
 
 // tree node
 export interface Node extends Bucket, Churn {
   path: string
-  lang?: string
+  /** the language of a file, "" for a folder, which is what every text field here says */
+  lang: string
   children?: Node[] // null on files
   /** files left out of a served tree, fetched when opened */
   leaves?: number
@@ -64,6 +66,7 @@ export interface Commit {
   insertions: number
   deletions: number
   /** Index into contributors, the merged identity */
+  /** the contributor id who wrote it */
   who: number
   date: string
   refs: string // branch and tag decorations
@@ -83,6 +86,12 @@ export interface Remote {
 }
 
 export interface Contributor {
+  /**
+   * what every index in this payload means: a commit's who, the keys of a folder's by,
+   * and the days in active all name this. An identity carries the id of the person it
+   * was folded into, so the two lists can be read together
+   */
+  id: number
   name: string
   email: string
   commits: number
@@ -255,7 +264,7 @@ export const git = (cwd: string, ...args: string[]): string =>
 
 // prettier-ignore
 export const blank = (name: string, path = ""): Node => ({
-  name, path, files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
+  name, path, lang: "", files: 0, chars: 0, code: 0, comment: 0, blank: 0, indent: 0,
   commits: 0, insertions: 0, deletions: 0, last: "", langs: {}, by: {},
 })
 

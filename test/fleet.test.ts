@@ -7,7 +7,7 @@ import { join } from "node:path"
 import { everyCall, graphs, many } from "../src/facts/many.ts"
 import { callsIn, graphIn } from "../src/facts/within.ts"
 import { holds } from "../src/serve/holds.ts"
-import { folder } from "./repo.ts"
+import { folder, repo } from "./repo.ts"
 
 const two = () =>
   folder({
@@ -78,5 +78,16 @@ test("some of a folder reads out of what was read for all of it", () => {
     Object.keys(rang.symbols).sort(),
     Object.keys(everyCall(dir, [join(dir, "two")]).symbols).sort(),
     "and the declarations in it",
+  )
+})
+
+test("one repo on its own is read as itself, never as a folder holding it", () => {
+  const dir = repo({ "a.ts": "export const a = 1\n", "b.ts": "import './a.ts'\n" })
+  const kept = holds(dir)
+  assert.deepEqual(kept.fleet, [], "nothing about it is a fleet")
+  assert.ok(Object.keys(kept.graph(null).modules).length > 0, "and its graph holds its files")
+  assert.ok(
+    Object.keys(kept.calls(null).symbols).length > 0,
+    "and its call graph, what it declares",
   )
 })

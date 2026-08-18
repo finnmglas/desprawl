@@ -124,7 +124,7 @@ export function reads(one: Asked): boolean {
 
   if (url.pathname === "/api/commit") {
     const hash = url.searchParams.get("hash") ?? ""
-    if (!/^[0-9a-f]{4,40}$/i.test(hash)) return send(400, "bad hash", "text/plain")
+    if (!/^[0-9a-f]{4,40}$/i.test(hash)) return json({ error: "bad hash" }, 400)
     return json(detail(at(url), hash))
   }
 
@@ -157,7 +157,7 @@ export function reads(one: Asked): boolean {
     const from = url.searchParams.get("from") ?? ""
     const to = url.searchParams.get("to") ?? ""
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
-      return send(400, "bad dates", "text/plain")
+      return json({ error: "bad dates" }, 400)
     const names = kept.stats(false).contributors.map((c) => (c.email || c.name).toLowerCase())
     return json(moved(at(url) || held[0], from, to, names))
   }
@@ -189,7 +189,7 @@ export function reads(one: Asked): boolean {
     const from = url.searchParams.get("from") ?? ""
     const to = url.searchParams.get("to") ?? ""
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
-      return send(400, "bad dates", "text/plain")
+      return json({ error: "bad dates" }, 400)
     return json(hourly(kept.about(url.searchParams.get("repo")), from, to))
   }
 

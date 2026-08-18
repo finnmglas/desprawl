@@ -9,6 +9,8 @@ import { Note } from "../atoms/card.tsx"
 import { toast } from "../atoms/toast.tsx"
 import { download, named } from "../../lib/app/export.ts"
 import { num } from "../../lib/say/format.ts"
+import { knowledge } from "../../../src/facts/knowledge.ts"
+import { balanced, fold } from "../../../src/read/layers.ts"
 import { callGraph, importGraph, isLive, staticPage } from "../../lib/app/live.ts"
 import { notes } from "../../lib/app/paper.ts"
 import { slides } from "../../lib/app/slides.ts"
@@ -108,6 +110,27 @@ export function Exports({
             const file = named("imports.json")
             download(file, JSON.stringify(got, null, 2), "application/json")
             toast(file, `${num(got.stats.edges)} imports between ${num(got.stats.files)} files`)
+          }}
+        />
+      )}
+      {(live || heldGraph) && (
+        <Row
+          label="knowledge-graph (json)"
+          what="every module, file, declaration and install, and what relates them"
+          run={async () => {
+            const graph = await importGraph()
+            if (!graph) return
+            const split = balanced(graph)
+            const found = knowledge(stats.repo, {
+              graph,
+              layout: fold(graph, split),
+              calls: await callGraph(),
+              grain: "declaration",
+              split,
+            })
+            const file = named("knowledge.json")
+            download(file, JSON.stringify(found, null, 2), "application/json")
+            toast(file, `${num(found.things.length)} things, ${num(found.links.length)} relations`)
           }}
         />
       )}

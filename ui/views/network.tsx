@@ -23,6 +23,7 @@ import { useKept } from "../lib/app/kept.ts"
 import { plural } from "../lib/say/format.ts"
 import { hands, worked } from "../lib/app/people.ts"
 import { type Grain, type Spot, type Wire } from "../lib/draw/network.ts"
+import { grainOf } from "../../src/facts/knowledge.ts"
 import { bundled, seating, type Held } from "../lib/draw/wires.ts"
 import { hitting } from "../lib/draw/hitting.ts"
 import { carrying, linked } from "../lib/draw/carried.tsx"
@@ -37,7 +38,9 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   const going = useGoing()
   // a picture somebody set up is the work
   const [lang, setLang] = useKept("net.lang", "")
-  const [grain, setGrain] = useKept<Grain>("net.grain", "module")
+  // a run before the declaration grain was named after what it holds remembered "function"
+  const [held, setGrain] = useKept<Grain>("net.grain", "module")
+  const grain = grainOf(held) || "module"
   const [imports, setImports] = useKept("net.imports", true)
   const [wired, setWired] = useKept("net.calls", true)
   const [http, setHttp] = useKept("net.http", true)
@@ -127,7 +130,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   const unitOfNode = (id: string) => {
     const spot = at.get(id)
     if (!spot) return boxAt.get(id)?.parent ?? id
-    return grain === "function" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
+    return grain === "declaration" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
   }
   // the wires as they are drawn, which is what a cursor can land on
   const shown: Held[] = useMemo(
@@ -183,7 +186,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
   // the click says which, rather than picking
   const walk = (spot: Spot) =>
     going.open(
-      grain === "function"
+      grain === "declaration"
         ? symbol(spot.id, undefined, `declared in ${spot.box}`)
         : grain === "file"
           ? asFile(spot.id, `${plural(spot.weight, "line")}`)

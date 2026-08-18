@@ -74,7 +74,9 @@ function people(each: Stats[]): { all: Contributor[]; seats: Map<string, number>
     }
     seats.push(seat)
   }
-  const all = [...by.values()].sort((a, b) => b.commits - a.commits)
+  const all = [...by.values()]
+    .sort((a, b) => b.commits - a.commits)
+    .map((one, i) => ({ ...one, id: i }))
   // the sort moved them, so a repo's own index has to find its person again
   const where = new Map(all.map((one, i) => [(one.email || one.name).toLowerCase(), i]))
   const keys = [...by.keys()]
@@ -95,9 +97,8 @@ function rooted(one: Stats, seat: Map<string, number>): Node {
   const rewrite = (node: Node, under: string): Node => ({
     ...node,
     path: node.path ? `${under}/${node.path}` : under,
-    by: Object.fromEntries(
-      Object.entries(node.by).map(([who, n]) => [seat.get(who) ?? Number(who), n]),
-    ),
+    // the keys are contributor ids, which the fleet renumbers as it folds people together
+    by: Object.fromEntries(Object.entries(node.by).map(([who, n]) => [seat.get(who) ?? who, n])),
     children: node.children?.map((child) => rewrite(child, under)),
   })
   const name = named(one.repo)
@@ -179,6 +180,19 @@ function addresses(each: Stats[]): Contributor[] {
       if (who.last > held.last) held.last = who.last
     }
   return [...by.values()].sort((a, b) => b.commits - a.commits)
+}
+
+/** every address pointed at the person the folder folded it into */
+const pointed = (identities: Contributor[], people: Contributor[]): Contributor[] => {
+  const at = new Map<string, number>()
+  for (const one of people) {
+    at.set((one.email || one.name).toLowerCase(), one.id)
+    for (const also of one.also ?? []) at.set(also.toLowerCase(), one.id)
+  }
+  return identities.map((one) => ({
+    ...one,
+    id: at.get((one.email || one.name).toLowerCase()) ?? 0,
+  }))
 }
 
 /** what the whole folder is built with: every list unioned, nothing claimed as its own */
@@ -302,7 +316,7 @@ export function many(
       thin: each.some((one) => one.thin),
       contributors,
       stack: stacks(each),
-      identities: addresses(each),
+      identities: pointed(addresses(each), contributors),
       log: logs(each, seats),
       active: busy(each, seats, series[0]?.start ?? first, series[0]?.data.length ?? 0),
       remotes: each.flatMap((one) => one.remotes),

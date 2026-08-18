@@ -8,6 +8,30 @@ import { detail } from "../src/facts/history.ts"
 import { timeline } from "../src/facts/samples.ts"
 import { child, inRepo, repo } from "./repo.ts"
 
+test("an index in the payload names a contributor id, and an address says whose it is", () => {
+  const dir = repo(
+    { files: { "a.ts": "export const a = 1\n" }, author: "Ann Smith <ann@a.io>" },
+    { files: { "a.ts": "export const a = 2\n" }, author: "Ann Smith <ann@work.io>" },
+    { files: { "b.ts": "export const b = 1\n" }, author: "Bo <bo@b.io>" },
+  )
+  const s = analyze(dir)
+  const people = new Map(s.contributors.map((one) => [one.id, one]))
+  assert.deepEqual(
+    s.contributors.map((one) => one.id),
+    s.contributors.map((_, i) => i),
+    "a person's id is where they sit, so an old reader that counted rows still lands",
+  )
+  assert.ok(
+    s.identities.length > s.contributors.length,
+    "Ann committed under two addresses, so there are more identities than people",
+  )
+  for (const one of s.identities)
+    assert.ok(people.has(one.id), `${one.email} points at a person nobody has`)
+  const ann = s.identities.filter((one) => one.email.startsWith("ann@"))
+  assert.equal(new Set(ann.map((one) => one.id)).size, 1, "both her addresses fold into one row")
+  for (const commit of s.log) assert.ok(people.has(commit.who), "and a commit names a person")
+})
+
 test("a path git quotes still gets its commits and churn", () => {
   const s = analyze(repo({ "grüße.ts": "a\n" }, { "grüße.ts": "a\nb\n" }))
   assert.equal(child(s.tree, "grüße.ts").commits, 2)

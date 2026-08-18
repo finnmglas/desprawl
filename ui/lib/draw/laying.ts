@@ -112,7 +112,7 @@ export function lanesOf(what: Laying): Lane[] {
           const w = widths[i]
           const inside = kids.get(unit.path) ?? []
           const h =
-            grain === "function"
+            grain === "declaration"
               ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
               : Math.max(
                   grain === "module" ? 88 : 80,

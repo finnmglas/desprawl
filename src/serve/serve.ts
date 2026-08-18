@@ -116,19 +116,19 @@ export function serve(
         res.end(body)
       }
 
-      // a cross site page may not read this, even knowing the port
-      if (origin && origin !== allowed) return send(403, "bad origin", "text/plain")
-      if ((url.searchParams.get("t") ?? req.headers["x-desprawl-token"]) !== token) {
-        return send(401, "bad token", "text/plain")
-      }
-
       const json = (data: unknown, code = 200) =>
         send(code, JSON.stringify(data), "application/json")
+      // one shape for everything that went wrong, whichever guard it was
+      const oops = (code: number, said: string) => json({ error: said }, code)
+
+      // a cross site page may not read this, even knowing the port
+      if (origin && origin !== allowed) return oops(403, "bad origin")
+      if ((url.searchParams.get("t") ?? req.headers["x-desprawl-token"]) !== token) {
+        return oops(401, "bad token")
+      }
 
       if (url.pathname === "/")
-        return html
-          ? send(200, html, "text/html")
-          : send(500, "no viewer built, run: pnpm build", "text/plain")
+        return html ? send(200, html, "text/html") : oops(500, "no viewer built, run: pnpm build")
 
       // the browser holds this open for as long as the tab lives
       if (url.pathname === "/api/session") {
@@ -174,7 +174,7 @@ export function serve(
           req.on("data", (chunk) => {
             body += chunk
             if (body.length > 256_000) {
-              send(413, "more faces than anyone has", "text/plain")
+              oops(413, "more faces than anyone has")
               req.destroy()
             }
           })
@@ -197,7 +197,7 @@ export function serve(
           req.on("data", (chunk) => {
             body += chunk
             if (body.length > 64_000) {
-              send(413, "settings are smaller than this", "text/plain")
+              oops(413, "settings are smaller than this")
               req.destroy()
             }
           })
@@ -205,7 +205,7 @@ export function serve(
             try {
               JSON.parse(body) // never poison the next read
             } catch {
-              return send(400, "bad json", "text/plain")
+              return oops(400, "bad json")
             }
             try {
               writePrefs(body)
@@ -246,7 +246,7 @@ export function serve(
         const said = explain(err) ?? (err instanceof Error ? err.message.trim() : String(err))
         return json({ error: said }, 500)
       }
-      return send(404, "not found", "text/plain")
+      return oops(404, "not found")
     })
 
     // port taken, take any free one

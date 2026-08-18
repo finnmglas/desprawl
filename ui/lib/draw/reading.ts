@@ -74,7 +74,7 @@ export function useReading({ lang, grain, bounds, repos, frame, anyway }: What) 
   const units = useMemo(() => new Map((layout?.units ?? []).map((u) => [u.path, u])), [layout])
 
   const size =
-    grain === "function"
+    grain === "declaration"
       ? Object.values(calls?.symbols ?? {}).filter((s) => s.kind !== "module").length
       : grain === "file"
         ? Object.keys(graph?.modules ?? {}).length

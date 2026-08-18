@@ -48,7 +48,7 @@ export function System({
   stack?: Stack
   people: Contributor[]
   /** commits per contributor index, by folder */
-  worked: Map<string, Record<number, number>>
+  worked: Map<string, Record<string, number>>
   /** what moved inside a chosen window, and who moved it, by group */
   moved?: Map<string, Move>
   faces: Record<string, string>

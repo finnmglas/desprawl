@@ -28,7 +28,7 @@ interface Props {
   units: Unit[]
   repos: string[]
   faces: Record<string, string>
-  worked: Map<string, Record<number, number>>
+  worked: Map<string, Record<string, number>>
   /** what moved in the chosen time frame, when there is a server to ask */
   changed: Map<string, Move>
   ranged: boolean

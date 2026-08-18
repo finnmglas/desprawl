@@ -173,7 +173,7 @@ export interface Move {
   up: number
   down: number
   /** commits per contributor, to name who moved it */
-  by: Record<number, number>
+  by: Record<string, number>
 }
 
 /** what one person did in the window */
@@ -327,7 +327,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
 
     // prettier-ignore
     const c = by.get(key) ?? {
-      name, email, commits: 0, insertions: 0, deletions: 0, files: 0, first: date, last: date,
+      id: -1, name, email, commits: 0, insertions: 0, deletions: 0, files: 0, first: date, last: date,
       paths: new Set<string>(), names: new Map<string, number>(),
     }
     c.commits++
@@ -379,12 +379,12 @@ export function history(repo: string, cap = COMMIT_MAX) {
   if (!last) last = newest
 
   // one row per raw identity, for whoever wants folding turned off
-  const identities: Contributor[] = [...by.values()]
-    .map(({ paths, names, ...c }) => {
+  const raw = [...by.entries()]
+    .map(([key, { paths, names, ...c }]) => {
       const name = [...names].sort((a, b) => b[1] - a[1])[0][0]
-      return { ...c, name, files: paths.size, bot: botOf(name, c.email) || undefined }
+      return { key, one: { ...c, name, files: paths.size, bot: botOf(name, c.email) || undefined } }
     })
-    .sort((a, b) => b.commits - a.commits)
+    .sort((a, b) => b.one.commits - a.one.commits)
 
   // union-find, merged on an unmistakable name prefix. .mailmap is the real fix
   const parent = new Map<string, string>()
@@ -452,7 +452,9 @@ export function history(repo: string, cap = COMMIT_MAX) {
   // every raw identity in a cluster points at the same, final row
   const order = new Map<string, number>()
   merged.forEach(({ group }, i) => group.forEach((k) => order.set(k, i)))
-  const contributors: Contributor[] = merged.map(({ group, ...c }) => c)
+  const contributors: Contributor[] = merged.map(({ group, ...c }, i) => ({ ...c, id: i }))
+  // one row per raw identity, each pointing at the person it was folded into
+  const identities: Contributor[] = raw.map(({ key, one }) => ({ ...one, id: order.get(key) ?? 0 }))
 
   history.forEach((commit, i) => {
     commit.who = order.get(byCommit[i]) ?? 0
@@ -476,7 +478,7 @@ export function history(repo: string, cap = COMMIT_MAX) {
     // summed, since a merge can land two identities on one index
     byWho: new Map(
       [...byWho].map(([path, hands]) => {
-        const at: Record<number, number> = {}
+        const at: Record<string, number> = {}
         for (const [key, n] of hands) {
           const i = order.get(key) ?? 0
           at[i] = (at[i] ?? 0) + n

@@ -9,7 +9,7 @@ import { CALL, IMPORT, REQUEST } from "../../../lib/draw/paint.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Grain } from "../../../lib/draw/network.ts"
 
-const GRAINS: Grain[] = ["module", "file", "function"]
+const GRAINS: Grain[] = ["module", "file", "declaration"]
 const PAINTS = ["module", "language", "size", "shape", "level", "kind", "one colour"]
 const WIRED = ["kind", "module", "leaving"]
 

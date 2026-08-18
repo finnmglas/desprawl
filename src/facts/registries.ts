@@ -16,6 +16,13 @@ export const REGISTRIES: Record<string, { label: string; at: (name: string) => s
 }
 
 /** the manifest kind a chip came from, said as the registry it means */
+/** where a package a file of this language asks for is published */
+// prettier-ignore
+export const REGISTRY_BY_LANG: Record<string, string> = {
+  ts: "npm", rust: "crates.io", python: "PyPI", jvm: "Maven", go: "Go",
+  csharp: "NuGet", ruby: "RubyGems", php: "Packagist",
+}
+
 export const REGISTRY_OF: Record<string, string> = {
   npm: "npm",
   cargo: "crates.io",

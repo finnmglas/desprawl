@@ -148,12 +148,13 @@ function units(read: Read) {
   }
 }
 
-function runs(read: Read) {
+function runs(read: Read, ask: Asked) {
   const live = reached(read.calls, true)
   const held = Object.values(read.calls.symbols).filter((one) => one.kind !== "module")
   const by = new Map<string, number>()
   for (const one of held) by.set(reachOf(one, live), (by.get(reachOf(one, live)) ?? 0) + 1)
-  const hot = [...held].sort((a, b) => b.callers.length - a.callers.length).slice(0, 20)
+  const take = ask.limit ?? 20
+  const hot = [...held].sort((a, b) => b.callers.length - a.callers.length).slice(0, take)
   return {
     text: [
       `${n(held.length)} declarations, ${n(read.calls.stats.edges)} calls, ` +
@@ -205,12 +206,23 @@ function loose(read: Read, ask: Asked) {
   const chatty = talky(read.repo, paths)
   const take = ask.limit ?? 20
   const rest = (all: unknown[]) => (all.length > take ? `\n… and ${all.length - take} more` : "")
+  // the two are the same copy with different cures, so they are read apart
+  const words = said.filter((one) => !one.styled)
+  const looks = said.filter((one) => one.styled)
   return {
     text: [
       grid([
         ["REPEATED LITERAL", "FILES"],
-        ...said.slice(0, take).map((one) => [cut(one.text, 56), one.times]),
-      ]) + rest(said),
+        ...words.slice(0, take).map((one) => [cut(one.text, 56), one.times]),
+      ]) + rest(words),
+      ...(looks.length
+        ? [
+            grid([
+              ["REPEATED CLASS LIST", "FILES"],
+              ...looks.slice(0, take).map((one) => [cut(one.text, 56), one.times]),
+            ]) + rest(looks),
+          ]
+        : []),
       grid([
         ["COPIED", "LINES", "AND"],
         ...same
@@ -228,7 +240,11 @@ function loose(read: Read, ask: Asked) {
           ]
         : []),
     ].join("\n\n"),
-    data: { repeated: said, copied: same, talky: chatty },
+    data: {
+      repeated: said.slice(0, take),
+      copied: same.slice(0, take),
+      talky: chatty.slice(0, take),
+    },
   }
 }
 
@@ -379,7 +395,11 @@ export async function views(
   const read = readIn(repo, ask.lang ?? "")
   if (view === "knowledge") return known(repo, read, ask)
   if (view === "architecture") return shape(read)
-  return view === "modules" ? units(read) : view === "execution" ? runs(read) : loose(read, ask)
+  return view === "modules"
+    ? units(read)
+    : view === "execution"
+      ? runs(read, ask)
+      : loose(read, ask)
 }
 
 export { GRAINS, KINDS, IMPACTS, LANGUAGES, weigh }

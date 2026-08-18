@@ -15,4 +15,11 @@ export type { Edge, Graph, Missing, Module } from "./read/graph.ts"
 export type { Asking, Grain, Knowledge, Link, Thing } from "./facts/knowledge.ts"
 export type { Layout, Unit } from "./read/layers.ts"
 export type { Api, Client, Endpoint, Link as Request } from "./read/routes.ts"
-export type { Node, Remote, Stack, Stats } from "./read/model.ts"
+export type { Contributor, Made, Node, Remote, Stack, Stats } from "./read/model.ts"
+
+// what the cli prints, for whatever reads it in ci
+export type { Checked, Count } from "./facts/check.ts"
+export type { Dep, Deps } from "./facts/deps.ts"
+export type { Sprawl, Task } from "./facts/work.ts"
+export type { Run, Suite } from "./facts/tests.ts"
+export type { Hours, Timeline } from "./facts/samples.ts"

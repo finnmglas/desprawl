@@ -127,7 +127,7 @@ export function does(one: Doing): boolean {
   // the one thing here that can take minutes, so it happens only when asked
   if (url.pathname === "/api/tests/run") {
     const script = url.searchParams.get("script") ?? ""
-    if (!/^[\w:-]+$/.test(script)) return send(400, "bad script", "text/plain")
+    if (!/^[\w:-]+$/.test(script)) return json({ error: "bad script" }, 400)
     // never a command from the url: only the one this repo's own detection wrote
     const measuring = url.searchParams.has("coverage")
     const found = kept.tests()

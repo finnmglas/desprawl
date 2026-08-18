@@ -225,7 +225,7 @@ export function draw(
   const unitOfSpot = (id: string) => {
     const spot = at.get(id)
     if (!spot) return boxAt.get(id)?.parent ?? id
-    return grain === "function" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
+    return grain === "declaration" ? (boxAt.get(spot.box)?.parent ?? spot.box) : spot.box
   }
   const chosen = (id: string) => !only || unitOfSpot(id) === only || id === only
 
