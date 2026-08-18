@@ -300,8 +300,24 @@ export function net(
   }
   const held = members(graph, calls, grain).filter((one) => known.has(unitAt(one.file)))
 
-  // a fleet draws one column per repo, and every band inside it is that repo's own
-  const columns = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
+  // a fleet draws one column per repo, and every band inside it is that repo's own.
+  // The order reads the way the requests run: whatever calls out on the left, whatever
+  // answers on the right, so the red lines cross the picture one way
+  const mineRepos = repos.filter((one) => layout.units.some((u) => repoOf(u.path) === one))
+  const faces = (one: string) => {
+    const mine = (path: string) => path === one || path.startsWith(`${one}/`)
+    let asks = 0
+    let serves = 0
+    for (const link of api?.links ?? []) {
+      if (mine(link.from) && !mine(link.to)) asks++
+      if (mine(link.to) && !mine(link.from)) serves++
+    }
+    return asks + serves ? (serves - asks) / (serves + asks) : 0
+  }
+  const facingRepo = new Map(mineRepos.map((one) => [one, faces(one)]))
+  const columns = [...mineRepos].sort(
+    (a, b) => (facingRepo.get(a) ?? 0) - (facingRepo.get(b) ?? 0) || a.localeCompare(b),
+  )
   const lanes = Math.max(1, columns.length)
   // a module is drawn as the box holding its name, and its dot only says where it sits
   const spots: Spot[] = (
@@ -392,114 +408,186 @@ export function net(
         ? Math.max(3, sizes.get(path)?.files ?? 1) * ROW * ROW
         : (inner.get(path) ?? []).length * ROW * ROW
 
+  // which way a module faces on the wire: -1 answers requests, 1 makes them, 0 neither.
+  // Laid out in that order a repo reads left to right, from what serves to what calls
+  const facing = new Map<string, number>()
+  {
+    const held = new Map<string, { serves: number; asks: number }>()
+    const bump = (path: string, which: "serves" | "asks") => {
+      const unit = unitAt(path)
+      if (!known.has(unit)) return
+      const one = held.get(unit) ?? { serves: 0, asks: 0 }
+      one[which]++
+      held.set(unit, one)
+    }
+    for (const one of api?.endpoints ?? []) bump(one.handler ?? one.file, "serves")
+    for (const one of api?.clients ?? []) bump(one.file, "asks")
+    for (const [unit, one] of held)
+      facing.set(unit, (one.asks - one.serves) / (one.asks + one.serves))
+  }
+
   // a level is a band, deepest at the top
-  const area = layout.units.reduce((sum, u) => sum + load(u.path), 0) * 1.35
-  const wideAll = Math.max(width, Math.min(6000, Math.sqrt(Math.max(1, area) * (width / tall))))
-  const wide = lanes > 1 ? Math.max(320, wideAll / lanes) : wideAll
-  // one module box holds four lines of writing, so fewer of them fit across a lane
-  const per = Math.max(2, Math.min(8, Math.round(wide / (grain === "module" ? 420 : 300))))
-  let deepest = 0
+  const areaOf = (held: typeof layout.units) =>
+    held.reduce((sum, u) => sum + load(u.path), 0) * 1.35
+  // a lane about as wide as it is tall: a column of boxes reads worse the taller it gets,
+  // and dividing one width between four repos is what made them slivers
+  const FLOOR = grain === "module" ? 420 : 320
   const LANE = 28
-  for (const [lane, column] of (lanes > 1 ? columns : [""]).entries()) {
-    const left = lane * (wide + LANE)
+  const laneOf = (column: string) => {
     const ours = lanes > 1 ? layout.units.filter((u) => repoOf(u.path) === column) : layout.units
+    const area = areaOf(ours)
+    const want = lanes > 1 ? Math.sqrt(area * 1.3) : Math.sqrt(area * (width / tall))
+    return { ours, wide: Math.max(FLOOR, Math.min(6000, want)) }
+  }
+
+  /** one repo laid out on its own, from its own corner */
+  const laid = (lanes > 1 ? columns : [""]).map((column) => {
+    const { ours, wide } = laneOf(column)
+    const mine: Box[] = []
     const levels = [...new Set(ours.map((u) => u.level))].sort((a, b) => b - a)
     let y = 0
     for (const level of levels) {
       const band = `L${level}`
       const top = y
-      const mine: Box[] = []
-      {
-        // each language keeps its own side
-        const here = ours
-          .filter((u) => u.level === level)
-          .sort(
-            (a, b) =>
-              repoOf(a.path).localeCompare(repoOf(b.path)) ||
-              (langAt.get(a.path) ?? "").localeCompare(langAt.get(b.path) ?? "") ||
-              a.path.localeCompare(b.path),
-          )
-        // a shelf mixes neither two languages nor two repos, so the columns stay one of each
-        const shelves: (typeof here)[] = []
-        for (let from = 0; from < here.length;) {
-          const lang = langAt.get(here[from].path) ?? ""
-          const mine = repoOf(here[from].path)
-          let to = from
-          while (
-            to < here.length &&
-            to - from < per &&
-            (langAt.get(here[to].path) ?? "") === lang &&
-            repoOf(here[to].path) === mine
-          )
-            to++
-          shelves.push(here.slice(from, to))
-          from = to
+      const here = ours
+        .filter((u) => u.level === level)
+        // each language keeps its own side, and inside one the modules that answer
+        // requests stand left of the modules that make them
+        .sort(
+          (a, b) =>
+            (langAt.get(a.path) ?? "").localeCompare(langAt.get(b.path) ?? "") ||
+            (facing.get(a.path) ?? 0) - (facing.get(b.path) ?? 0) ||
+            a.path.localeCompare(b.path),
+        )
+      const room = wide - 2 * PAD
+      // what each box wants: square pixels, laid square
+      const want = (unit: (typeof here)[number]) =>
+        Math.max(
+          grain === "module" ? 184 : 120,
+          Math.min(room, Math.sqrt(Math.max(1, load(unit.path)) * 1.35)),
+        )
+      // a shelf holds one language, and wraps when the next box would not fit
+      const shelves: (typeof here)[] = []
+      let held: typeof here = []
+      let across = 0
+      for (const unit of here) {
+        const w = want(unit)
+        const lang = langAt.get(unit.path) ?? ""
+        const same = !held.length || (langAt.get(held[0].path) ?? "") === lang
+        if (held.length && (!same || across + GAP + w > room)) {
+          shelves.push(held)
+          held = []
+          across = 0
         }
-        for (const shelf of shelves) {
-          const weights = shelf.map((u) => Math.sqrt(Math.max(1, load(u.path))))
-          const total = weights.reduce((sum, one) => sum + one, 0) || 1
-          const room = wide - 2 * PAD - GAP * (shelf.length - 1)
-          // its share, never wider than twice its height, and never narrower than the
-          // name a module box carries, since at that grain the box is all there is to read
-          const widths = shelf.map((unit, i) =>
-            Math.max(
-              grain === "module" ? 184 : 120,
-              Math.min((room * weights[i]) / total, Math.sqrt(Math.max(1, load(unit.path)) * 2.2)),
-            ),
-          )
-          // the floor can outgrow a narrow lane, and a box past its own border reads as
-          // belonging to the repo beside it, so the shelf is scaled back to fit
-          const asked = widths.reduce((sum, one) => sum + one, 0)
-          if (asked > room) for (const i of widths.keys()) widths[i] *= room / asked
-          const spare = Math.max(0, room - widths.reduce((sum, one) => sum + one, 0))
-          const step = spare / (shelf.length + 1)
-          let x = PAD + step
-          let tall = 0
-          shelf.forEach((unit, i) => {
-            const w = widths[i]
-            const inside = kids.get(unit.path) ?? []
-            const h =
-              grain === "function"
-                ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
-                : Math.max(grain === "module" ? 88 : 80, Math.min(460, load(unit.path) / w + 20))
-            mine.push({ id: unit.path, label: unit.path, parent: band, depth: 1, x, y, w, h })
-            x += w + GAP + step
-            tall = Math.max(tall, h)
-          })
-          y += tall + GAP
-        }
+        held.push(unit)
+        across += (across ? GAP : 0) + w
       }
-      boxes.push({
+      if (held.length) shelves.push(held)
+
+      for (const shelf of shelves) {
+        const widths = shelf.map(want)
+        // the floor can outgrow a narrow lane, so a shelf is scaled back to fit inside it
+        const asked = widths.reduce((sum, one) => sum + one, 0) + GAP * (shelf.length - 1)
+        if (asked > room)
+          for (const i of widths.keys())
+            widths[i] *= (room - GAP * (shelf.length - 1)) / (asked - GAP * (shelf.length - 1))
+        const spare = Math.max(
+          0,
+          room - widths.reduce((sum, one) => sum + one, 0) - GAP * (shelf.length - 1),
+        )
+        const step = spare / (shelf.length + 1)
+        let x = PAD + step
+        let tall = 0
+        shelf.forEach((unit, i) => {
+          const w = widths[i]
+          const inside = kids.get(unit.path) ?? []
+          const h =
+            grain === "function"
+              ? pack(fitted(inside, w - 2 * PAD), w - 2 * PAD).h + 14
+              : Math.max(
+                  grain === "module" ? 88 : 80,
+                  // never a sliver: past its own width a box is wider, not taller
+                  Math.min(w * 1.7, load(unit.path) / w + 20),
+                )
+          mine.push({ id: unit.path, label: unit.path, parent: band, depth: 1, x, y, w, h })
+          x += w + GAP + step
+          tall = Math.max(tall, h)
+        })
+        y += tall + GAP
+      }
+      mine.push({
         id: lanes > 1 ? `${column}:${band}` : band,
-        label: lanes > 1 && level === levels[0] ? column : `level ${level}`,
+        // the lane border carries the repo's name, so a band only ever says its level
+        label: `level ${level}`,
         parent: "",
         depth: 0,
-        x: left + PAD / 2,
+        x: PAD / 2,
         y: top,
         w: wide - PAD,
         h: Math.max(y - GAP - top, 40),
       })
-      boxes.push(
-        ...mine.map((one) => ({
-          ...one,
-          x: one.x + left,
-          parent: lanes > 1 ? `${column}:${one.parent}` : one.parent,
-        })),
-      )
     }
-    // the lane itself, drawn as a border so two repos never read as one picture
-    if (lanes > 1)
-      boxes.push({
-        id: `repo:${column}`,
-        label: column,
-        parent: "",
-        depth: -1,
-        x: left,
-        y: -LANE / 2,
-        w: wide,
-        h: y + LANE / 2,
-      })
-    deepest = Math.max(deepest, y)
+    for (const box of mine)
+      if (box.depth === 1) box.parent = lanes > 1 ? `${column}:${box.parent}` : box.parent
+    return { column, wide, deep: Math.max(y, 60), boxes: mine }
+  })
+
+  // and the lanes themselves packed into rows, so a folder of repos is not one long strip
+  const room = Math.max(
+    width,
+    Math.sqrt(laid.reduce((sum, one) => sum + one.wide * one.deep, 0) * (width / tall)),
+  )
+  const total = laid.reduce((sum, one) => sum + one.wide + LANE, 0)
+  const lines = Math.max(1, Math.ceil(total / room))
+  // rows of about the same width rather than filled to the brim, or the last one holds a
+  // single lane and whatever the order put last stops being on the right
+  const across = total / lines
+  const rows: (typeof laid)[] = []
+  {
+    let held: typeof laid = []
+    let wide_ = 0
+    let rest = laid.length
+    let left_ = lines
+    for (const one of laid) {
+      if (held.length && (wide_ + one.wide > across || rest < left_) && left_ > 1) {
+        rows.push(held)
+        held = []
+        wide_ = 0
+        left_--
+      }
+      held.push(one)
+      wide_ += one.wide + LANE
+      rest--
+    }
+    if (held.length) rows.push(held)
+  }
+
+  let deepest = 0
+  let widest = 0
+  // the rows run bottom to top and every row left to right, both by which way a repo faces,
+  // so nothing that calls out ever sits above or right of something that answers
+  let top = lanes > 1 ? LANE : 0
+  for (const held of [...rows].reverse()) {
+    let left = 0
+    for (const one of held) {
+      for (const box of one.boxes) boxes.push({ ...box, x: box.x + left, y: box.y + top })
+      // the lane itself, drawn as a border so two repos never read as one picture
+      if (lanes > 1)
+        boxes.push({
+          id: `repo:${one.column}`,
+          label: one.column,
+          parent: "",
+          depth: -1,
+          x: left,
+          y: top - LANE / 2,
+          w: one.wide,
+          h: one.deep + LANE / 2,
+        })
+      left += one.wide + LANE
+      widest = Math.max(widest, left - LANE)
+      deepest = Math.max(deepest, top + one.deep)
+    }
+    top += Math.max(...held.map((one) => one.deep)) + LANE * 2
   }
 
   // then the file boxes, inside the unit box that was just placed
@@ -582,7 +670,9 @@ export function net(
     spots,
     boxes,
     wires: wired,
-    width: Math.max(wide * lanes + LANE * Math.max(0, lanes - 1), width),
+    // what was drawn, not what it was drawn in: padding the picture out to the frame
+    // leaves a small repo sitting against the left edge rather than in the middle
+    width: Math.max(widest, 1),
     height: Math.max(deepest, 200),
     passes,
   }

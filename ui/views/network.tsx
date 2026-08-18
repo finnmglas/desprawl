@@ -105,6 +105,9 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     recall<{ scale: number; x: number; y: number }>("net.camera") ?? { scale: 1, x: 0, y: 0 },
   )
   const drag = useRef<{ x: number; y: number } | null>(null)
+  // a drag ends in a click event of its own, and opening whatever it ended on is not
+  // what anybody meant by moving the picture
+  const moved = useRef(false)
   // one finger drags, two pinch
   const fingers = useRef<{ x: number; y: number; away: number } | null>(null)
   const [wide, setWide] = useState(900)
@@ -182,6 +185,9 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     schedule()
   }
   const seats = useRef(new Map<string, { x: number; y: number }>())
+  // and where every box was, since a module is drawn as one and a jump is what a reader
+  // cannot follow: an arriving api graph reorders them under the cursor
+  const frames = useRef(new Map<string, { x: number; y: number; w: number; h: number }>())
   // whether the camera is where the reader put it, or still where it was opened
   const touched = useRef(recall<boolean>("net.touched") ?? false)
   const framed = useRef(recall<{ w: number; h: number }>("net.framed") ?? { w: 0, h: 0 })
@@ -194,7 +200,11 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     },
     [],
   )
-  const moving = useRef<{ from: Map<string, { x: number; y: number }>; at: number } | null>(null)
+  const moving = useRef<{
+    from: Map<string, { x: number; y: number }>
+    boxes: Map<string, { x: number; y: number; w: number; h: number }>
+    at: number
+  } | null>(null)
 
   // a fresh picture opens whole: hunting for it loses the shape
   const whole = () => {
@@ -213,7 +223,10 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     if (!drawn) return
     setNear(null)
     // the nodes walk to where they now are, so a grain change is followed
-    if (moves && seats.current.size) moving.current = { from: seats.current, at: performance.now() }
+    // the clock starts on the first frame drawn, not here: laying a big graph out takes
+    // longer than the walk itself, and the walk would be over before anything moved
+    if (moves && (seats.current.size || frames.current.size))
+      moving.current = { from: seats.current, boxes: frames.current, at: 0 }
     // kept as a share, since the next drawing resizes
     const kept = only && drawn.boxes.find((b) => b.id === only)
     const was = framed.current
@@ -557,6 +570,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
 
     const now = performance.now()
     const walk = moving.current
+    if (walk && !walk.at) walk.at = now
     const step = walk ? Math.min(1, (now - walk.at) / 500) : 1
     // slow out: settling rather than stopping dead is what reads as movement
     const eased = 1 - (1 - step) ** 3
@@ -565,6 +579,18 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
       if (!was) return spot
       return { x: was.x + (spot.x - was.x) * eased, y: was.y + (spot.y - was.y) * eased }
     }
+    /** a box on its way from where it was drawn last time to where it belongs now */
+    const framed = (box: Box) => {
+      const was = step < 1 && walk ? walk.boxes.get(box.id) : undefined
+      if (!was) return box
+      return {
+        ...box,
+        x: was.x + (box.x - was.x) * eased,
+        y: was.y + (box.y - was.y) * eased,
+        w: was.w + (box.w - was.w) * eased,
+        h: was.h + (box.h - was.h) * eased,
+      }
+    }
     const rough = step < 1 || now < busy.current
     const text = (base: number) => (base * scale ** 0.35) / scale
 
@@ -572,8 +598,10 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     const where = (id: string) => {
       const spot = at.get(id)
       if (spot) return { ...seat(spot), r: spot.r }
-      const box = boxAt.get(id)
-      return box ? { x: box.x + box.w / 2, y: box.y + box.h / 2, r: 0 } : null
+      const held = boxAt.get(id)
+      if (!held) return null
+      const box = framed(held)
+      return { x: box.x + box.w / 2, y: box.y + box.h / 2, r: 0 }
     }
 
     const lit = near ? new Set([near.id]) : null
@@ -587,7 +615,8 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     const ends = edge && !near ? new Set([edge.from, edge.to]) : null
 
     if (bounds)
-      for (const box of drawn.boxes) {
+      for (const held of drawn.boxes) {
+        const box = framed(held)
         const picked = box.id === only
         if (box.depth === -1) {
           // a repo lane: a border and its name, so two repos never read as one picture
@@ -876,6 +905,12 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
 
     // where everything ended up, so the next arrangement knows where to walk from
     seats.current = new Map(drawn.spots.map((spot) => [spot.id, seat(spot)]))
+    frames.current = new Map(
+      drawn.boxes.map((box) => {
+        const one = framed(box)
+        return [box.id, { x: one.x, y: one.y, w: one.w, h: one.h }]
+      }),
+    )
     // one frame more while moving, and one after to put the detail back
     if (step < 1) schedule()
     else if (rough) setTimeout(schedule, 150)
@@ -1153,10 +1188,12 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                   className="block cursor-crosshair touch-none select-none"
                   onMouseDown={(event) => {
                     drag.current = { x: event.clientX, y: event.clientY }
+                    moved.current = false
                   }}
                   onTouchStart={(event) => {
                     const now = touching(event)
                     fingers.current = now
+                    moved.current = false
                     // a tap has no hover before it
                     if (now && event.touches.length === 1) setNear(spotAt(now.x, now.y))
                   }}
@@ -1165,6 +1202,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                     const was = fingers.current
                     fingers.current = now
                     if (!now || !was) return
+                    if (Math.abs(now.x - was.x) + Math.abs(now.y - was.y) > 3) moved.current = true
                     // the gap is the zoom, the midpoint stays put
                     if (now.away && was.away) {
                       const next = Math.min(
@@ -1197,8 +1235,11 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                   onMouseMove={(event) => {
                     const box = board.current!.getBoundingClientRect()
                     if (drag.current) {
-                      view.current.x += event.clientX - drag.current.x
-                      view.current.y += event.clientY - drag.current.y
+                      const dx = event.clientX - drag.current.x
+                      const dy = event.clientY - drag.current.y
+                      if (Math.abs(dx) + Math.abs(dy) > 3) moved.current = true
+                      view.current.x += dx
+                      view.current.y += dy
                       drag.current = { x: event.clientX, y: event.clientY }
                       return rushed()
                     }
@@ -1215,6 +1256,8 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
                     if (line?.from !== edge?.from || line?.to !== edge?.to) setEdge(line ?? null)
                   }}
                   onClick={(event) => {
+                    // it moved under the cursor, so the cursor was moving it
+                    if (moved.current) return
                     const box = board.current!.getBoundingClientRect()
                     const px = event.clientX - box.left
                     const py = event.clientY - box.top
