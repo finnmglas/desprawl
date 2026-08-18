@@ -50,7 +50,7 @@ export function does(one: Doing): boolean {
     return true
   }
 
-  if (url.pathname === "/api/tests") return json(kept.tests())
+  if (url.pathname === "/api/tests") return json(kept.tests(url.searchParams.get("repo")))
 
   if (url.pathname === "/api/actions") return json(actions(at(url) || held[0]))
 

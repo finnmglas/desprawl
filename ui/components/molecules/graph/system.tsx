@@ -45,7 +45,7 @@ export function System({
   /** the repo, since "this repo" says less than its own name does */
   name: string
   units: Unit[]
-  stack: Stack
+  stack?: Stack
   people: Contributor[]
   /** commits per contributor index, by folder */
   worked: Map<string, Record<number, number>>
@@ -127,11 +127,13 @@ export function System({
       ),
   })).filter((row) => row.held.length)
 
-  const named = [...new Set([...stack.hosts, ...stack.apis, ...stack.connects])].map((label) => ({
+  const named = [
+    ...new Set([...(stack?.hosts ?? []), ...(stack?.apis ?? []), ...(stack?.connects ?? [])]),
+  ].map((label) => ({
     label,
-    from: stack.from[label],
-    registry: REGISTRY_OF[stack.registries[label] ?? ""] ?? "npm",
-    talks: units.filter((u) => stack.from[label] && u.installs.includes(stack.from[label])),
+    from: stack?.from[label] ?? "",
+    registry: REGISTRY_OF[stack?.registries[label] ?? ""] ?? "npm",
+    talks: units.filter((u) => stack?.from[label] && u.installs.includes(stack.from[label])),
   }))
   // runs on one side, calls on the other
   const hosts = named.filter((s) => isHost(s.label))
@@ -206,12 +208,12 @@ export function System({
         <div className="flex flex-wrap items-center gap-1.5 border-b px-3 py-2">
           {/* the wall is the repo, so its name outranks the chips beside it */}
           <span className="text-base font-semibold">{name}</span>
-          {stack.frameworks.slice(0, 4).map((name) => (
+          {(stack?.frameworks ?? []).slice(0, 4).map((name) => (
             <Chip
               key={name}
               label={name}
-              from={stack.from[name]}
-              registry={REGISTRY_OF[stack.registries[name] ?? ""] ?? "npm"}
+              from={stack?.from[name] ?? ""}
+              registry={REGISTRY_OF[stack?.registries[name] ?? ""] ?? "npm"}
             />
           ))}
           {clients.length > 0 && (

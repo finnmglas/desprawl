@@ -29,9 +29,22 @@ export interface Commit {
   message?: string
 }
 
+/** a folder holding named repos, which is what desprawl reads as one */
+export function folder(held: Record<string, (Record<string, string> | Commit)[]>): string {
+  const dir = mkdtempSync(join(tmpdir(), "desprawl-fleet-"))
+  process.on("exit", () => rmSync(dir, { recursive: true, force: true }))
+  for (const [name, commits] of Object.entries(held)) repo(join(dir, name), ...commits)
+  return dir
+}
+
 /** repo({"a.ts": "x"}, {"a.ts": "x\ny"}) is two commits, dated in order */
-export function repo(...commits: (Record<string, string> | Commit)[]): string {
-  const dir = mkdtempSync(join(tmpdir(), "desprawl-test-"))
+export function repo(...commits: (Record<string, string> | Commit)[]): string
+export function repo(into: string, ...commits: (Record<string, string> | Commit)[]): string
+export function repo(...args: (string | Record<string, string> | Commit)[]): string {
+  const into = typeof args[0] === "string" ? (args.shift() as string) : ""
+  const commits = args as (Record<string, string> | Commit)[]
+  const dir = into || mkdtempSync(join(tmpdir(), "desprawl-test-"))
+  if (into) mkdirSync(into, { recursive: true })
   // a suite leaves one of these per repo, and tmpfs runs out of inodes long before bytes
   process.on("exit", () => rmSync(dir, { recursive: true, force: true }))
   const run = (when: string, ...args: string[]) =>

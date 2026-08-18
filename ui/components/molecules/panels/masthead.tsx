@@ -4,6 +4,7 @@
 import { Find } from "../find.tsx"
 import { NpmMark } from "../../atoms/icons.tsx"
 import { RemoteLink } from "../remote-link.tsx"
+import { Repos } from "./repos.tsx"
 import { Settings } from "../agent/settings.tsx"
 import { Tabs } from "../../atoms/tabs.tsx"
 import { toast } from "../../atoms/toast.tsx"
@@ -125,19 +126,11 @@ export function Masthead(props: Props) {
         )}
         <Find value={typed} onChange={setTyped} placeholder="Search panels" />
         {repos.length > 0 && onRepo && (
-          <select
-            value={only}
-            onChange={(event) => onRepo(event.target.value)}
-            title="Which repo in this folder"
-            className="bg-card h-9 max-w-40 shrink-0 rounded-md border px-2 text-sm"
-          >
-            <option value="">every repo</option>
-            {repos.map((one) => (
-              <option key={one} value={one}>
-                {one}
-              </option>
-            ))}
-          </select>
+          <Repos
+            all={repos}
+            chosen={only ? only.split(",") : []}
+            onChange={(next) => onRepo(next.join(","))}
+          />
         )}
         <Settings
           stats={stats}

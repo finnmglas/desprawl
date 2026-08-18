@@ -137,19 +137,20 @@ export function reads(one: Asked): boolean {
   }
 
   // slow, so the ui asks after it has painted
-  if (url.pathname === "/api/count") return json({ commits: kept.commits() })
+  if (url.pathname === "/api/count")
+    return json({ commits: kept.commits(url.searchParams.get("repo")) })
 
   // measured at even points, not accumulated
-  if (url.pathname === "/api/size") return json(kept.sizes())
+  if (url.pathname === "/api/size") return json(kept.sizes(url.searchParams.get("repo")))
 
   // seconds of work on a big repo, so only on ask
-  if (url.pathname === "/api/graph") return json(kept.graph(at(url)))
+  if (url.pathname === "/api/graph") return json(kept.graph(url.searchParams.get("repo")))
 
   // slower again than the import graph, since every body is read
-  if (url.pathname === "/api/calls") return json(kept.calls(at(url)))
+  if (url.pathname === "/api/calls") return json(kept.calls(url.searchParams.get("repo")))
 
   // which file serves an endpoint and which one calls it, across the whole folder
-  if (url.pathname === "/api/routes") return json(kept.api(at(url)))
+  if (url.pathname === "/api/routes") return json(kept.api(url.searchParams.get("repo")))
 
   // what moved between two dates, per file, for painting a window on the picture
   if (url.pathname === "/api/moved") {
@@ -160,10 +161,10 @@ export function reads(one: Asked): boolean {
     const names = kept.stats(false).contributors.map((c) => (c.email || c.name).toLowerCase())
     return json(moved(at(url) || held[0], from, to, names))
   }
-  if (url.pathname === "/api/sprawl") return json(kept.sprawl())
+  if (url.pathname === "/api/sprawl") return json(kept.sprawl(url.searchParams.get("repo")))
 
   if (url.pathname === "/api/deps") {
-    kept.deps().then(
+    kept.deps(url.searchParams.get("repo")).then(
       (one) => json(one),
       (err: Error) => json({ error: err.message }, 500),
     )
@@ -173,10 +174,10 @@ export function reads(one: Asked): boolean {
   if (url.pathname === "/api/static") {
     const made = onePage(kept.stats(false), {
       root: at(url) || repo,
-      graph: kept.graph(at(url)),
+      graph: kept.graph(url.searchParams.get("repo")),
       called: kept.read.calls,
       deps: kept.read.deps,
-      suite: kept.tests(),
+      suite: kept.tests(url.searchParams.get("repo")),
       viewer: html,
     })
     return send(200, made.html, "text/html")
@@ -189,9 +190,9 @@ export function reads(one: Asked): boolean {
     const to = url.searchParams.get("to") ?? ""
     if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to))
       return send(400, "bad dates", "text/plain")
-    return json(hourly(repo, from, to))
+    return json(hourly(kept.about(url.searchParams.get("repo")), from, to))
   }
 
-  if (url.pathname === "/api/timeline") return json(kept.timeline())
+  if (url.pathname === "/api/timeline") return json(kept.timeline(url.searchParams.get("repo")))
   return false
 }

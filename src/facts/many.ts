@@ -12,9 +12,13 @@ import { joined, reading } from "../read/routes.ts"
 import type { Api, Client, Endpoint } from "../read/routes.ts"
 import type { Calls } from "../read/calls.ts"
 import type { Graph } from "../read/graph.ts"
-import type { Commit, Contributor, Node, Series, Stats } from "../read/model.ts"
+import type { Commit, Contributor, Node, Series, Stack, Stats } from "../read/model.ts"
 
 /** a folder is a fleet when it is not a repo itself and holds more than one */
+/** the repos a reader is about: the ones it named, or the whole folder */
+const held = (path: string, only?: string[]): string[] =>
+  only?.length ? fleet(path).filter((one) => only.includes(one)) : fleet(path)
+
 export function fleet(path: string): string[] {
   if (existsSync(join(path, ".git"))) return []
   let names: string[] = []
@@ -156,9 +160,115 @@ function align(each: Stats[]): Series[] {
   })
 }
 
+/** one row per address across the fleet, which is what a folded row is folded from */
+function addresses(each: Stats[]): Contributor[] {
+  const by = new Map<string, Contributor>()
+  for (const one of each)
+    for (const who of one.identities) {
+      const key = (who.email || who.name).toLowerCase()
+      const held = by.get(key)
+      if (!held) {
+        by.set(key, { ...who })
+        continue
+      }
+      held.commits += who.commits
+      held.insertions += who.insertions
+      held.deletions += who.deletions
+      held.files += who.files
+      if (who.first < held.first) held.first = who.first
+      if (who.last > held.last) held.last = who.last
+    }
+  return [...by.values()].sort((a, b) => b.commits - a.commits)
+}
+
+/** what the whole folder is built with: every list unioned, nothing claimed as its own */
+function stacks(each: Stats[]): Stack {
+  const all = each.map((one) => one.stack)
+  const first = all[0]
+  const union = (of: (one: Stack) => string[]): string[] => [...new Set(all.flatMap(of))]
+  const kinds = new Set(all.map((one) => one.kind))
+  return {
+    ...first,
+    // a folder has no manifest of its own, so it claims no name, version or licence
+    kind:
+      kinds.size === 1 ? first.kind : kinds.has("none") && kinds.size === 2 ? first.kind : "mixed",
+    name: undefined,
+    version: undefined,
+    license: undefined,
+    private: all.every((one) => one.private),
+    vendored: all.reduce((sum, one) => sum + one.vendored, 0),
+    dependencies: all.reduce((sum, one) => sum + one.dependencies, 0),
+    manifests: all.flatMap((one) => one.manifests),
+    strict: {
+      on: all.reduce((sum, one) => sum + one.strict.on, 0),
+      off: all.reduce((sum, one) => sum + one.strict.off, 0),
+    },
+    containers: {
+      dockerfiles: all.reduce((sum, one) => sum + one.containers.dockerfiles, 0),
+      compose: all.reduce((sum, one) => sum + one.containers.compose, 0),
+      kubernetes: all.reduce((sum, one) => sum + one.containers.kubernetes, 0),
+      terraform: all.reduce((sum, one) => sum + one.containers.terraform, 0),
+    },
+    pinning: {
+      exact: all.reduce((sum, one) => sum + one.pinning.exact, 0),
+      caret: all.reduce((sum, one) => sum + one.pinning.caret, 0),
+      tilde: all.reduce((sum, one) => sum + one.pinning.tilde, 0),
+      range: all.reduce((sum, one) => sum + one.pinning.range, 0),
+      linked: all.reduce((sum, one) => sum + one.pinning.linked, 0),
+    },
+    typescript: union((one) => one.typescript),
+    managers: union((one) => one.managers),
+    lockfiles: union((one) => one.lockfiles),
+    build: union((one) => one.build),
+    frameworks: union((one) => one.frameworks),
+    state: union((one) => one.state),
+    ui: union((one) => one.ui),
+    connects: union((one) => one.connects),
+    testing: union((one) => one.testing),
+    runtimes: union((one) => one.runtimes),
+    styling: union((one) => one.styling),
+    content: union((one) => one.content),
+    visuals: union((one) => one.visuals),
+    observability: union((one) => one.observability),
+    auth: union((one) => one.auth),
+    scripts: union((one) => one.scripts),
+    linters: union((one) => one.linters),
+    formatters: union((one) => one.formatters),
+    rules: union((one) => one.rules),
+    ci: union((one) => one.ci),
+    bundlers: union((one) => one.bundlers),
+    hosts: union((one) => one.hosts),
+    apps: union((one) => one.apps),
+    node: union((one) => one.node),
+    modules: union((one) => one.modules),
+    env: union((one) => one.env),
+    apis: union((one) => one.apis),
+    licenses: union((one) => one.licenses),
+    parts: union((one) => one.parts),
+    ports: [...new Set(all.flatMap((one) => one.ports))],
+    from: Object.assign({}, ...all.map((one) => one.from)) as Record<string, string>,
+    registries: Object.assign({}, ...all.map((one) => one.registries)) as Record<string, string>,
+    ai: {
+      ...first.ai,
+      signed: all.reduce((sum, one) => sum + one.ai.signed, 0),
+      scanned: all.reduce((sum, one) => sum + one.ai.scanned, 0),
+      capped: all.some((one) => one.ai.capped),
+      by: Object.assign({}, ...all.map((one) => one.ai.by)) as Record<string, number>,
+      tools: union((one) => one.ai.tools),
+    },
+  }
+}
+
 /** every repo in the folder as one set of numbers, each still readable alone */
-export function many(path: string, cap?: number): { each: Stats[]; all: Stats } {
-  const each = fleet(path).map((one) => analyze(one, cap))
+export function many(
+  path: string,
+  cap?: number,
+  /** the repos to read, when a reader asked for some of them rather than the folder */
+  only?: string[],
+  /** how to read one, so a caller holding them already hands them over */
+  of: (repo: string) => Stats = (one) => analyze(one, cap),
+): { each: Stats[]; all: Stats } {
+  const each = held(path, only).map(of)
   if (!each.length) throw new Error(`${path} holds no repos to read`)
 
   const { all: contributors, seats } = people(each)
@@ -191,7 +301,8 @@ export function many(path: string, cap?: number): { each: Stats[]; all: Stats } 
       truncated: each.some((one) => one.truncated),
       thin: each.some((one) => one.thin),
       contributors,
-      identities: contributors,
+      stack: stacks(each),
+      identities: addresses(each),
       log: logs(each, seats),
       active: busy(each, seats, series[0]?.start ?? first, series[0]?.data.length ?? 0),
       remotes: each.flatMap((one) => one.remotes),
@@ -206,14 +317,14 @@ export function many(path: string, cap?: number): { each: Stats[]; all: Stats } 
 }
 
 /** every repo's import graph on one set of keys, prefixed so nothing crosses a repo */
-export function graphs(path: string): Graph {
+export function graphs(path: string, only?: string[]): Graph {
   const all: Graph = {
     modules: {},
     packages: {},
     missing: [],
-    stats: { files: 0, edges: 0, external: 0, generated: 0, assets: 0, coverage: 0 },
+    stats: { files: 0, edges: 0, external: 0, generated: 0, assets: 0, seen: 0, coverage: 0 },
   }
-  const repos = fleet(path)
+  const repos = held(path, only)
   all.repos = repos.map(named)
   for (const one of repos) {
     const under = named(one)
@@ -234,18 +345,20 @@ export function graphs(path: string): Graph {
     all.stats.external += graph.stats.external
     all.stats.generated += graph.stats.generated
     all.stats.assets += graph.stats.assets
+    all.stats.seen += graph.stats.seen
+    ;(all.by ??= {})[under] = graph.stats
   }
-  const asked = all.stats.edges + all.stats.external + all.missing.length
-  all.stats.coverage = asked ? (all.stats.edges + all.stats.external) / asked : 1
+  const seen = all.stats.seen
+  all.stats.coverage = seen ? (seen - all.missing.length) / seen : 1
   return all
 }
 
 /** every repo's api, read as one wire: a call in one repo lands on an endpoint in another */
-export function everyApi(path: string): Api {
+export function everyApi(path: string, only?: string[]): Api {
   const endpoints: Endpoint[] = []
   const clients: Client[] = []
   const hosts: string[] = []
-  for (const one of fleet(path)) {
+  for (const one of held(path, only)) {
     const under = named(one)
     const at = (file: string) => `${under}/${file}`
     const graph = build(one)
@@ -268,14 +381,14 @@ export function everyApi(path: string): Api {
 }
 
 /** and every call graph, on the same prefixed keys */
-export function everyCall(path: string): Calls {
+export function everyCall(path: string, only?: string[]): Calls {
   const all: Calls = {
     symbols: {},
     unresolved: [],
     // prettier-ignore
     stats: { files: 0, symbols: 0, functions: 0, classes: 0, components: 0, edges: 0, external: 0, builtin: 0, coverage: 0, unresolved: 0, uncalled: 0, lines: 0 },
   }
-  for (const one of fleet(path)) {
+  for (const one of held(path, only)) {
     const under = named(one)
     const at = (id: string) => `${under}/${id}`
     const found = calls(one)
@@ -290,6 +403,7 @@ export function everyCall(path: string): Calls {
     all.unresolved.push(...found.unresolved.map((one) => ({ ...one, from: one.from.map(at) })))
     for (const key of Object.keys(all.stats) as (keyof Calls["stats"])[])
       if (key !== "coverage") all.stats[key] += found.stats[key]
+    ;(all.by ??= {})[under] = found.stats
   }
   const seen = all.stats.edges + all.stats.external + all.stats.builtin + all.stats.unresolved
   all.stats.coverage = seen ? (all.stats.edges + all.stats.external + all.stats.builtin) / seen : 1

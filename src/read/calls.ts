@@ -12,6 +12,8 @@ export type { Symbol }
 
 export interface Calls {
   symbols: Record<string, Symbol>
+  /** what each repo in a folder came to on its own, when a folder was read as one */
+  by?: Record<string, Calls["stats"]>
   /** resolved to nothing: a global, or dynamic. One row per name, not per call site */
   unresolved: { name: string; sites: number; from: string[] }[]
   stats: {

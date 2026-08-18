@@ -109,7 +109,6 @@ export function Architecture(props: Props) {
                       faces={faces}
                       units={mine}
                       repos={repos}
-                      stack={stats.stack}
                       chosen={holds(
                         at.pick,
                         units.map((u) => u.path),

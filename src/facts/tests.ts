@@ -26,6 +26,31 @@ export interface Suite {
   ran: Run | null
 }
 
+/** nothing found, which is also what a folder of repos has in common */
+const EMPTY: Suite = {
+  script: "",
+  command: "",
+  files: 0,
+  cases: 0,
+  runners: [],
+  measure: "",
+  measured: "",
+  coverage: null,
+  covered: "",
+  ran: null,
+}
+
+/** a folder of repos has as many suites as it has repos, and no one command to run */
+export function merged(all: Suite[]): Suite {
+  if (all.length < 2) return all[0] ?? EMPTY
+  return {
+    ...EMPTY,
+    files: all.reduce((sum, one) => sum + one.files, 0),
+    cases: all.reduce((sum, one) => sum + one.cases, 0),
+    runners: [...new Set(all.flatMap((one) => one.runners))],
+  }
+}
+
 export interface Run {
   ok: boolean
   code: number

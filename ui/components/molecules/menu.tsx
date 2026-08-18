@@ -7,16 +7,18 @@ import { Button } from "../atoms/button.tsx"
 import { cn } from "../../lib/app/ui.ts"
 
 export interface MenuProps {
-  children: React.ReactNode
+  children: React.ReactNode | ((close: () => void) => React.ReactNode)
   className?: string
   /** Defaults to an ellipsis. */
   trigger?: React.ReactNode
+  /** a trigger with words in it is as wide as they are, not a square */
+  wide?: boolean
   title?: string
   /** Return true to swallow the click */
   onTriggerClick?: (event: React.MouseEvent) => boolean
 }
 
-export function Menu({ children, className, trigger, title, onTriggerClick }: MenuProps) {
+export function Menu({ children, className, trigger, title, wide, onTriggerClick }: MenuProps) {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
 
@@ -41,7 +43,7 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
         variant="outline"
         size="icon"
         // on dark the page behind is darker, so it reads as a hole
-        className="bg-card"
+        className={cn("bg-card", wide && "w-auto gap-1.5 px-3")}
         title={title ?? "More"}
         onClick={(event) => {
           if (onTriggerClick?.(event)) return
@@ -55,7 +57,7 @@ export function Menu({ children, className, trigger, title, onTriggerClick }: Me
           onClick={() => setOpen(false)}
           className="bg-card absolute right-0 z-40 mt-1 flex w-72 flex-col rounded-md border p-1 shadow-md"
         >
-          {children}
+          {typeof children === "function" ? children(() => setOpen(false)) : children}
         </div>
       )}
     </div>

@@ -265,6 +265,31 @@ const blank = (name: string, range: string, dev: boolean, ecosystem: string): De
   advisories: [],
 })
 
+/** a folder of repos installs one set of packages between them, each named once */
+export function joined(all: Deps[]): Deps {
+  if (all.length < 2) return all[0] ?? { list: [], offline: false, missed: 0, checked: "" }
+  const held = new Map<string, Dep>()
+  for (const one of all)
+    for (const dep of one.list) {
+      const key = `${dep.ecosystem}:${dep.name}@${dep.version}`
+      const seen = held.get(key)
+      // asked for by any of them is asked for, and shipping anywhere is not dev only
+      if (seen)
+        held.set(key, { ...seen, direct: seen.direct || dep.direct, dev: seen.dev && dep.dev })
+      else held.set(key, dep)
+    }
+  return {
+    list: [...held.values()],
+    offline: all.some((one) => one.offline),
+    missed: all.reduce((sum, one) => sum + one.missed, 0),
+    checked:
+      all
+        .map((one) => one.checked)
+        .sort()
+        .at(-1) ?? "",
+  }
+}
+
 /** licences from disk, advisories from osv */
 export async function deps(repo: string): Promise<Deps> {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()

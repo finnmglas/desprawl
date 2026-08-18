@@ -216,13 +216,17 @@ function App({
     document.title = `${name} · desprawl`
   }, [stats.repo])
 
+  // the repos this page is about, and none of them when it is about one
+  const chosen = only ? only.split(",").filter(Boolean) : repos
+  const read = chosen.length === 1 ? [] : chosen
+
   const view = (one: string) =>
     one === "Tasks" ? (
       <Tasks stats={stats} faces={faces} />
     ) : one === "Graph" ? (
       <>
-        {wanted("Network") && <Network stats={stats} repos={only ? [] : repos} />}
-        {wanted("Modules") && <Modules stats={stats} faces={faces} repos={only ? [] : repos} />}
+        {wanted("Network") && <Network stats={stats} repos={read} />}
+        {wanted("Modules") && <Modules stats={stats} faces={faces} repos={read} />}
         {wanted("Execution") && <Execution stats={stats} />}
         <Onward stats={stats} current="Graph" />
       </>
@@ -232,7 +236,7 @@ function App({
         metadata={prefs.metadata || printing}
         onMetadata={(open) => change({ metadata: open })}
         faces={faces}
-        repos={only ? [] : repos}
+        repos={read}
       />
     )
 
@@ -389,7 +393,11 @@ function Root() {
       })
       .then((next) => {
         setStats(next)
-        toast(repo || "Every repo", next.repo)
+        const named = repo.split(",").filter(Boolean)
+        toast(
+          named.length > 1 ? `${named.length} repos` : (named[0] ?? "Every repo"),
+          named.length > 1 ? named.join(", ") : next.repo,
+        )
       })
       .catch((err: Error) => setError(err.message))
   }

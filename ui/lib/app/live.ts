@@ -10,6 +10,7 @@ import type { Action, Alive } from "../../../src/serve/actions.ts"
 import type { Agent } from "../../../src/serve/agent.ts"
 import type { Talk } from "../../../src/serve/talk.ts"
 import type { Graph } from "../../../src/read/graph.ts"
+import { apiIn, callsIn, graphIn } from "../../../src/facts/within.ts"
 import type { Api } from "../../../src/read/routes.ts"
 import type { Detail, Moved } from "../../../src/facts/history.ts"
 import type { Hours, Timeline } from "../../../src/facts/samples.ts"
@@ -115,6 +116,7 @@ export const allTime = (): Promise<Timeline | null> => ask<Timeline | null>("/ap
 /** built on the first ask, or carried by a static page */
 // held for the life of the page, or every tab switch refetches a megabyte
 const held = new Map<string, Promise<unknown>>()
+const whole = new Map<string, unknown>()
 const drop = () => held.clear()
 const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
   const found = (held.get(path) ?? made()) as Promise<T>
@@ -124,22 +126,51 @@ const once = <T>(path: string, made: () => Promise<T>): Promise<T> => {
   return found
 }
 
+/** what a pick means: the repos it named, or none when the page is about the folder */
+const picked = (): string[] => only.split(",").filter(Boolean)
+
+/**
+ * the whole folder is read once, and picking some of it filters what is already here:
+ * the server would answer the same thing a second time, minutes later on a big folder
+ */
+const some = <T>(path: string, take: (whole: T, names: string[]) => T, ask_: () => Promise<T>) =>
+  once(path, async () => {
+    const names = picked()
+    const all = whole.get(path) as T | undefined
+    if (all && names.length) return take(all, names)
+    const made = await ask_()
+    if (made && !names.length) whole.set(path, made)
+    return made
+  })
+
 export const importGraph = (): Promise<Graph | null> =>
   window.__DESPRAWL_GRAPH__
     ? Promise.resolve(window.__DESPRAWL_GRAPH__)
-    : once("/api/graph", () => ask<Graph | null>("/api/graph", null))
+    : some<Graph | null>(
+        "/api/graph",
+        (all, names) => (all ? graphIn(all, names) : all),
+        () => ask<Graph | null>("/api/graph", null),
+      )
 
 /** every declaration and what calls it */
 export const callGraph = (): Promise<Calls | null> =>
   window.__DESPRAWL_CALLS__
     ? Promise.resolve(window.__DESPRAWL_CALLS__)
-    : once("/api/calls", () => ask<Calls | null>("/api/calls", null))
+    : some<Calls | null>(
+        "/api/calls",
+        (all, names) => (all ? callsIn(all, names) : all),
+        () => ask<Calls | null>("/api/calls", null),
+      )
 
 /** the endpoints, the call sites, and which of them reach each other */
 export const apiGraph = (): Promise<Api | null> =>
   window.__DESPRAWL_ROUTES__
     ? Promise.resolve(window.__DESPRAWL_ROUTES__)
-    : once("/api/routes", () => ask<Api | null>("/api/routes", null))
+    : some<Api | null>(
+        "/api/routes",
+        (all, names) => (all ? apiIn(all, names) : all),
+        () => ask<Api | null>("/api/routes", null),
+      )
 
 /** the whole thing as one file, built by the server */
 export async function staticPage(): Promise<string | null> {

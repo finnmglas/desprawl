@@ -10,9 +10,12 @@ export interface Timeline {
   last: string
   commits: number[]
   devs: number[]
-  /** even points, for measuring size across history */
-  samples: { hash: string; date: string }[]
+  /** even points, for measuring size across history, each in the repo it was read from */
+  samples: { hash: string; date: string; repo: string }[]
 }
+
+/** one repo, or a folder of them read as one */
+const each = (repo: string | string[]): string[] => (Array.isArray(repo) ? repo : [repo])
 
 const SAMPLES = 80
 
@@ -28,22 +31,27 @@ export interface Hours {
 }
 
 /** every hour between two days, read with the diff */
-export function hourly(repo: string, from: string, to: string): Hours {
+export function hourly(repo: string | string[], from: string, to: string): Hours {
   // git windows in local time, %at is an instant
   const edge = (day: string, by: number) =>
     new Date(Date.parse(day) + by * DAY).toISOString().slice(0, 10)
-  const log = git(
-    repo,
-    "log",
-    `--since=${edge(from, -1)}`,
-    `--until=${edge(to, 1)}`,
-    "--numstat",
-    "--pretty=format:%x01%at%x1f%aE",
-  )
   const counts = new Map<string, number>()
   const adds = new Map<string, number>()
   const dels = new Map<string, number>()
   const who = new Map<string, Set<string>>()
+  // every repo read into the same hours, so a folder of them counts each person once
+  const log = each(repo)
+    .map((one) =>
+      git(
+        one,
+        "log",
+        `--since=${edge(from, -1)}`,
+        `--until=${edge(to, 1)}`,
+        "--numstat",
+        "--pretty=format:%x01%at%x1f%aE",
+      ),
+    )
+    .join("\n")
   let at = ""
   for (const line of log.split("\n")) {
     if (line.startsWith("\x01")) {
@@ -81,18 +89,19 @@ export function hourly(repo: string, from: string, to: string): Hours {
 }
 
 // dates and authors only, no diff: fifteen seconds not twenty minutes
-export function timeline(repo: string): Timeline {
-  const log = git(repo, "log", "--format=%at%x1f%aE%x1f%h")
+export function timeline(repo: string | string[]): Timeline {
   const byDay = new Map<string, Set<string>>()
   const counts = new Map<string, number>()
   let total = 0
   let min = Infinity
   let max = -Infinity
-  const picked: { hash: string; date: string }[] = []
+  const picked: { hash: string; date: string; repo: string }[] = []
 
+  const mine = each(repo)
+  const log = mine.map((one) => git(one, "log", `--format=%at%x1f%aE%x1f%h%x1f${one}`)).join("\n")
   for (const line of log.split("\n")) {
     if (!line) continue
-    const [at, email, hash] = line.split("\x1f")
+    const [at, email, hash, from] = line.split("\x1f")
     const seconds = Number(at)
     if (!seconds) continue
     total++
@@ -102,7 +111,7 @@ export function timeline(repo: string): Timeline {
     max = Math.max(max, seconds)
     const stamp = new Date(seconds * 1000).toISOString().slice(0, 10)
     counts.set(stamp, (counts.get(stamp) ?? 0) + 1)
-    picked.push({ hash, date: stamp })
+    picked.push({ hash, date: stamp, repo: from })
     const who = byDay.get(stamp) ?? new Set<string>()
     who.add((email ?? "").toLowerCase())
     byDay.set(stamp, who)
@@ -119,8 +128,12 @@ export function timeline(repo: string): Timeline {
   }
   // log is newest first, so reverse then thin
   picked.reverse()
-  const step = Math.max(1, Math.floor(picked.length / SAMPLES))
-  const samples = picked.filter((_, i) => i % step === 0 || i === picked.length - 1)
+  const want = Math.max(2, Math.floor(SAMPLES / mine.length))
+  const samples = mine.flatMap((one) => {
+    const held = picked.filter((sample) => sample.repo === one)
+    const step = Math.max(1, Math.floor(held.length / want))
+    return held.filter((_, i) => i % step === 0 || i === held.length - 1)
+  })
 
   return { total, first, last, commits, devs, samples }
 }

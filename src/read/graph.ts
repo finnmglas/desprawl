@@ -41,6 +41,8 @@ export interface Graph {
   modules: Record<string, Module>
   /** the repos it was read from, when a folder of them was read as one */
   repos?: string[]
+  /** and what each of them came to on its own, so some of them can be read back out */
+  by?: Record<string, Graph["stats"]>
   packages: Record<string, string[]> // package to its importers
   missing: Missing[]
   stats: {
@@ -49,6 +51,8 @@ export interface Graph {
     external: number
     generated: number // on disk, untracked
     assets: number // css, json: edges but not modules
+    /** specifiers read, which is what coverage is a share of */
+    seen: number
     coverage: number // share of specifiers resolved
   }
 }
@@ -436,6 +440,7 @@ export function build(repo: string): Graph {
       external,
       generated,
       assets,
+      seen,
       coverage: seen ? (seen - missing.length) / seen : 1,
     },
   }
