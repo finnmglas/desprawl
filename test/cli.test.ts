@@ -8,11 +8,26 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { test } from "node:test"
 import { explain, older } from "../src/facts/needs.ts"
+import { build } from "../src/read/graph.ts"
+import { calls } from "../src/read/calls.ts"
+import { knowledge } from "../src/facts/knowledge.ts"
+import { balanced, fold } from "../src/read/layers.ts"
+import { VERSION } from "../src/read/model.ts"
 import { anonymous } from "../src/serve/view.ts"
 import { isUrl } from "../src/serve/remote.ts"
 import type { Stats } from "../src/read/model.ts"
 import { VIEWS } from "../src/facts/views.ts"
 import { repo } from "./repo.ts"
+
+/** what the cli prints as json: an envelope, and the payload inside it */
+function said<T>(...args: string[]): { desprawl: string; kind: string; repo: string; data: T } {
+  return JSON.parse(run(...args).out) as {
+    desprawl: string
+    kind: string
+    repo: string
+    data: T
+  }
+}
 
 /** the real binary, since these are the paths a person actually walks into */
 function run(...args: string[]): { out: string; code: number } {
@@ -68,7 +83,7 @@ test("a folder that exists wins over the owner/repo shorthand", () => {
 
 test("the report and the json agree on the same repo", () => {
   const dir = repo({ "a.ts": "const a = 1\n" }, { "a.ts": "const a = 1\nconst b = 2\n" })
-  const json = JSON.parse(run("--json", dir).out)
+  const json = said<Record<string, number>>("--json", dir).data
   assert.equal(json.commits, 2)
   assert.equal(json.code, 2)
   assert.match(run("cli", dir).out, /2 commits/)
@@ -93,14 +108,14 @@ test("every view prints something a person and a parser can both read", async ()
 })
 
 test("a filter narrows the list and never invents a row", () => {
-  const all = JSON.parse(run("tasks", ".", "--json").out) as { kind: string; hits: string }[]
-  const size = JSON.parse(run("tasks", ".", "--json", "--kind", "size").out) as { kind: string }[]
+  const all = said<{ kind: string; hits: string }[]>("tasks", ".", "--json").data
+  const size = said<{ kind: string }[]>("tasks", ".", "--json", "--kind", "size").data
   assert.ok(size.length <= all.length)
   assert.ok(
     size.every((one) => one.kind === "size"),
     "a kind filter lets nothing else through",
   )
-  const three = JSON.parse(run("tasks", ".", "--json", "--limit", "3").out) as unknown[]
+  const three = said<unknown[]>("tasks", ".", "--json", "--limit", "3").data
   assert.ok(three.length <= 3)
 })
 
@@ -125,21 +140,41 @@ test("the knowledge graph comes out at whichever grain is asked for", () => {
   assert.match(head, /kind\tid\tlabel/, "tab separated, so a sheet or a script can take it")
 })
 
+test("every json says which desprawl wrote it, and what it is", () => {
+  const held = said<{ desprawl: string; repo: string }>("modules", ".", "--json")
+  assert.equal(held.kind, "modules", "the envelope names the view it came from")
+  assert.match(held.desprawl, /^\d+\.\d+\.\d+$/, "and the version that wrote it")
+  assert.ok(held.repo.startsWith("/"), "and the repo it read, as one path however it was typed")
+
+  // and the payloads that can be written to a file carry it themselves
+  const graph = build(".")
+  assert.equal(graph.desprawl, VERSION)
+  assert.ok(graph.repo.endsWith("desprawl"), "a graph knows where it came from")
+  const rang = calls(".", graph)
+  assert.equal(rang.desprawl, VERSION, "so does a call graph")
+  const layout = fold(graph, balanced(graph))
+  assert.equal(
+    knowledge(".", { graph, layout, calls: rang, grain: "module" }).desprawl,
+    VERSION,
+    "and the knowledge graph, which is the one built for other tools",
+  )
+})
+
 test("--anon leaves every address out, whichever way the numbers come out", () => {
   const ADDRESS = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/
-  const plain = JSON.parse(run("cli", ".", "--json").out) as {
+  const plain = said<{
     repo: string
     contributors: { email: string; also?: string[] }[]
     identities: { email: string }[]
-  }
+  }>("cli", ".", "--json").data
   assert.ok(
     plain.identities.some((one) => one.email),
     "the plain read has the addresses",
   )
 
-  const said = run("cli", ".", "--json", "--anon").out
-  assert.doesNotMatch(said, ADDRESS, "and --anon has none of them, folded ones included")
-  const hidden = JSON.parse(said) as typeof plain
+  const held = run("cli", ".", "--json", "--anon").out
+  assert.doesNotMatch(held, ADDRESS, "and --anon has none of them, folded ones included")
+  const hidden = (JSON.parse(held) as { data: typeof plain }).data
   assert.equal(hidden.contributors.length, plain.contributors.length, "the people are still there")
   assert.ok(!hidden.repo.includes("/"), "and the path is the folder, not this machine")
 
@@ -148,9 +183,12 @@ test("--anon leaves every address out, whichever way the numbers come out", () =
   assert.doesNotMatch(past, ADDRESS, "a view payload is anonymous too")
 
   // a remote names the account this is hosted under, and an ssh one is an address
-  assert.ok(JSON.parse(run("cli", ".", "--json").out).remotes.length, "the plain read has them")
-  assert.deepEqual((JSON.parse(said) as { remotes: unknown[] }).remotes, [], "and --anon has none")
-  assert.doesNotMatch(said, /github\.com\//, "nor the url anywhere else in the payload")
+  assert.ok(
+    said<{ remotes: unknown[] }>("cli", ".", "--json").data.remotes.length,
+    "the plain read has them",
+  )
+  assert.deepEqual(hidden.remotes, [], "and --anon has none")
+  assert.doesNotMatch(held, /github\.com\//, "nor the url anywhere else in the payload")
 })
 
 test("what a forge wrote is scrubbed, what a person wrote is not", () => {

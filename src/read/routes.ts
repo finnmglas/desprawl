@@ -1,6 +1,7 @@
 // owner: finn
 // goal: which file serves an http endpoint, and which file calls one
 
+import { made } from "../read/model.ts"
 import { collect, nearest, type Found } from "./inside.ts"
 import { filled, pathy } from "./rules.ts"
 import { VENDORED, build, type Graph } from "./graph.ts"
@@ -184,6 +185,7 @@ export function reading(
   // a spec, a collection and a proto file each list endpoints without holding any code
   const said = specs(repo, tracked(repo))
   return {
+    ...made(repo),
     endpoints: once([...serving(found), ...said.endpoints]),
     clients: once([...found.clients, ...said.clients]),
     hosts: said.hosts,
@@ -208,10 +210,16 @@ export function api(repo: string, graph?: Graph, calls?: Calls): Api {
 }
 
 /** the same, once several repos have been read into one list */
-export function joined(endpoints: Endpoint[], clients: Client[], hosts: string[] = []): Api {
+export function joined(
+  endpoints: Endpoint[],
+  clients: Client[],
+  hosts: string[] = [],
+  repo = "",
+): Api {
   const links = link(endpoints, clients, hosts)
   const reached = new Set(links.map((one) => one.call))
   return {
+    ...made(repo),
     endpoints,
     clients,
     links,

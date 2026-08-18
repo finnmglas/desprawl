@@ -5,11 +5,11 @@ import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { reading } from "../read/graph.ts"
-import { git } from "../read/model.ts"
+import { git, made, type Made } from "../read/model.ts"
 import { roleOf } from "../read/layers.ts"
 import { scrub } from "../read/specifiers.ts"
 
-export interface Suite {
+export interface Suite extends Made {
   /** the script a reader would run, and what it is called in the manifest */
   script: string
   command: string
@@ -28,6 +28,7 @@ export interface Suite {
 
 /** nothing found, which is also what a folder of repos has in common */
 const EMPTY: Suite = {
+  ...made(""),
   script: "",
   command: "",
   files: 0,
@@ -45,6 +46,7 @@ export function merged(all: Suite[]): Suite {
   if (all.length < 2) return all[0] ?? EMPTY
   return {
     ...EMPTY,
+    repo: all[0]?.repo ?? "",
     files: all.reduce((sum, one) => sum + one.files, 0),
     cases: all.reduce((sum, one) => sum + one.cases, 0),
     runners: [...new Set(all.flatMap((one) => one.runners))],
@@ -183,8 +185,9 @@ export function tests(repo: string): Suite {
         `${made_} ${scripts[script].replace(/^node --test\s*/, "")}`
       : made_
 
-  const { made, from } = coverage(root)
+  const { made: found, from } = coverage(root)
   return {
+    ...made(root),
     script,
     command: script ? scripts[script] : "",
     measure,
@@ -192,7 +195,7 @@ export function tests(repo: string): Suite {
     files,
     cases,
     runners,
-    coverage: made,
+    coverage: found,
     covered: from,
     ran: null,
   }

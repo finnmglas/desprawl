@@ -1,6 +1,7 @@
 // owner: finn
 // goal: the graphs as typed things and typed relations, for whatever reads them next
 
+import type { Made } from "../read/model.ts"
 import { unitOf } from "../read/layers.ts"
 import type { Calls } from "../read/calls.ts"
 import type { Graph } from "../read/graph.ts"
@@ -27,7 +28,7 @@ export interface Link {
   weight: number
 }
 
-export interface Knowledge {
+export interface Knowledge extends Made {
   repo: string
   grain: Grain
   things: Thing[]
@@ -135,7 +136,14 @@ export function knowledge(repo: string, asking: Asking): Knowledge {
     if (found) found.weight++
     else merged.set(key, { ...link })
   }
-  return { repo, grain, things, links: [...merged.values()] }
+  // the graph it was built from already says which desprawl read it, and from where
+  return {
+    desprawl: asking.graph.desprawl,
+    repo: asking.graph.repo || repo,
+    grain,
+    things,
+    links: [...merged.values()],
+  }
 }
 
 /** the same thing as rows, for whatever opens a table rather than a document */

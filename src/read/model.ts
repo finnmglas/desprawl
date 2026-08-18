@@ -3,7 +3,7 @@
 
 import { execFileSync } from "node:child_process"
 import { readFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 // one level up from src in the repo, and from dist in the package
 const manifest = JSON.parse(
@@ -198,6 +198,23 @@ export interface Stack {
   registries: Record<string, string>
   ai: Ai
 }
+
+/**
+ * on anything that can end up in a file: which desprawl wrote it and what it read.
+ * No timestamp, so the same repo read twice writes the same bytes
+ */
+export interface Made {
+  /** the version that wrote it */
+  desprawl: string
+  /** the repo it was read from, or the folder when one holds several */
+  repo: string
+}
+
+export const made = (repo: string): Made => ({
+  desprawl: VERSION,
+  // one spelling of the path, however it was typed on the way in
+  repo: repo ? resolve(repo) : "",
+})
 
 export interface Stats extends Split {
   version: string // desprawl that wrote this, so a reader knows the shape

@@ -246,7 +246,7 @@ export async function printed(): Promise<Blob | null> {
 
 /** the text level sprawl: repeated literals and copied runs */
 export const sprawlHere = (): Promise<Sprawl> =>
-  ask("/api/sprawl", { repeated: [], copied: [], talky: [] })
+  ask("/api/sprawl", { desprawl: "", repo: "", repeated: [], copied: [], talky: [] })
 
 /** licences off disk, advisories from osv, asked for once */
 export const dependencies = (): Promise<Deps | null> =>

@@ -3,7 +3,7 @@
 
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
-import { git } from "./model.ts"
+import { made, git, type Made } from "./model.ts"
 import { declared, foreign, scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
 import { READS, candidates, dialectOf, type Dialect } from "./dialects.ts"
 
@@ -37,7 +37,7 @@ export interface Missing {
   reason: "no such file" | "outside the repo"
 }
 
-export interface Graph {
+export interface Graph extends Made {
   modules: Record<string, Module>
   /** the repos it was read from, when a folder of them was read as one */
   repos?: string[]
@@ -431,6 +431,7 @@ export function build(repo: string): Graph {
   const edges = Object.values(modules).reduce((sum, m) => sum + m.out.length, 0)
 
   return {
+    ...made(root),
     modules,
     packages,
     missing,

@@ -1,6 +1,7 @@
 // owner: finn
 // goal: every detection, read as work someone could pick up
 
+import type { Made } from "../read/model.ts"
 import type { Said, Talky, Twice } from "./sprawl.ts"
 import { reachOf, reached } from "../read/reach.ts"
 import { familyOf } from "./licence.ts"
@@ -272,7 +273,7 @@ export const isEntry = (path: string) =>
   /^(convex|functions|api|pages|app|src\/app|src\/pages|src\/routes|routes)\//.test(path)
 
 /** read off disk by the cli, sent over the wire to a page that has none */
-export interface Sprawl {
+export interface Sprawl extends Made {
   repeated: Said[]
   copied: Twice[]
   talky: Talky[]

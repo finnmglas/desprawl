@@ -1,6 +1,7 @@
 // owner: finn
 // goal: the documents that list endpoints, read as endpoints
 
+import type { Made } from "./model.ts"
 import { closeSync, openSync, readFileSync, readSync } from "node:fs"
 import { join } from "node:path"
 import { jsonc } from "./graph.ts"
@@ -45,7 +46,7 @@ export interface Link {
   how: "exact" | "tail"
 }
 
-export interface Api {
+export interface Api extends Made {
   endpoints: Endpoint[]
   clients: Client[]
   links: Link[]

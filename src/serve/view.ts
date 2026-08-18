@@ -10,8 +10,10 @@ import type { Calls } from "../read/calls.ts"
 import type { Deps } from "../facts/deps.ts"
 import type { Suite } from "../facts/tests.ts"
 import { build } from "../read/graph.ts"
+import { everyCall, fleet, graphs } from "../facts/many.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
 import type { Graph } from "../read/graph.ts"
+import { made } from "../read/model.ts"
 import type { Contributor, Stats } from "../read/model.ts"
 
 export function open(target: string): void {
@@ -55,11 +57,14 @@ export function page(
   // < escaped so a path holding </script> cannot close the tag
   const inline = (data: unknown) => JSON.stringify(data).replaceAll("<", "\\u003c")
   const root = held?.root ?? stats.repo
-  const graph = held?.graph ?? build(root)
+  // a folder of repos is read as one, the same way the served run reads it
+  const some = fleet(root).length > 0
+  const graph = held?.graph ?? (some ? graphs(root) : build(root))
   const heavy = graph.stats.files > HEAVY
-  const said = held?.called ?? (heavy ? null : calls(root, graph))
+  const said = held?.called ?? (heavy ? null : some ? everyCall(root) : calls(root, graph))
   const paths = Object.keys(graph.modules)
   const loose = {
+    ...made(root),
     repeated: repeated(root, paths),
     copied: copied(root, paths),
     talky: talky(root, paths),

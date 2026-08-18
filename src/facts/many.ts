@@ -7,7 +7,7 @@ import { analyze } from "./analyze.ts"
 import { build } from "../read/graph.ts"
 import { calls } from "../read/calls.ts"
 import { near, norm } from "./history.ts"
-import { blank, merge, rank, VERSION } from "../read/model.ts"
+import { made, blank, merge, rank, VERSION } from "../read/model.ts"
 import { joined, reading } from "../read/routes.ts"
 import type { Api, Client, Endpoint } from "../read/routes.ts"
 import type { Calls } from "../read/calls.ts"
@@ -319,6 +319,7 @@ export function many(
 /** every repo's import graph on one set of keys, prefixed so nothing crosses a repo */
 export function graphs(path: string, only?: string[]): Graph {
   const all: Graph = {
+    ...made(path),
     modules: {},
     packages: {},
     missing: [],
@@ -383,6 +384,7 @@ export function everyApi(path: string, only?: string[]): Api {
 /** and every call graph, on the same prefixed keys */
 export function everyCall(path: string, only?: string[]): Calls {
   const all: Calls = {
+    ...made(path),
     symbols: {},
     unresolved: [],
     // prettier-ignore

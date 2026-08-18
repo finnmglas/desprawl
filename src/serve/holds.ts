@@ -6,7 +6,7 @@ import { calls } from "../read/calls.ts"
 import { deps, joined } from "../facts/deps.ts"
 import { build } from "../read/graph.ts"
 import { everyApi, everyCall, fleet, graphs, many } from "../facts/many.ts"
-import { git } from "../read/model.ts"
+import { git, made } from "../read/model.ts"
 import { api as apiOf } from "../read/routes.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
 import { anonymous } from "./view.ts"
@@ -171,13 +171,14 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
       const paths = Object.keys(graph(name ?? null).modules)
       // a fleet's paths are read from the folder holding it, each prefixed with its repo
       const root = pick(name ?? null) || repo
-      const made: Sprawl = {
+      const found: Sprawl = {
+        ...made(root),
         repeated: repeated(root, paths),
         copied: copied(root, paths),
         talky: talky(root, paths),
       }
-      loose.set(held_, made)
-      return made
+      loose.set(held_, found)
+      return found
     },
     about: mine,
     tests: (name) => {

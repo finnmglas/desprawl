@@ -6,7 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cycles } from "../read/cycles.ts"
 import { build } from "../read/graph.ts"
-import { git } from "../read/model.ts"
+import { made, git, type Made } from "../read/model.ts"
 import type { Graph } from "../read/graph.ts"
 
 export interface Count {
@@ -19,7 +19,7 @@ export interface Count {
   which: string[]
 }
 
-export interface Checked {
+export interface Checked extends Made {
   base: string
   head: string
   counts: Count[]
@@ -66,7 +66,7 @@ export function check(repo: string, base: string): Checked {
       count("unresolved imports", was.unresolved, now.unresolved),
       count("barrel files", was.barrels, now.barrels),
     ]
-    return { base: at, head, counts, worse: counts.some((one) => one.added > 0) }
+    return { ...made(root), base: at, head, counts, worse: counts.some((one) => one.added > 0) }
   } finally {
     try {
       git(root, "worktree", "remove", "--force", where)

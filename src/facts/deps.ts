@@ -3,7 +3,7 @@
 
 import { readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
 import { join } from "node:path"
-import { git } from "../read/model.ts"
+import { made, git, type Made } from "../read/model.ts"
 export { familyOf, type Family } from "./licence.ts"
 import { reading } from "../read/graph.ts"
 import { manifests } from "./manifests.ts"
@@ -74,7 +74,7 @@ async function published(names: string[]): Promise<Map<string, Told>> {
   return when
 }
 
-export interface Deps {
+export interface Deps extends Made {
   list: Dep[]
   /** why a column is empty */
   offline: boolean
@@ -267,7 +267,8 @@ const blank = (name: string, range: string, dev: boolean, ecosystem: string): De
 
 /** a folder of repos installs one set of packages between them, each named once */
 export function joined(all: Deps[]): Deps {
-  if (all.length < 2) return all[0] ?? { list: [], offline: false, missed: 0, checked: "" }
+  if (all.length < 2)
+    return all[0] ?? { ...made(""), list: [], offline: false, missed: 0, checked: "" }
   const held = new Map<string, Dep>()
   for (const one of all)
     for (const dep of one.list) {
@@ -279,6 +280,7 @@ export function joined(all: Deps[]): Deps {
       else held.set(key, dep)
     }
   return {
+    ...made(all[0]?.repo ?? ""),
     list: [...held.values()],
     offline: all.some((one) => one.offline),
     missed: all.reduce((sum, one) => sum + one.missed, 0),
@@ -361,5 +363,5 @@ export async function deps(repo: string): Promise<Deps> {
     // no network, or osv is down: the licences still came off disk
     offline = true
   }
-  return { list, offline, missed, checked: new Date().toISOString() }
+  return { ...made(repo), list, offline, missed, checked: new Date().toISOString() }
 }

@@ -4,15 +4,16 @@
 
 import { spawnSync } from "node:child_process"
 import { existsSync, statSync } from "node:fs"
+import { resolve } from "node:path"
 import { parseArgs } from "node:util"
 import { getHeapStatistics } from "node:v8"
 import { analyze } from "./facts/analyze.ts"
 import { fleet, many } from "./facts/many.ts"
 import { check } from "./facts/check.ts"
-import { deps } from "./facts/deps.ts"
-import { tests } from "./facts/tests.ts"
+import { deps, joined } from "./facts/deps.ts"
+import { merged, tests } from "./facts/tests.ts"
 import { human, nest, pct, tokens } from "./facts/human.ts"
-import { blank, git, merge } from "./read/model.ts"
+import { VERSION, blank, git, merge } from "./read/model.ts"
 import { explain, needs } from "./facts/needs.ts"
 import { isUrl, local } from "./serve/remote.ts"
 import { serve } from "./serve/serve.ts"
@@ -181,6 +182,10 @@ function branch(n: Node, total: number, level = 0): string[][] {
     ])
 }
 
+/** what a printed payload is, before whatever it holds */
+const wrapped = (kind: string, repo: string, data: unknown) =>
+  JSON.stringify({ desprawl: VERSION, kind, repo, made: new Date().toISOString(), data }, null, 2)
+
 function report(s: Stats): string {
   if (!s.files)
     return (
@@ -256,7 +261,7 @@ try {
     if (!base) fail("check needs a --base to compare against, like --base main")
     const found = check(target, base!)
     if (values.json) {
-      console.log(JSON.stringify(found, null, 2))
+      console.log(wrapped("check", resolve(target), found))
       process.exit(found.worse ? 1 : 0)
     }
     console.log(`${found.head} against ${found.base}`)
@@ -295,7 +300,10 @@ try {
     })
     // never process.exit here: it drops whatever of a large payload has not been written
     const data = values.anon ? hidden(made.data) : made.data
-    console.log(values.json ? JSON.stringify(data, null, 2) : made.text)
+    const about = values.anon
+      ? (resolve(target).split("/").filter(Boolean).pop() ?? "")
+      : resolve(target)
+    console.log(values.json ? wrapped(command, about, data) : made.text)
   }
 
   // analyses live not static
@@ -312,11 +320,19 @@ try {
     const read_ = reading ? analyze(reading, cap) : many(target, cap).all
     const stats = values.anon ? anonymous(read_) : read_
     // licences in disk, advisories network saved in page
+    // a folder of repos has no manifest and no suite of its own, and asking for one throws
+    const each = fleet(target)
     const held = viewing
-      ? { deps: await deps(target).catch(() => null), suite: tests(target), root: target }
+      ? {
+          deps: await Promise.all((each.length ? each : [target]).map((one) => deps(one)))
+            .then(joined)
+            .catch(() => null),
+          suite: merged((each.length ? each : [target]).map(tests)),
+          root: target,
+        }
       : undefined
     if (viewing) console.log(view(stats, values.out, held))
-    else console.log(values.json ? JSON.stringify(stats, null, 2) : report(stats))
+    else console.log(values.json ? wrapped("stats", stats.repo, stats) : report(stats))
   }
 } catch (err) {
   fail(err)

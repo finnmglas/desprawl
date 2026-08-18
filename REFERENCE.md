@@ -69,14 +69,15 @@ total   1.79k  100.0%      109    260     33  68.3k  17.1k   2.5   61  3.56k  20
 desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--depth N] [--top N] [--commits N] [--digits N] [--raw] [--json]
 ```
 
-|                              |                                            |
-| ---------------------------- | ------------------------------------------ |
-| `desprawl`                   | open interface on current directory        |
-| `desprawl ../other-repo`     | open another repo                          |
-| `desprawl <git url>`         | clone to downloads, then open              |
-| `desprawl cli`               | print report in cli                        |
-| `desprawl --static`          | open static html file, no server           |
-| `desprawl --json`            | whole cli report, tree + time series       |
+|                          |                                      |
+| ------------------------ | ------------------------------------ |
+| `desprawl`               | open interface on current directory  |
+| `desprawl ../other-repo` | open another repo                    |
+| `desprawl <git url>`     | clone to downloads, then open        |
+| `desprawl cli`           | print report in cli                  |
+| `desprawl --static`      | open static html file, no server     |
+| `desprawl --json`        | whole cli report, tree + time series |
+
 | `desprawl check --base main` | what this branch added, exit 1 if anything |
 
 | flag          |                                                                                                                                                                                                                                                                                      |
@@ -90,7 +91,7 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 | `--out FILE`  | write the file there, rather than a temporary name                                                                                                                                                                                                                                   |
 | `--keep`      | keep server after the tab closes                                                                                                                                                                                                                                                     |
 | `--raw`       | exact numbers instead of scaled ones                                                                                                                                                                                                                                                 |
-| `--json`      | machine readable, numbers exact                                                                                                                                                                                                                                                      |
+| `--json`      | machine readable, numbers exact, wrapped in an envelope saying which desprawl wrote it                                                                                                                                                                                               |
 | `--base REF`  | what `check` compares against                                                                                                                                                                                                                                                        |
 
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
@@ -122,6 +123,22 @@ desprawl check --base main
 Reads the base ref in a worktree of its own and reports what this branch **added**, never what the repo already holds: import cycles, unresolved imports and barrel files. Exits 1 if anything grew, so it plugs into CI or an agent loop.
 
 A threshold on a total becomes a target, and "this repo has 3 loops" is not actionable on a repo that is already a mess. "Your diff added a loop that was not on main" is local, cheap and unarguable.
+
+## What a file says about itself
+
+Every json desprawl prints carries the same envelope, so a file found later can be read
+without guessing which version wrote it or what it was about:
+
+```json
+{ "desprawl": "0.5.0", "kind": "modules", "repo": "/path/to/repo", "made": "2026-08-19T09:12:00.000Z", "data": ... }
+```
+
+`kind` is the view it came from, or `stats` for the whole report and `check` for a branch
+comparison. The payloads that can be written to a file on their own carry the first two of
+those fields themselves, without the timestamp, so reading the same repo twice writes the
+same bytes: the import graph, the call graph, the api, the knowledge graph, the
+dependencies, the text sprawl, and `Stats`, which has had `version` and `repo` all along.
+The saved html carries all of them, so it says which desprawl drew it.
 
 ## Library
 

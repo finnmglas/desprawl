@@ -2,9 +2,9 @@
 // goal: the repo measured over its own history, by hour and at even points
 
 import { DAY, believable } from "./history.ts"
-import { git } from "../read/model.ts"
+import { git, made, type Made } from "../read/model.ts"
 
-export interface Timeline {
+export interface Timeline extends Made {
   total: number
   first: string
   last: string
@@ -135,7 +135,7 @@ export function timeline(repo: string | string[]): Timeline {
     return held.filter((_, i) => i % step === 0 || i === held.length - 1)
   })
 
-  return { total, first, last, commits, devs, samples }
+  return { ...made(mine[0] ?? ""), total, first, last, commits, devs, samples }
 }
 
 // bytes at one commit, from the tree, a walk is a quarter second

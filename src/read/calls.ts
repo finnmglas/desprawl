@@ -1,6 +1,8 @@
 // owner: finn
 // goal: which function calls which
 
+import { made } from "./model.ts"
+import type { Made } from "./model.ts"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { build, packageOf, type Graph } from "./graph.ts"
@@ -10,7 +12,7 @@ import { siting, type Symbol } from "./siting.ts"
 
 export type { Symbol }
 
-export interface Calls {
+export interface Calls extends Made {
   symbols: Record<string, Symbol>
   /** what each repo in a folder came to on its own, when a folder was read as one */
   by?: Record<string, Calls["stats"]>
@@ -482,6 +484,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   const external = all.reduce((sum, s) => sum + s.packages.length, 0)
   const placed = edges + external + builtin
   return {
+    ...made(repo),
     symbols,
     unresolved,
     stats: {

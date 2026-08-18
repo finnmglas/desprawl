@@ -1,6 +1,7 @@
 // owner: finn
 // goal: every panel the ui draws, as lines a terminal or an agent can read
 
+import { made } from "../read/model.ts"
 import { analyze } from "./analyze.ts"
 import { timeline } from "./samples.ts"
 import { GRAINS, asRows, knowledge, type Grain } from "./knowledge.ts"
@@ -99,6 +100,7 @@ async function work(repo: string, ask: Asked): Promise<{ text: string; data: unk
     repeated: repeated(repo, paths),
     copied: copied(repo, paths),
     talky: talky(repo, paths),
+    ...made(read.repo),
   }
   const found = asked(tasks(read.layout, read.calls, kit, read.lines, read.graph, said), ask)
   const minutes = found.reduce((sum, one) => sum + one.minutes, 0)
