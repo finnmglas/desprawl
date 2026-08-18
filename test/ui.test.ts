@@ -7,6 +7,7 @@ import { analyze } from "../src/facts/analyze.ts"
 import { human } from "../src/facts/human.ts"
 import { place } from "../ui/lib/draw/lanes.ts"
 import { effective, shares } from "../ui/lib/draw/scale.ts"
+import { asMatrix, type Column } from "../ui/lib/say/columns.ts"
 import { bucket, defaultGrain, grainsFor, nearestGrain } from "../ui/lib/say/format.ts"
 import { expand, rows } from "../ui/lib/draw/series.ts"
 import { isId, nameOf, namesOf } from "../src/read/naming.ts"
@@ -266,6 +267,85 @@ test("a table is written the way whatever opens it next expects", () => {
   assert.ok(by("xls").includes("<x:Name>groups</x:Name>"), "excel is handed a sheet name")
   assert.ok(by("xls").includes("&quot;") === false, "and the cells are html escaped")
   assert.ok(by("xls").includes("<td x:num>24</td>"), "with numbers marked as numbers")
+})
+
+test("a written table holds the numbers, not what a display setting makes of them", () => {
+  const rows = [
+    { name: "ui", code: 1790, comment: 0, blank: 0 },
+    { name: "src", code: 210, comment: 0, blank: 0 },
+  ]
+  const loc: Column<(typeof rows)[number]> = {
+    key: "code",
+    label: "loc",
+    num: true,
+    get: (row) => row.code,
+    ofRow: (row) => row.code + row.comment + row.blank,
+  }
+  const sums = { code: 2000 }
+
+  assert.equal(effective(loc, rows[0], "repo", sums), 0.895, "the screen shows a share")
+  assert.deepEqual(
+    asMatrix([{ key: "name", label: "group", get: (row) => row.name }, loc], rows),
+    [
+      ["group", "loc"],
+      ["ui", 1790],
+      ["src", 210],
+    ],
+    "and the file still says 1790, whatever the screen is doing",
+  )
+})
+
+test("what a cell says is what it was, not what Number() would make of it", () => {
+  const rows = [
+    ["what", "value"],
+    ["version", "1.10"],
+    ["name", "1e5"],
+    ["colour", "0x1f"],
+    ["id", "0123"],
+    ["padded", " 12 "],
+    ["word", "Infinity"],
+    ["count", "1790"],
+  ]
+  const held = JSON.parse(FORMATS.find((one) => one.key === "json")!.of(rows, "cells")) as {
+    what: string
+    value: string | number
+  }[]
+  const said = Object.fromEntries(held.map((one) => [one.what, one.value]))
+  assert.equal(said.version, "1.10", "a version is not 1.1")
+  assert.equal(said.name, "1e5", "and not 100000")
+  assert.equal(said.colour, "0x1f", "nor 31")
+  assert.equal(said.id, "0123")
+  assert.equal(said.padded, " 12 ", "the spaces were in the data")
+  assert.equal(said.word, "Infinity", "which JSON cannot hold as a number at all")
+  assert.equal(said.count, 1790, "and a plain number is still a number")
+})
+
+test("a written table holds what a sheet, a parser and a shell would each do to it", () => {
+  const rows = [
+    ["name", "note"],
+    ["formula", "=SUM(A1:A9)"],
+    ["dashed", "-1+1"],
+    ["churned", "-1.15m"],
+    ["scoped", "@types/node"],
+    ["tabbed", "one\ttwo"],
+    ["lined", "one\ntwo"],
+    ["slashed", "C:\\path\\to"],
+  ]
+  const by = (key: string) => FORMATS.find((one) => one.key === key)!.of(rows, "cells")
+
+  const csv = by("csv")
+  assert.ok(csv.includes("'=SUM(A1:A9)"), "a sheet is never handed a formula it would run")
+  assert.ok(csv.includes("'-1+1"), "a sign that goes on to build one opens it too")
+  assert.ok(csv.includes(",-1.15m"), "while a churn of -1.15m is the text it always was")
+  assert.ok(csv.includes(",@types/node"), "and a scoped package is a name, not a call")
+  assert.ok(csv.includes('"one\ntwo"'), "a newline stays inside its own cell")
+
+  const tsv = by("tsv")
+  assert.ok(tsv.includes('"one\ttwo"'), "a tab in a cell is quoted, or the columns shift")
+
+  const toml = by("toml")
+  assert.ok(toml.includes('note = "C:\\\\path\\\\to"'), "a backslash is escaped")
+  assert.ok(toml.includes('note = "one\\ntwo"'), "and a newline never sits raw in a string")
 })
 
 test("a folder does not say the same word twice because it borrowed it", () => {

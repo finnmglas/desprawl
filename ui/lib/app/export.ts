@@ -1,19 +1,6 @@
 // owner: finn
 // goal: rows out, to clipboard or disk
 
-export const delimit = (rows: (string | number)[][], sep: string): string =>
-  rows
-    .map((row) =>
-      row
-        .map((cell) =>
-          sep === "," && /[",\n]/.test(String(cell))
-            ? `"${String(cell).replaceAll('"', '""')}"`
-            : cell,
-        )
-        .join(sep),
-    )
-    .join("\n")
-
 let subject = "repo"
 export const describes = (repo: string): void => {
   subject = repo.split("/").filter(Boolean).pop() || "repo"

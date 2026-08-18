@@ -26,6 +26,16 @@ export interface Column<T> {
   width?: number // pixels, not read off content
 }
 
+/**
+ * a table as a file: the header, then what each row holds. Never what a display setting
+ * is making of it, since a share of a total and a count under the same heading is a file
+ * nobody can read back
+ */
+export const asMatrix = <T>(columns: Column<T>[], rows: T[]): (string | number)[][] => [
+  columns.map((one) => one.label),
+  ...rows.map((row) => columns.map((one) => one.get(row))),
+]
+
 /** a row's own lines, the denominator when reading shares within a row */
 export const lines = (n: Node) => n.code + n.comment + n.blank
 

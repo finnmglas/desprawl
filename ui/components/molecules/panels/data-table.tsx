@@ -10,7 +10,9 @@ import { TBody, TD, TH, THead, TR, Table } from "../../atoms/table.tsx"
 import { Tip } from "../../atoms/tip.tsx"
 import { type Column } from "../../../lib/say/columns.ts"
 import { Find } from "../find.tsx"
-import { delimit } from "../../../lib/app/export.ts"
+import {} from "../../../lib/app/export.ts"
+import { asMatrix } from "../../../lib/say/columns.ts"
+import { delimited } from "../../../lib/say/formats.ts"
 import { HINTS } from "../../../lib/say/hints.ts"
 import { backdrop, cycle, pct } from "../../../lib/say/format.ts"
 import { effective, shares } from "../../../lib/draw/scale.ts"
@@ -176,10 +178,7 @@ export function DataTable<T>({
     spot.current?.scrollIntoView({ block: "center", behavior: "smooth" })
   }, [at, open, windowed])
 
-  const matrix = () => [
-    columns.map((c) => c.label),
-    ...sorted.map((row) => columns.map((c) => scaled(c, row))),
-  ]
+  const matrix = () => asMatrix(columns, sorted)
   // a title can carry a mark, so the file name is its words
   const slug = (typeof title === "string" ? title : (file ?? "table"))
     .toLowerCase()
@@ -200,7 +199,7 @@ export function DataTable<T>({
             />
           )}
           <CopyButton
-            text={() => delimit(matrix(), "\t")}
+            text={() => delimited(matrix(), "\t")}
             message={`Copied ${sorted.length} rows`}
             note="Paste straight into a sheet"
           />
