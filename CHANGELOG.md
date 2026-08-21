@@ -8,11 +8,13 @@ Notable changes per release. Dates are the day the tag shipped.
 
 ### Added
 
+- **Every language resolves its imports through one map from name to folder.** Python packages are found by their `__init__.py`, wherever the folder holding them sits, so a uv workspace, a service run from its own folder and a `src/` layout all resolve instead of reading as installed packages. Rust anchors `crate::` at the crate root its manifest declares rather than assuming `src/`, and a `use` group inside a `use` group names everything in it. On ripgrep that is 425 import edges to 801, every unresolved import gone, and 46 "fix this import" tasks on code that compiles gone with them.
 - **Dart and Flutter are read like any other language**: imports resolve through `package:` names off every `pubspec.yaml`, declarations and calls land in the graph, and `http`, `dio` and shelf's router are told apart the way every other language's two sides are. A flutter app in a folder of repos now draws its red edge into the backend it calls.
 - `pubspec.yaml` is a manifest: name, version, dependencies and overrides, with pub.dev as the registry a chip links to and the ecosystem its advisories are asked for under. Flutter, Bloc, Provider, Riverpod, dio and flutter_test each land in the bucket their npm counterpart uses.
 
 ### Fixed
 
+- **A helper collected every call that shared its name.** A method call in any language but typescript landed on whichever single file declared that name, so one `def lower` took every `x.lower()` in the repo. A call now lands only where this file's imports reach, and the naming hotspots stop being accidents of naming.
 - **A flutter repo read as "language none, Kotlin"**, naming the android shell over the hundred thousand lines of dart beside it. Dart counts as a language a repo can be written in now.
 
 ## [0.6.0] - 2026-08-19

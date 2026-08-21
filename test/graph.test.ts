@@ -297,3 +297,95 @@ test("a dart part its builder writes is generated, not a broken import", () => {
     ["lib/api.dart"],
   )
 })
+
+test("a python package is imported by its name, wherever the folder holding it sits", () => {
+  const dir = repo({
+    // a workspace member, one folder deep, imported absolutely from a service
+    "common/sharedlib/pyproject.toml": '[project]\nname = "shared-lib"\n',
+    "common/sharedlib/sharedlib/__init__.py": "",
+    "common/sharedlib/sharedlib/thing.py": "def helper():\n    return 1\n",
+    "api/app/__init__.py": "",
+    "api/app/main.py": "from sharedlib.thing import helper\nimport sharedlib\n",
+    // a service run from its own folder, which no manifest writes down
+    "service/inner/core/__init__.py": "",
+    "service/inner/core/db.py": "def query():\n    return 2\n",
+    "service/inner/handlers/__init__.py": "",
+    "service/inner/handlers/run.py": "from core.db import query\n",
+    // and the src layout the packaging docs ask for
+    "lib/src/mypkg/__init__.py": "",
+    "lib/src/mypkg/a.py": "def go():\n    return 3\n",
+    "lib/tests/test_a.py": "from mypkg.a import go\n",
+  })
+  const graph = build(dir)
+  const to = (from: string) => graph.modules[from].out.map((one) => one.to).sort()
+  assert.deepEqual(to("api/app/main.py"), [
+    "common/sharedlib/sharedlib/__init__.py",
+    "common/sharedlib/sharedlib/thing.py",
+  ])
+  assert.deepEqual(to("service/inner/handlers/run.py"), ["service/inner/core/db.py"])
+  assert.deepEqual(to("lib/tests/test_a.py"), ["lib/src/mypkg/a.py"])
+  // and none of them is a package somebody installed
+  assert.deepEqual(Object.keys(graph.packages), [])
+})
+
+test("two packages of one name answer only to the file nearest them", () => {
+  const graph = build(
+    repo({
+      "a/svc/core/__init__.py": "",
+      "a/svc/core/db.py": "def query():\n    return 1\n",
+      "a/svc/main.py": "from core.db import query\n",
+      "b/svc/core/__init__.py": "",
+      "b/svc/core/db.py": "def query():\n    return 2\n",
+      "b/svc/main.py": "from core.db import query\n",
+    }),
+  )
+  assert.deepEqual(
+    graph.modules["a/svc/main.py"].out.map((one) => one.to),
+    ["a/svc/core/db.py"],
+  )
+  assert.deepEqual(
+    graph.modules["b/svc/main.py"].out.map((one) => one.to),
+    ["b/svc/core/db.py"],
+  )
+})
+
+test("a rust crate root is where its manifest says, which is not always src", () => {
+  const graph = build(
+    repo({
+      // ripgrep's shape: the binary's modules sit outside any src folder
+      "Cargo.toml":
+        '[package]\nname = "rg"\n\n[[bin]]\nname = "rg"\npath = "crates/core/main.rs"\n',
+      "crates/core/main.rs": "mod flags;\nuse crate::flags::defs::FLAGS;\nfn main() { FLAGS(); }\n",
+      "crates/core/flags/mod.rs": "pub mod defs;\n",
+      "crates/core/flags/defs.rs": "pub fn FLAGS() -> u8 { 1 }\n",
+      "crates/core/flags/complete/bash.rs":
+        "use crate::flags::defs::FLAGS;\npub fn go() { FLAGS(); }\n",
+      "crates/cli/Cargo.toml": '[package]\nname = "rg-cli"\n',
+      "crates/cli/src/lib.rs": "use crate as own;\npub fn helper() -> u8 { 2 }\n",
+    }),
+  )
+  assert.deepEqual(graph.missing, [], "a repo that compiles has no broken import")
+  assert.ok(
+    graph.modules["crates/core/flags/complete/bash.rs"].out.some(
+      (one) => one.to === "crates/core/flags/defs.rs",
+    ),
+    "crate:: anchors at the crate root, not at the nearest src folder",
+  )
+})
+
+test("a use group inside a use group names everything in it", () => {
+  const graph = build(
+    repo({
+      "Cargo.toml": '[package]\nname = "fix"\n',
+      "src/lib.rs": "pub mod one;\npub mod two;\n",
+      "src/one.rs": "pub struct One;\npub fn go() -> u8 { 1 }\n",
+      "src/two.rs": "pub struct Two;\n",
+      "src/uses.rs": "use crate::{two::Two, one::{self, One, go}};\npub fn run() { go(); }\n",
+    }),
+  )
+  assert.deepEqual(
+    [...new Set(graph.modules["src/uses.rs"].out.map((one) => one.to))].sort(),
+    ["src/lib.rs", "src/one.rs", "src/two.rs"],
+    "the crate root, and both modules the nested group names",
+  )
+})

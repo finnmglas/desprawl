@@ -27,6 +27,33 @@ export interface Dialect {
   decls: { kind: "function" | "class"; re: RegExp }[]
 }
 
+/** `use a::{b, c::{d, e as f}}` names a::b, a::c::d and a::c::e, and a group can hold a group */
+function opened(text: string): string[] {
+  const at = text.indexOf("{")
+  const head = (at === -1 ? text : text.slice(0, at)).replace(/::\s*$/, "").trim()
+  if (at === -1) return [head.replace(/\s+as\s+[\w*]+$/, "").trim()]
+  const inner = text.slice(at + 1, text.lastIndexOf("}"))
+  const parts: string[] = []
+  let depth = 0
+  let held = ""
+  for (const ch of inner) {
+    if (ch === "{") depth++
+    else if (ch === "}") depth--
+    if (ch === "," && !depth) {
+      parts.push(held)
+      held = ""
+    } else held += ch
+  }
+  parts.push(held)
+  return [
+    head,
+    ...parts
+      .map((one) => one.replace(/\s+as\s+[\w*]+/, "").trim())
+      .filter((one) => one && one !== "self")
+      .flatMap((one) => opened(`${head}::${one}`)),
+  ]
+}
+
 // prettier-ignore
 const DIALECTS: Dialect[] = [
   {
@@ -41,21 +68,7 @@ const DIALECTS: Dialect[] = [
       /#\[path\s*=\s*[^\]]*\]\s*(?:pub\s+(?:\([^)]*\)\s*)?)?mod\s+[A-Za-z_]\w*\s*;|(?:^|[\s;}])(?:pub\s+(?:\([^)]*\)\s*)?)?mod\s+([A-Za-z_]\w*)\s*;/gm,
       /(?:^|[\s;}])(?:pub\s+(?:\([^)]*\)\s*)?)?use\s+([^;]+);/gm,
     ],
-    // `use crate::a::{b, c as d}` names crate::a, crate::a::b and crate::a::c
-    expand: (text) => {
-      const at = text.indexOf("{")
-      const head = (at === -1 ? text : text.slice(0, at)).replace(/::\s*$/, "").trim()
-      if (at === -1) return [head.replace(/\s+as\s+\w+$/, "").trim()]
-      const inner = text.slice(at + 1, text.lastIndexOf("}"))
-      return [
-        head,
-        ...inner
-          .split(",")
-          .map((one) => one.replace(/\s+as\s+[\w*]+/, "").trim())
-          .filter((one) => one && one !== "self" && !one.includes("{"))
-          .map((one) => `${head}::${one}`),
-      ]
-    },
+    expand: opened,
     decls: [
       { kind: "function", re: /(?:^|[\s;}])(?:pub\s+(?:\([^)]*\)\s*)?)?(?:async\s+|const\s+|unsafe\s+|extern\s+"[^"]*"\s+)*fn\s+([A-Za-z_]\w*)/gm },
       { kind: "class", re: /(?:^|[\s;}])(?:pub\s+(?:\([^)]*\)\s*)?)?(?:struct|enum|trait|union|type)\s+([A-Za-z_]\w*)/gm },
@@ -210,12 +223,12 @@ export function candidates(
     ]
     // a sibling crate in the same workspace is named, not pathed
     const crate = parts_.get(head.replace(/_/g, "-")) ?? parts_.get(head)
-    if (crate && head !== "crate") {
-      const held = rest.length ? rest : ["lib"]
+    if (crate !== undefined && head !== "crate") {
+      const at = crate.split("/").filter(Boolean)
       return [
-        ...spell([crate, "src", ...held], exts),
-        ...spell([crate, "src", ...held, "mod"], exts),
-        `${crate}/src/lib.rs`,
+        ...spell([...at, ...rest], exts),
+        ...spell([...at, ...rest, "mod"], exts),
+        ...owner(at),
       ]
     }
     // `a::b::One` names the module b as often as a module called One, so both are tried
@@ -230,8 +243,21 @@ export function candidates(
           ]
         : owner(at)
     if (head === "crate") {
+      // the crate holding this file says where its root is, and only a manifest knows that
+      const mine = [...parts_.values()]
+        .filter((one) => from.startsWith(`${one}/`))
+        .sort((a, b) => b.length - a.length)[0]
       const src = from.split("/").lastIndexOf("src")
-      return reach(src === -1 ? [] : from.split("/").slice(0, src + 1), rest)
+      const at =
+        mine ??
+        (src === -1
+          ? ""
+          : from
+              .split("/")
+              .slice(0, src + 1)
+              .join("/"))
+      // and a target a manifest gave its own path, like a test binary, roots at its folder
+      return [...reach(at ? at.split("/") : [], rest), ...reach(dir, rest)]
     }
     if (head === "self") return reach(dir, rest)
     if (head === "super" && !rest.length && /\/(lib|main|mod)\.rs$/.test(from)) return [from]
@@ -250,13 +276,21 @@ export function candidates(
   if (dialect.id === "python") {
     const dots = /^\.+/.exec(text)?.[0].length ?? 0
     const parts = text.slice(dots).split(".").filter(Boolean)
-    const base = dots ? up(dots - 1) : []
-    const held = [...base, ...parts]
     // `from a.b import c` may name the module a/b or the thing c inside a/b
+    const ways = (at: string[]) => [
+      ...spell(at, exts),
+      ...spell([...at, "__init__"], exts),
+      ...(parts.length > 1 ? spell(at.slice(0, -1), exts) : []),
+    ]
+    if (dots) return ways([...up(dots - 1), ...parts])
+    // an absolute import names a package, and the folder holding that package is a root
+    // nothing writes down: the repo, a service run from its own folder, a workspace member
+    const home = parts_.get(parts[0])
     return [
-      ...spell(held, exts),
-      ...spell([...held, "__init__"], exts),
-      ...(parts.length > 1 ? spell(held.slice(0, -1), exts) : []),
+      ...(home === undefined ? [] : ways([...home.split("/"), ...parts.slice(1)])),
+      // every folder above the file is a root it could have been run from, nearest first
+      ...dir.flatMap((_, at) => ways([...dir.slice(0, dir.length - at), ...parts])),
+      ...ways(parts),
     ]
   }
 
@@ -265,7 +299,7 @@ export function candidates(
     const named = /^package:([^/]+)\/(.+)$/.exec(text)
     if (named) {
       const home = parts_.get(named[1])
-      return home === undefined ? [] : [[home, "lib", named[2]].filter(Boolean).join("/")]
+      return home === undefined ? [] : [[home, named[2]].filter(Boolean).join("/")]
     }
     // the sdk is never a file here
     if (text.startsWith("dart:")) return []

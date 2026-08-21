@@ -4,6 +4,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { calls } from "../src/read/calls.ts"
+import { build } from "../src/read/graph.ts"
 import { repo } from "./repo.ts"
 
 test("a call across files follows the import that brought the name in", () => {
@@ -83,4 +84,44 @@ test("what nothing calls is counted, which is the point of the whole pass", () =
   const graph = calls(dir)
   assert.equal(graph.symbols["a.ts#alone"].callers.length, 0)
   assert.equal(graph.stats.uncalled, 2, "the lonely one, and the entry point nothing here calls")
+})
+
+test("a helper sharing a name with a method collects nobody else's calls", () => {
+  const dir = repo({
+    "pyproject.toml": '[project]\nname = "fix"\n',
+    // one file declares `lower`, and nothing in the repo imports it
+    "tools/py_functions.py": "def lower(text):\n    return text\n",
+    "app/__init__.py": "",
+    "app/util.py": "def shout(text):\n    return text.upper()\n",
+    "app/main.py": [
+      "from app.util import shout",
+      "",
+      "def go(name):",
+      "    said = name.lower()",
+      "    return shout(said)",
+      "",
+    ].join("\n"),
+  })
+  const found = calls(dir, build(dir))
+  assert.ok(
+    !found.symbols["tools/py_functions.py#lower"].callers.includes("app/main.py#go"),
+    "x.lower() is the string's own method, not this repo's helper",
+  )
+  assert.ok(
+    found.symbols["app/util.py#shout"].callers.includes("app/main.py#go"),
+    "and an imported name still lands",
+  )
+})
+
+test("a method call still lands where an import says it can", () => {
+  const dir = repo({
+    "go.mod": "module fix\n",
+    "main.go": 'package main\n\nimport "fix/util"\n\nfunc main() {\n\tutil.Go()\n}\n',
+    "util/util.go": "package util\n\nfunc Go() int { return 1 }\n",
+  })
+  const found = calls(dir, build(dir))
+  assert.ok(
+    found.symbols["util/util.go#Go"].callers.includes("main.go#main"),
+    `util.Go() is a call to the package it imported, found ${JSON.stringify(found.symbols["util/util.go#Go"].callers)}`,
+  )
 })

@@ -207,6 +207,68 @@ export function packageOf(specifier: string): string {
   return specifier.startsWith("@") ? parts.slice(0, 2).join("/") : parts[0]
 }
 
+/**
+ * the folder each importable name's modules sit in, for the languages that name a package
+ * rather than pathing to it. A name two folders answer to is a guess, so neither is offered
+ */
+function naming(root: string, tracked: Set<string>): Map<string, string> {
+  const named = new Map<string, string>()
+  const home = (path: string) => (dirname(path) === "." ? "" : dirname(path))
+  const under = (dir: string, path: string) => !dir || path.startsWith(`${dir}/`)
+  const said = (path: string, match: RegExp) => {
+    try {
+      return match.exec(readFileSync(join(root, path), "utf8"))?.[1] ?? ""
+    } catch {
+      return ""
+    }
+  }
+
+  // a crate's modules sit where its lib.rs or main.rs is, which ripgrep puts outside src/
+  const crates = [...tracked].filter((p) => /(^|\/)Cargo\.toml$/.test(p))
+  const roots = new Map<string, string>()
+  for (const path of tracked) {
+    if (!/(^|\/)(lib|main)\.rs$/.test(path)) continue
+    const owner = crates
+      .map(home)
+      .filter((one) => under(one, path))
+      .sort((a, b) => b.length - a.length)[0]
+    if (owner === undefined) continue
+    const held = roots.get(owner)
+    // the shallowest one is the crate itself, the rest are its examples and its tests
+    if (held === undefined || home(path).split("/").length < held.split("/").length)
+      roots.set(owner, home(path))
+  }
+  for (const path of crates) {
+    const name = said(path, /^\s*name\s*=\s*"([^"]+)"/m)
+    if (name)
+      named.set(name, roots.get(home(path)) ?? [home(path), "src"].filter(Boolean).join("/"))
+  }
+
+  // a pub package hands out its lib folder and nothing else
+  for (const path of tracked) {
+    if (!/(^|\/)pubspec\.ya?ml$/.test(path)) continue
+    const name = said(path, /^name\s*:\s*["']?([\w.-]+)/m)
+    if (name) named.set(name, [home(path), "lib"].filter(Boolean).join("/"))
+  }
+
+  // a folder holding __init__.py is a python package, and the outermost one carries the name
+  // an absolute import writes. No manifest says this: the distribution name is a different word
+  const packaged = new Set<string>()
+  for (const path of tracked) if (/(^|\/)__init__\.py$/.test(path)) packaged.add(home(path))
+  const twice = new Set<string>()
+  const held = new Map<string, string>()
+  for (const dir of packaged) {
+    const up = dir.includes("/") ? dir.slice(0, dir.lastIndexOf("/")) : ""
+    if (!dir || packaged.has(up)) continue
+    const name = dir.slice(dir.lastIndexOf("/") + 1)
+    if (held.has(name)) twice.add(name)
+    else held.set(name, dir)
+  }
+  for (const [name, dir] of held) if (!twice.has(name) && !named.has(name)) named.set(name, dir)
+
+  return named
+}
+
 export function build(repo: string): Graph {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const tracked = new Set(
@@ -223,18 +285,7 @@ export function build(repo: string): Graph {
       (!SOURCE.test(p) || !bundled(join(root, p))),
   )
 
-  // a crate, and a pub package, names its siblings rather than pathing to them
-  const named = new Map<string, string>()
-  const home = (path: string) => (dirname(path) === "." ? "" : dirname(path))
-  for (const path of tracked) {
-    if (/(^|\/)Cargo\.toml$/.test(path)) {
-      const name = /^\s*name\s*=\s*"([^"]+)"/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
-      if (name) named.set(name, home(path))
-    } else if (/(^|\/)pubspec\.ya?ml$/.test(path)) {
-      const name = /^name\s*:\s*["']?([\w.-]+)/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
-      if (name) named.set(name, home(path))
-    }
-  }
+  const named = naming(root, tracked)
 
   // resolves to its own folder, not node_modules
   const workspaces = new Map<string, string>()
@@ -308,7 +359,9 @@ export function build(repo: string): Graph {
           }
           continue
         }
-        if (held && held !== from) {
+        // a module naming the file it is written in resolved, it just drew no edge
+        if (held === from) continue
+        if (held) {
           modules[from].imports[spec.text] = held
           modules[from].out.push({ to: held, type: false, lazy: false, via: false })
           modules[held].in.push(from)

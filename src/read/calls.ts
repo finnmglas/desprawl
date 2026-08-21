@@ -409,6 +409,15 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const lang = graph.modules[file]?.lang ?? ""
     const owns = lang && lang !== "ts" ? keywordsOf(lang) : KEYWORD
     const runtime = lang && lang !== "ts" ? runtimeOf(lang) : GLOBAL
+    // what this file's imports name, read once: a method call may land in one of these.
+    // a crate root and a barrel are doorways, so what they hand on counts as reached too
+    const reaches = new Set<string>()
+    if (lang && lang !== "ts")
+      for (const one of bindings.get(file)?.values() ?? []) {
+        if (!one.file || reaches.has(one.file)) continue
+        reaches.add(one.file)
+        for (const on of bindings.get(one.file)?.values() ?? []) if (on.file) reaches.add(on.file)
+      }
     const walking = [...(mine.get(file) ?? []), `${file}#${TOP}`]
     for (const id of walking) {
       const top = id.endsWith(`#${TOP}`)
@@ -445,6 +454,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         runtime,
         symbols,
         declares,
+        reaches,
         bindings,
         locals,
         takes,
