@@ -239,7 +239,7 @@ function licences(repo: string, paths: string[]): { licenses: string[]; vendored
 // prettier-ignore
 const SERVER = ["Express", "Fastify", "NestJS", "Koa", "Hono", "hapi", "Next.js", "Nuxt", "SvelteKit"]
 // prettier-ignore
-const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt"]
+const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt", "Flutter"]
 
 /** what the repo holds, judged by what it depends on and what it ships */
 function shipped(
@@ -459,6 +459,7 @@ const MANAGERS: Record<string, string> = {
   gradle: "gradle",
   cmake: "cmake",
   go: "go",
+  pub: "pub",
 }
 
 /** packages outside npm, in the same buckets the node ones use */
@@ -471,7 +472,15 @@ const OUT_FRAMEWORKS: Table = {
   "spring-boot-starter": "Spring Boot", "spring-core": "Spring", ktor: "Ktor", micronaut: "Micronaut",
   quarkus: "Quarkus", vertx: "Vert.x", gin: "Gin", echo: "Echo", fiber: "Fiber", chi: "chi",
   laravel: "Laravel", symfony: "Symfony", vapor: "Vapor", rails: "Rails", sinatra: "Sinatra",
-  "aspnetcore": "ASP.NET Core",
+  "aspnetcore": "ASP.NET Core", flutter: "Flutter", shelf: "shelf", "dart_frog": "Dart Frog",
+}
+
+// what holds the state of a running app, which is not what shapes it
+// prettier-ignore
+const OUT_STATE: Table = {
+  "flutter_bloc": "Bloc", bloc: "Bloc", provider: "Provider", riverpod: "Riverpod",
+  "flutter_riverpod": "Riverpod", "get_it": "get_it", mobx: "MobX", "flutter_mobx": "MobX",
+  redux: "Redux",
 }
 
 // an argument parser shapes a program the way a router does, and says it is a cli
@@ -489,6 +498,7 @@ const OUT_RUNTIMES: Table = {
   tokio: "Tokio", "async-std": "async-std", smol: "smol", rayon: "Rayon", crossbeam: "crossbeam",
   "kotlinx-coroutines-core": "Coroutines", asyncio: "asyncio", uvloop: "uvloop", gevent: "gevent",
   uvicorn: "Uvicorn", gunicorn: "Gunicorn", hypercorn: "Hypercorn", wasm: "WebAssembly",
+  "flutter_isolate": "Isolates",
 }
 
 // something it talks to: a database, an http client, a queue, a model
@@ -501,7 +511,9 @@ const OUT_CONNECTS: Table = {
   langchain: "LangChain", transformers: "Transformers", torch: "PyTorch", tensorflow: "TensorFlow",
   scikit: "scikit-learn", retrofit: "Retrofit", okhttp: "OkHttp", exposed: "Exposed",
   hibernate: "Hibernate", jdbc: "JDBC", gorm: "GORM", sqlx_go: "sqlx", "grpc-go": "gRPC",
-  "aws-sdk-go": "AWS", stripe: "Stripe", sentry: "Sentry",
+  "aws-sdk-go": "AWS", stripe: "Stripe", sentry: "Sentry", dio: "dio", chopper: "Chopper",
+  "shared_preferences": "SharedPreferences", sqflite: "SQLite", hive: "Hive",
+  "firebase_core": "Firebase", "cloud_firestore": "Firebase", graphql_flutter: "GraphQL",
 }
 
 // how it reads and writes its own data, which is neither a framework nor a connection
@@ -517,6 +529,7 @@ const OUT_UI: Table = {
   egui: "egui", iced: "iced", ratatui: "Ratatui", crossterm: "crossterm", indicatif: "indicatif",
   appcompat: "AppCompat", "core-ktx": "AndroidX", material: "Material", compose: "Compose",
   swiftui: "SwiftUI", tkinter: "Tkinter", "PyQt5": "Qt", kivy: "Kivy",
+  cupertino_icons: "Cupertino", "google_fonts": "Google Fonts",
 }
 
 // prettier-ignore
@@ -525,12 +538,17 @@ const OUT_TESTS: Table = {
   junit: "JUnit", mockito: "Mockito", assertj: "AssertJ", kotest: "Kotest", espresso: "Espresso",
   criterion: "Criterion", divan: "divan", proptest: "proptest", quickcheck: "QuickCheck",
   testify: "testify", gtest: "GoogleTest", catch2: "Catch2", doctest: "doctest", rspec: "RSpec",
-  phpunit: "PHPUnit", xunit: "xUnit", nunit: "NUnit",
+  phpunit: "PHPUnit", xunit: "xUnit", nunit: "NUnit", "flutter_test": "flutter_test",
+  "integration_test": "integration_test", mocktail: "mocktail",
 }
 
-const FOREIGN: [Table, "frameworks" | "runtimes" | "connects" | "content" | "ui" | "testing"][] = [
+const FOREIGN: [
+  Table,
+  "frameworks" | "runtimes" | "connects" | "content" | "ui" | "testing" | "state",
+][] = [
   [OUT_FRAMEWORKS, "frameworks"],
   [OUT_CLIS, "frameworks"],
+  [OUT_STATE, "state"],
   [OUT_RUNTIMES, "runtimes"],
   [OUT_CONNECTS, "connects"],
   [OUT_CONTENT, "content"],

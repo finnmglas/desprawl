@@ -186,6 +186,10 @@ const RULES: Rule[] = [
   { id: "url", langs: ["swift"], side: "client",
     re: String.raw`URL\s*\(\s*string\s*:\s*§p` },
 
+  // ---- dart ----
+  // http.get(Uri.parse("/x")) calls, shelf's router.get("/x", handler) serves, one shape
+  { id: "http", langs: ["dart"], side: "guess",
+    re: String.raw`(?<who>[A-Za-z_$][\w$]*)\s*\.\s*(?<m>${VERBS})\s*(?:<[^<>()]*>)?\s*\(\s*(?:Uri\s*\.\s*parse\s*\(\s*)?¶` },
   // ---- a wrapper of its own, named after the verb it sends ----
   // `_getJson("/user/profile/")` and `deleteFlow("/flows/" + id)` are calls like any other
   // the jvm is left out: its own rule already reads a bare get("/x") either way
@@ -211,14 +215,14 @@ export const SERVERS = new Set([
   "polka", "connect", "hono", "elysia", "@nestjs/common", "@nestjs/core", "next-connect", "h3",
   "flask", "fastapi", "django", "rest_framework", "starlette", "sanic", "bottle", "falcon",
   "tornado", "quart", "gin", "echo", "fiber", "chi", "gorilla", "actix_web", "axum", "rocket",
-  "warp", "sinatra", "rails", "vapor", "ktor",
+  "warp", "sinatra", "rails", "vapor", "ktor", "shelf", "shelf_router", "dart_frog",
 ])
 // prettier-ignore
 export const CLIENTS = new Set([
   "axios", "ky", "got", "superagent", "node-fetch", "undici", "swr", "ofetch", "openapi-fetch",
   "@tanstack/react-query", "requests", "httpx", "urllib3", "reqwest", "okhttp3", "retrofit2",
   "faraday", "httparty", "rest-client", "guzzlehttp", "alamofire", "urllib",
-  "volley", "unirest", "curl", "net", "restsharp", "refit", "flurl",
+  "volley", "unirest", "curl", "net", "restsharp", "refit", "flurl", "dio", "chopper",
 ])
 // what a call site is usually held in, when nothing imported says which side this is
 export const CALLERS =

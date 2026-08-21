@@ -471,3 +471,38 @@ test("a niche framework is still a framework: every family, one file each", () =
   for (const one of ["POST /v1/things", "ANY /v1/telemetry", "GET /refit/things", "ANY /v1/things"])
     assert.ok(asked.includes(one), `${one} missing from ${asked.join(", ")}`)
 })
+
+test("a flutter app's calls are read, and a dart server's routes are not one of them", () => {
+  const found = served(
+    repo({
+      "pubspec.yaml": "name: app\ndependencies:\n  http: ^1.2.0\n  dio: ^5.4.0\n  shelf: ^1.4.0\n",
+      "lib/api.dart": [
+        "import 'package:http/http.dart' as http;",
+        "import 'package:dio/dio.dart';",
+        "",
+        "class Api {",
+        "  final Dio dio = Dio();",
+        "",
+        "  Future<void> one(String id) async {",
+        "    await http.get(Uri.parse('/api/v1/users/\$id'));",
+        "  }",
+        "",
+        "  Future<void> two() async {",
+        "    await dio.post('/api/v1/notes', data: 1);",
+        "  }",
+        "}",
+      ].join("\n"),
+      "lib/serve.dart": [
+        "import 'package:shelf_router/shelf_router.dart';",
+        "",
+        "void wire(Router router) {",
+        "  router.get('/api/v1/health', (request) {",
+        "    return 'ok';",
+        "  });",
+        "}",
+      ].join("\n"),
+    }),
+  )
+  assert.deepEqual(sites(found), ["GET /api/v1/users/*", "POST /api/v1/notes"].sort())
+  assert.deepEqual(ends(found), ["GET /api/v1/health"])
+})

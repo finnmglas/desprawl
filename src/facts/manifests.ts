@@ -16,7 +16,7 @@ export interface Asked {
 export interface Read {
   /** the manifest itself, so a claim can be followed */
   path: string
-  kind: "npm" | "cargo" | "python" | "gradle" | "cmake" | "go"
+  kind: "npm" | "cargo" | "python" | "gradle" | "cmake" | "go" | "pub"
   /** what the project calls itself */
   name?: string
   version?: string
@@ -224,6 +224,49 @@ function cmake(root: string, path: string): Read {
   }
 }
 
+/** pubspec is yaml: a section at the margin, and every package it asks for one indent in */
+function pub(root: string, path: string): Read {
+  const source = text(root, path)
+  const asked: Asked[] = []
+  let at = ""
+  let inner = 0
+  for (const raw of source.split("\n")) {
+    const line = raw.replace(/(^|\s)#.*$/, "").trimEnd()
+    if (!line.trim()) continue
+    const head = /^([\w-]+)\s*:/.exec(line)
+    if (head) {
+      at = head[1]
+      inner = 0
+      continue
+    }
+    if (!/^(dependencies|dev_dependencies|dependency_overrides)$/.test(at)) continue
+    const one = /^(\s+)([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line)
+    if (!one) continue
+    // the first entry says what one indent is here, and deeper is how that one is fetched
+    if (!inner) inner = one[1].length
+    if (one[1].length > inner) continue
+    asked.push({
+      name: one[2],
+      // an sdk, git or path dependency names no version
+      range: /^["']?[\d^~<>=]/.test(one[3]) ? one[3].replace(/["']/g, "").trim() : "",
+      // an override pins what something else pulled in, and it ships like any of them
+      dev: at === "dev_dependencies",
+      ecosystem: "Pub",
+    })
+  }
+  const said = (key: string) =>
+    new RegExp(`^${key}\\s*:\\s*(.*)$`, "m").exec(source)?.[1].replace(/["']/g, "").trim()
+  return {
+    path,
+    kind: "pub",
+    name: said("name"),
+    version: said("version"),
+    asked,
+    // executables: is what `dart pub global activate` puts on the path
+    bins: /^executables\s*:/m.test(source) ? ["pub executable"] : [],
+  }
+}
+
 function golang(root: string, path: string): Read {
   const source = text(root, path)
   const asked: Asked[] = []
@@ -275,6 +318,7 @@ const READERS: [RegExp, (root: string, path: string) => Read][] = [
   [/(^|\/)pom\.xml$/, maven],
   [/(^|\/)CMakeLists\.txt$/, cmake],
   [/(^|\/)go\.mod$/, golang],
+  [/(^|\/)pubspec\.ya?ml$/, pub],
 ]
 
 /** every manifest a repo holds that is not package.json, read by whichever rule fits */

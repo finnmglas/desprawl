@@ -13,6 +13,7 @@ export const REGISTRIES: Record<string, { label: string; at: (name: string) => s
   NuGet: { label: "NuGet", at: (n) => `https://www.nuget.org/packages/${n}` },
   RubyGems: { label: "RubyGems", at: (n) => `https://rubygems.org/gems/${n}` },
   Packagist: { label: "Packagist", at: (n) => `https://packagist.org/packages/${n}` },
+  Pub: { label: "pub.dev", at: (n) => `https://pub.dev/packages/${n}` },
 }
 
 /** the manifest kind a chip came from, said as the registry it means */
@@ -20,7 +21,7 @@ export const REGISTRIES: Record<string, { label: string; at: (name: string) => s
 // prettier-ignore
 export const REGISTRY_BY_LANG: Record<string, string> = {
   ts: "npm", rust: "crates.io", python: "PyPI", jvm: "Maven", go: "Go",
-  csharp: "NuGet", ruby: "RubyGems", php: "Packagist",
+  csharp: "NuGet", ruby: "RubyGems", php: "Packagist", dart: "Pub",
 }
 
 export const REGISTRY_OF: Record<string, string> = {
@@ -29,6 +30,7 @@ export const REGISTRY_OF: Record<string, string> = {
   python: "PyPI",
   gradle: "Maven",
   go: "Go",
+  pub: "Pub",
   cmake: "",
 }
 

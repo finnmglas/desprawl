@@ -271,3 +271,29 @@ test("a re-export with no from does not swallow the import after it", () => {
     "and it binds its own names, not the ones handed back out",
   )
 })
+
+test("a dart part its builder writes is generated, not a broken import", () => {
+  const dir = repo({
+    "pubspec.yaml": "name: app\n",
+    "lib/user.dart": [
+      "import 'package:app/api.dart';",
+      "part 'user.g.dart';",
+      "part 'user.freezed.dart';",
+      "part 'gone.dart';",
+      "",
+      "class User {}",
+    ].join("\n"),
+    "lib/api.dart": "class Api {}\n",
+  })
+  const graph = build(dir)
+  assert.deepEqual(
+    graph.missing.map((one) => one.specifier),
+    ["gone.dart"],
+    "only the part nobody generates is missing",
+  )
+  assert.equal(graph.stats.generated, 2)
+  assert.deepEqual(
+    graph.modules["lib/user.dart"].out.map((one) => one.to),
+    ["lib/api.dart"],
+  )
+})

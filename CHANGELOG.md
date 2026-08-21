@@ -4,6 +4,17 @@
 
 Notable changes per release. Dates are the day the tag shipped.
 
+## [Unreleased]
+
+### Added
+
+- **Dart and Flutter are read like any other language**: imports resolve through `package:` names off every `pubspec.yaml`, declarations and calls land in the graph, and `http`, `dio` and shelf's router are told apart the way every other language's two sides are. A flutter app in a folder of repos now draws its red edge into the backend it calls.
+- `pubspec.yaml` is a manifest: name, version, dependencies and overrides, with pub.dev as the registry a chip links to and the ecosystem its advisories are asked for under. Flutter, Bloc, Provider, Riverpod, dio and flutter_test each land in the bucket their npm counterpart uses.
+
+### Fixed
+
+- **A flutter repo read as "language none, Kotlin"**, naming the android shell over the hundred thousand lines of dart beside it. Dart counts as a language a repo can be written in now.
+
 ## [0.6.0] - 2026-08-19
 
 The api graph, a picture you can read at module grain, and a folder of repos read as one.

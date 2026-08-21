@@ -78,7 +78,7 @@ function head(file: string): Buffer | null {
 // prettier-ignore
 export const CODE = new Set([
   TS, JS, "Rust", "Python", "Go", "Ruby", "Java", "Kotlin", "C", "C++", "C#", "Swift", "PHP",
-  "Shell", "Vue", "Svelte", "Perl", "Groovy",
+  "Dart", "Shell", "Vue", "Svelte", "Perl", "Groovy",
 ])
 
 const HASH = new Set(["Python", "Shell", "YAML", "TOML", "Ruby", "Make", "Docker", "just"])

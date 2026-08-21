@@ -108,6 +108,19 @@ const DIALECTS: Dialect[] = [
     ],
   },
   {
+    // dart quotes a string either way and reads its own strings, so it scrubs as js does
+    id: "dart", label: "Dart", exts: ["dart"], flavour: "js",
+    quoted: true,
+    // a part is a file of this library, and `part of` names the file holding it
+    imports: [/^[^\S\n]*(?:import|export|part(?:\s+of)?)\s+["']([^"'\n]+)["']/gm],
+    // prettier-ignore
+    decls: [
+      { kind: "class", re: /(?:^|[\s;}])(?:abstract\s+|base\s+|final\s+|sealed\s+|interface\s+|mixin\s+)*(?:class|mixin|enum|extension|typedef)\s+(?!on\b)([A-Za-z_]\w*)/gm },
+      // it names its type first, so a statement of two words and a bracket reads the same
+      { kind: "function", re: /^[^\S\n]*(?!(?:return|await|throw|yield|new|case|assert|if|else|for|while|switch|do)\b)(?:(?:static|external|factory|const|final|late|@override)\s+)*(?:[A-Za-z_][\w<>,\s?]*[\s>?])([A-Za-z_]\w*)\s*(?:<[^<>()]*>)?\s*\([^;]*?\)\s*(?:async\*?|sync\*)?\s*(?=[{=])/gm },
+    ],
+  },
+  {
     id: "csharp", label: "C#", exts: ["cs"], flavour: "c",
     imports: [/^[^\S\n]*using\s+(?:static\s+)?([\w.]+)\s*;/gm],
     // prettier-ignore
@@ -245,6 +258,22 @@ export function candidates(
       ...spell([...held, "__init__"], exts),
       ...(parts.length > 1 ? spell(held.slice(0, -1), exts) : []),
     ]
+  }
+
+  if (dialect.id === "dart") {
+    // `package:name/x.dart` is the lib folder of that package, wherever the package sits
+    const named = /^package:([^/]+)\/(.+)$/.exec(text)
+    if (named) {
+      const home = parts_.get(named[1])
+      return home === undefined ? [] : [[home, "lib", named[2]].filter(Boolean).join("/")]
+    }
+    // the sdk is never a file here
+    if (text.startsWith("dart:")) return []
+    // everything else is written relative to the file that asks for it
+    const parts = text.split("/").filter((one) => one && one !== ".")
+    const back = parts.filter((one) => one === "..").length
+    const held = parts.slice(back)
+    return [[...up(back), ...held].join("/"), held.join("/"), ["lib", ...held].join("/")]
   }
 
   if (dialect.id === "jvm") {
@@ -404,6 +433,27 @@ const OWNED: Record<string, { keywords: string[]; runtime: string[] }> = {
     runtime: ["String", "Int", "Double", "Float", "Bool", "Array", "Dictionary", "Set", "Optional",
       "Result", "Error", "print", "map", "filter", "reduce", "count", "append", "first", "last",
       "isEmpty", "compactMap", "flatMap", "sorted", "contains", "forEach"],
+  },
+  dart: {
+    keywords: ["abstract", "as", "assert", "async", "await", "base", "break", "case", "catch",
+      "class", "const", "continue", "covariant", "default", "deferred", "do", "dynamic", "else",
+      "enum", "export", "extends", "extension", "external", "factory", "false", "final", "finally",
+      "for", "get", "hide", "if", "implements", "import", "in", "interface", "is", "late",
+      "library", "mixin", "new", "null", "on", "operator", "part", "required", "rethrow", "return",
+      "sealed", "set", "show", "static", "super", "switch", "sync", "this", "throw", "true", "try",
+      "typedef", "var", "void", "when", "while", "with", "yield"],
+    // the core library, and the widgets flutter hands every app that never declares them
+    runtime: ["print", "String", "int", "double", "num", "bool", "List", "Map", "Set", "Iterable",
+      "Future", "Stream", "Object", "DateTime", "Duration", "Uri", "RegExp", "StringBuffer",
+      "Exception", "Error", "ArgumentError", "StateError", "identical", "override", "required",
+      "add", "addAll", "remove", "contains", "map", "where", "toList", "toSet", "toString",
+      "length", "forEach", "then", "catchError", "firstWhere", "join", "split", "substring",
+      "indexOf", "trim", "isEmpty", "isNotEmpty", "keys", "values", "expand", "reduce", "fold",
+      "sort", "first", "last", "cast", "parse", "tryParse", "jsonDecode", "jsonEncode",
+      "Widget", "StatelessWidget", "StatefulWidget", "State", "BuildContext", "Key", "setState",
+      "Container", "Column", "Row", "Text", "Scaffold", "Padding", "Center", "SizedBox", "Icon",
+      "AppBar", "ListView", "Navigator", "MediaQuery", "Theme", "Colors", "EdgeInsets", "Expanded",
+      "Stack", "Positioned", "Align", "Flexible", "Wrap", "Card", "Image", "TextStyle", "runApp"],
   },
   csharp: {
     keywords: ["class", "interface", "struct", "enum", "record", "namespace", "using", "public",

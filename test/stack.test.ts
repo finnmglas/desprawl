@@ -253,3 +253,41 @@ test("what a repo is built into is one of the parts it is made of", () => {
   assert.ok(s.parts.includes("ios"), "the platform is named, not filed under mobile")
   assert.ok(!s.parts.includes("android"), "and only the one it was actually set up for")
 })
+
+test("a flutter app reads as dart, not as the shell android builds it with", () => {
+  const dir = repo({
+    "pubspec.yaml": [
+      "name: mobile",
+      "version: 1.4.2+18",
+      "",
+      "environment:",
+      "  sdk: '>=3.3.0 <4.0.0'",
+      "",
+      "dependencies:",
+      "  flutter:",
+      "    sdk: flutter",
+      "  dio: ^5.4.0",
+      "  provider: ^6.1.1",
+      "",
+      "dev_dependencies:",
+      "  flutter_test:",
+      "    sdk: flutter",
+      "",
+      "flutter:",
+      "  assets:",
+      "    - assets/images/",
+    ].join("\n"),
+    "lib/main.dart": "void main() {\n  runApp();\n}\n",
+    "android/app/build.gradle": 'apply plugin: "com.android.application"\n',
+  })
+  const s = stack(dir, analyze(dir).languages)
+  assert.equal(s.primary, "Dart", "117k lines of dart do not read as the kotlin shell")
+  assert.deepEqual(s.frameworks, ["Flutter"])
+  assert.deepEqual(s.state, ["Provider"])
+  assert.ok(s.managers.includes("pub"), `pub missing from ${s.managers.join(", ")}`)
+  assert.equal(s.registries.Flutter, "pub")
+  // the assets list under `flutter:` is not a package, and neither is the sdk constraint
+  const asked = s.manifests.length
+  assert.equal(asked, 0, "a pubspec is not a package.json")
+  assert.equal(s.dependencies, 4)
+})

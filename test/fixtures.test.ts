@@ -108,6 +108,26 @@ const FIXTURES: Fixture[] = [
     edges: [["main.go", "util/util.go"]],
     declares: ["main", "Go", "Held"],
   },
+  {
+    lang: "dart",
+    files: {
+      "pubspec.yaml":
+        "name: fix\nversion: 1.0.0\n\ndependencies:\n  flutter:\n    sdk: flutter\n  http: ^1.1.0\n",
+      "lib/main.dart":
+        "import 'package:fix/util.dart';\nimport 'deep/inner.dart';\nimport 'package:http/http.dart' as http;\n\nvoid main() {\n  helper();\n  deeply();\n}\n",
+      "lib/util.dart": "int helper() {\n  return 1;\n}\n\nclass Held {}\n",
+      "lib/deep/inner.dart": "int deeply() {\n  return 2;\n}\n",
+    },
+    edges: [
+      ["lib/main.dart", "lib/util.dart"],
+      ["lib/main.dart", "lib/deep/inner.dart"],
+    ],
+    declares: ["main", "helper", "Held", "deeply"],
+    reaches: [
+      ["lib/main.dart#main", "lib/util.dart#helper"],
+      ["lib/main.dart#main", "lib/deep/inner.dart#deeply"],
+    ],
+  },
 ]
 
 for (const one of FIXTURES)
@@ -149,6 +169,10 @@ test("a string or a comment cannot invent an import in any language", () => {
     ["A.kt", 'val s = "import com.fake.Thing"\nimport com.real.Thing'],
     ["a.rb", 'x = "require \'fake\'"\nrequire "real"'],
     ["a.php", '<?php\n$s = "use Fake\\\\Thing;";\nuse Real\\\\Thing;'],
+    [
+      "a.dart",
+      "const s = \"import 'fake.dart';\";\n// import 'commented.dart';\nimport 'real.dart';",
+    ],
   ]
   for (const [path, source] of cases) {
     const found = foreign(source, dialectOf(path)!).map((one) => one.text)
@@ -172,6 +196,7 @@ test("every language desprawl claims is one it can actually read", () => {
     "h.rb": "def go\nend",
     "i.php": "<?php\nfunction go() {}",
     "j.ts": "export const go = () => 1",
+    "k.dart": "void go() {}",
   }
   const dir = repo(one)
   const graph = build(dir)

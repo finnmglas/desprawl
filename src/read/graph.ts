@@ -70,6 +70,9 @@ const REWRITE: [RegExp, string[]][] = [
   [/\.cjs$/, [".cts", ".d.cts", ".cjs"]],
 ]
 
+// a builder writes these beside the file that declares them, and a repo checks in neither
+const DERIVED = /\.(g|freezed|gr|config|mocks|pb|pbjson|pbenum|pbserver)\.dart$/
+
 // output, not source
 const BUNDLED = /(\.min\.[cm]?jsx?$)|(\.[0-9a-f]{8,}\.[cm]?jsx?$)|(^|\/)[\w.-]*-build\//
 
@@ -220,12 +223,17 @@ export function build(repo: string): Graph {
       (!SOURCE.test(p) || !bundled(join(root, p))),
   )
 
-  // a crate names its siblings rather than pathing to them
-  const crates = new Map<string, string>()
+  // a crate, and a pub package, names its siblings rather than pathing to them
+  const named = new Map<string, string>()
+  const home = (path: string) => (dirname(path) === "." ? "" : dirname(path))
   for (const path of tracked) {
-    if (!/(^|\/)Cargo\.toml$/.test(path)) continue
-    const name = /^\s*name\s*=\s*"([^"]+)"/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
-    if (name) crates.set(name, dirname(path) === "." ? "" : dirname(path))
+    if (/(^|\/)Cargo\.toml$/.test(path)) {
+      const name = /^\s*name\s*=\s*"([^"]+)"/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
+      if (name) named.set(name, home(path))
+    } else if (/(^|\/)pubspec\.ya?ml$/.test(path)) {
+      const name = /^name\s*:\s*["']?([\w.-]+)/m.exec(readFileSync(join(root, path), "utf8"))?.[1]
+      if (name) named.set(name, home(path))
+    }
   }
 
   // resolves to its own folder, not node_modules
@@ -280,7 +288,7 @@ export function build(repo: string): Graph {
       for (const spec of foreign(source, dialect, done)) {
         if (!spec.guess) seen++
         // the repo says whether an angled include is its own
-        const tried = candidates(dialect, spec.text, from, crates)
+        const tried = candidates(dialect, spec.text, from, named)
         const held = tried.find((one) => modules[one])
         // a package names a folder, and which root that folder sits under is not written
         let inside: string[] = []
@@ -309,7 +317,9 @@ export function build(repo: string): Graph {
         const name = outsideOf(dialect, spec.text) || (spec.type ? spec.text : "")
         // somebody else's crate was never ours to find
         if (!name) {
-          if (!spec.guess) missing.push({ from, specifier: spec.text, reason: "no such file" })
+          // a part nobody checked in was generated, and telling someone to fix it is a lie
+          if (DERIVED.test(spec.text)) generated++
+          else if (!spec.guess) missing.push({ from, specifier: spec.text, reason: "no such file" })
           continue
         }
         external++
@@ -469,6 +479,9 @@ function outsideOf(dialect: Dialect, text: string): string {
     return /^(crate|super|self)$/.test(head) ? "" : head
   }
   if (dialect.id === "python") return text.startsWith(".") ? "" : text.split(".")[0]
+  // `package:http/http.dart` asks for http, and `dart:async` is the sdk itself
+  if (dialect.id === "dart")
+    return text.startsWith("dart:") ? text : (/^package:([^/]+)/.exec(text)?.[1] ?? "")
   if (dialect.id === "jvm") return text.split(".").slice(0, 2).join(".")
   return text.split("/").pop() ?? text
 }
