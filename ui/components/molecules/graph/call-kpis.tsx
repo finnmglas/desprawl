@@ -29,7 +29,7 @@ interface Props {
   rooted: string
 }
 
-/** the same numbers off any reading of the call graph, counted the way the view counts them */
+/** the same numbers off any reading, counted the way the view counts them */
 function of(one: Calls, exports: boolean) {
   const live = reached(one, exports)
   const held = Object.values(one.symbols).filter((s) => s.kind !== "module")
@@ -37,8 +37,7 @@ function of(one: Calls, exports: boolean) {
   return {
     declarations: held.length,
     calls: one.stats.edges,
-    // resolution rather than what failed to resolve: the colour means direction, and a rise
-    // in call sites nobody could place drawn green would read as praise for the gap
+    // resolution, not what failed: green means up, and up on a gap reads as praise
     resolution: Math.round(one.stats.coverage * 10_000) / 100,
     dead: held.filter((s) => state(s) === "dead").length,
     open: held.filter((s) => state(s) === "open").length,
@@ -51,8 +50,7 @@ function of(one: Calls, exports: boolean) {
 export function CallKpis(props: Props) {
   const { calls, declared, dead, only, deadLines, declaredLines, busiest } = props
   const { repeated, loops, roots, rooted } = props
-  // the graph as it stood then, counted by the same lines. Held, since an scc over every
-  // declaration is not something to run on each render
+  // held: an scc over every declaration is not something to run on each render
   const { compare } = useDisplay()
   const was = useWas("calls")?.calls
   const exports = roots === rooted

@@ -1,5 +1,5 @@
 // owner: finn
-// goal: one read and one scrub per file per run, since four stages want the same bytes
+// goal: one read and one scrub per file
 
 import { readFileSync, statSync } from "node:fs"
 import { resolve } from "node:path"
@@ -9,22 +9,20 @@ import type { Flavour } from "./dialects.ts"
 type Done = ReturnType<typeof scrub>
 
 interface Held {
-  /** what the file was when it was read, so an edit under a live server is never served */
+  /** mtime when read, so a live edit is never served from here */
   when: number
   text: string
   done: Map<string, Done>
 }
 
-// a kernel is a gigabyte of text, so what is held is bounded and everything past it is
-// read again. A repo that fits pays for one read and one scrub, whichever stage asks first
+// a kernel is a gigabyte of text, so this is bounded and the rest is read again
 const LIMIT = 128_000_000
 
 const held = new Map<string, Held>()
 let chars = 0
 
 function of(path: string): Held | null {
-  // one stage says the repo the way the reader typed it and another says its git root,
-  // and two spellings of one file is how a cache holds everything and hits nothing
+  // one stage says the repo as typed, another its git root
   const file = resolve(path)
   let when: number
   try {
@@ -55,7 +53,7 @@ function of(path: string): Held | null {
 /** the file as written, or "" where there is nothing to read */
 export const reading = (file: string): string => of(file)?.text ?? ""
 
-/** and with its comments and strings taken out, which is what every reader wants */
+/** and scrubbed, which is what every reader wants */
 export function scrubbed(file: string, flavour: Flavour = "js", templates = false): Done {
   const one = of(file)
   if (!one) return { code: "", strings: [] }
@@ -67,7 +65,7 @@ export function scrubbed(file: string, flavour: Flavour = "js", templates = fals
   return made
 }
 
-/** between repos, and between one run and the next: nothing here outlives a reading */
+/** between repos, and between runs */
 export function forget(): void {
   held.clear()
   chars = 0

@@ -188,7 +188,7 @@ function branch(n: Node, total: number, level = 0): string[][] {
 const wrapped = (kind: string, repo: string, data: unknown) =>
   JSON.stringify({ desprawl: VERSION, kind, repo, made: new Date().toISOString(), data }, null, 2)
 
-/** how much of it is a language somebody writes, since json fixtures are not an ai cost */
+/** how much is a language somebody writes: json fixtures are not an ai cost */
 function written(s: Stats): string {
   const code = s.languages.filter((one) => CODE.has(one.name))
   const chars = code.reduce((sum, one) => sum + one.chars, 0)

@@ -141,7 +141,7 @@ function python(root: string, path: string): Read {
     // [project.optional-dependencies] and [tool.poetry.group.dev.dependencies]
     if (!/optional-dependencies|group\..*\.dependencies|^tool\.poetry\.dependencies$/.test(name))
       continue
-    // an extra is `dev = ["pytest"]`: the key names the group, the strings name the packages
+    // `dev = ["pytest"]`: the key names the group, the strings the packages
     const extras = /optional-dependencies$/.test(name)
     let group = ""
     for (const line of lines) {
@@ -235,7 +235,7 @@ function cmake(root: string, path: string): Read {
   }
 }
 
-/** pubspec is yaml: a section at the margin, and every package it asks for one indent in */
+/** pubspec is yaml: a section at the margin, a package one indent in */
 function pub(root: string, path: string): Read {
   const source = text(root, path)
   const asked: Asked[] = []
@@ -253,14 +253,14 @@ function pub(root: string, path: string): Read {
     if (!/^(dependencies|dev_dependencies|dependency_overrides)$/.test(at)) continue
     const one = /^(\s+)([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line)
     if (!one) continue
-    // the first entry says what one indent is here, and deeper is how that one is fetched
+    // the first entry sets the indent, deeper is how that one is fetched
     if (!inner) inner = one[1].length
     if (one[1].length > inner) continue
     asked.push({
       name: one[2],
       // an sdk, git or path dependency names no version
       range: /^["']?[\d^~<>=]/.test(one[3]) ? one[3].replace(/["']/g, "").trim() : "",
-      // an override pins what something else pulled in, and it ships like any of them
+      // an override pins what something else pulled in, and it ships
       dev: at === "dev_dependencies",
       ecosystem: "Pub",
     })
@@ -273,7 +273,7 @@ function pub(root: string, path: string): Read {
     name: said("name"),
     version: said("version"),
     asked,
-    // executables: is what `dart pub global activate` puts on the path
+    // what `pub global activate` puts on the path
     bins: /^executables\s*:/m.test(source) ? ["pub executable"] : [],
   }
 }

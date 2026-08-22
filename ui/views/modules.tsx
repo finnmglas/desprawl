@@ -45,7 +45,7 @@ const KEEP = ["source only", "all folders"]
 
 const real = (unit: Unit) => unit.role === "source"
 
-/** the same four numbers off any reading of the graph, folded the way the reader folds it */
+/** the same four numbers off any reading, folded the way the reader folds it */
 function folded(graph: Graph, at: string, keep: string) {
   const layout = fold(graph, at === AUTO ? balanced(graph) : DEPTH[at])
   const units = layout.units.filter((u) => keep === KEEP[1] || real(u))
@@ -165,7 +165,7 @@ export function Modules({
   }
   const levels = Math.max(...units.map((u) => u.level)) + 1
   const files = units.reduce((sum, u) => sum + u.files, 0)
-  // the same fold over the graph as it stood then, at whichever grouping the reader picked
+  // the same fold, at whichever grouping the reader picked
   const then = since(was && folded(was, at, keep), compare, {
     groups: units.length,
     levels,

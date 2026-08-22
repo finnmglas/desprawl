@@ -1,5 +1,5 @@
 // owner: finn
-// goal: the repo as it was, read the same way it is read now, so a kpi can say which way it went
+// goal: the repo as it was
 
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -13,11 +13,10 @@ import type { Graph } from "../read/graph.ts"
 import type { Calls } from "../read/calls.ts"
 import type { Sprawl } from "./work.ts"
 
-/** the totals a masthead shows, which no graph carries. Named so a card can hold them
- * against its own numbers by name, whichever ones it happens to show */
+/** masthead totals, keyed by name so a card can hold its own against them */
 export type Sized = Record<"code" | "comment" | "chars" | "files" | "commits", number>
 
-/** what was read, and which commit it was read at */
+/** what was read, and at which commit */
 export interface Was {
   /** the commit the window opens on, empty when the repo held nothing that far back */
   at: string
@@ -33,7 +32,7 @@ export type Want = "size" | "graph" | "calls" | "sprawl"
 
 const nothing: Sized = { code: 0, comment: 0, chars: 0, files: 0, commits: 0 }
 
-/** the newest commit older than the window, or "" when every commit is newer than it */
+/** the newest commit older than the window, "" when there is none */
 function edge(root: string, days: number): { at: string; when: string } {
   const when = new Date(Date.now() - days * 86_400_000).toISOString()
   const at = git(root, "rev-list", "-1", `--before=${when}`, "HEAD").trim()
@@ -42,8 +41,7 @@ function edge(root: string, days: number): { at: string; when: string } {
     : { at: "", when: "" }
 }
 
-// a checkout is the expensive half, so one per repo and window is held and every reading
-// shares it. Two windows at a time: a reader flips back and forth, they do not collect
+// a checkout is the expensive half, so every reading shares one. Two at a time
 const MOST = 2
 const held = new Map<string, { dir: string; at: string; when: string }>()
 
@@ -57,7 +55,7 @@ function drop(key: string) {
   } catch {
     rmSync(one.dir, { recursive: true, force: true })
   }
-  // a run that died mid way leaves an entry behind, and git will not reuse the path
+  // a dead run leaves an entry, and git will not reuse the path
   try {
     git(root, "worktree", "prune")
   } catch {
@@ -65,7 +63,7 @@ function drop(key: string) {
   }
 }
 
-/** every checkout this run made, gone. Called when the process ends, and by the tests */
+/** every checkout this run made, gone */
 export function forget(): void {
   for (const key of [...held.keys()]) drop(key)
 }
@@ -76,22 +74,39 @@ for (const signal of ["exit", "SIGINT", "SIGTERM"] as const)
     if (signal !== "exit") process.exit(0)
   })
 
-/**
- * the repo as it stood, in a throwaway worktree beside it. Every reader here starts with a
- * folder and a git dir, which is exactly what a worktree is, so nothing else had to change
- */
+// a run that died left its checkout registered, and prune only clears one whose folder went
+const swept = new Set<string>()
+
+function sweep(root: string): void {
+  if (swept.has(root)) return
+  swept.add(root)
+  const mine = new Set([...held.values()].map((one) => one.dir))
+  try {
+    for (const line of git(root, "worktree", "list", "--porcelain").split("\n")) {
+      const dir = line.startsWith("worktree ") ? line.slice(9).trim() : ""
+      if (!/(^|\/)desprawl-was-[^/]+$/.test(dir) || mine.has(dir)) continue
+      git(root, "worktree", "remove", "--force", dir)
+      rmSync(dir, { recursive: true, force: true })
+    }
+    git(root, "worktree", "prune")
+  } catch {
+    // whatever is left stays, and the next checkout takes a name of its own
+  }
+}
+
+/** the repo as it stood, in a throwaway worktree: a folder and a git dir */
 function home(root: string, days: number): { dir: string; at: string; when: string } | null {
   const { at, when } = edge(root, days)
   if (!at) return null
-  // keyed by the commit, not by the window: two windows landing on the same commit are one
-  // checkout, and a window said twice with a millisecond between is not two of them
+  // keyed by the commit: two windows can land on one
   const key = `${root}@${at}`
   const seen = held.get(key)
   if (seen) return seen
+  sweep(root)
   let dir = ""
   try {
     dir = mkdtempSync(join(tmpdir(), "desprawl-was-"))
-    // detached, so it takes no branch and leaves none behind
+    // detached: no branch either way
     git(root, "worktree", "add", "--detach", "--quiet", dir, at)
   } catch {
     if (dir) rmSync(dir, { recursive: true, force: true })
@@ -115,10 +130,7 @@ const sized = (dir: string, root: string, at: string): Sized => {
   }
 }
 
-/**
- * one reading of an older commit, asked for by name. The caller says what it wants because
- * a call graph costs what a call graph costs, and a masthead never needed one
- */
+/** one reading, asked for by name: a call graph costs what a call graph costs */
 export function before(repo: string, days: number, want: Want = "size"): Was | null {
   if (!(days > 0)) return null
   let root: string
@@ -128,13 +140,13 @@ export function before(repo: string, days: number, want: Want = "size"): Was | n
     return null
   }
   const at = home(root, days)
-  // a repo that held nothing then: every number grew from zero, which is the honest reading
+  // nothing there then, so every number grew from zero
   if (!at) return want === "size" ? { at: "", when: "", size: nothing } : null
   try {
     if (want === "size") return { ...at, size: sized(at.dir, root, at.at) }
     if (want === "graph") return { ...at, graph: build(at.dir) }
     if (want === "calls") return { ...at, calls: calls(at.dir, build(at.dir)) }
-    // the same paths the panel reads today: the modules, not every tracked file
+    // the modules, the way the panel reads them
     const paths = Object.keys(build(at.dir).modules)
     return {
       ...at,
@@ -146,7 +158,7 @@ export function before(repo: string, days: number, want: Want = "size"): Was | n
       },
     }
   } catch {
-    // a bare repo, a submodule, no disk: a card without an arrow beats a card with a guess
+    // a bare repo, a submodule, no disk: no arrow beats a guessed one
     return null
   }
 }

@@ -27,7 +27,7 @@ export interface Dialect {
   decls: { kind: "function" | "class"; re: RegExp }[]
 }
 
-/** `use a::{b, c::{d, e as f}}` names a::b, a::c::d and a::c::e, and a group can hold a group */
+/** `use a::{b, c::{d, e}}` names four things, since a group can hold a group */
 function opened(text: string): string[] {
   const at = text.indexOf("{")
   const head = (at === -1 ? text : text.slice(0, at)).replace(/::\s*$/, "").trim()

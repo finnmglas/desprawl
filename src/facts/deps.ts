@@ -170,7 +170,7 @@ function tree(root: string): Map<string, Held> {
   return found
 }
 
-/** pep 503: pillow, Pillow and pillow_heif's `pillow-heif` are one name written four ways */
+/** pep 503: pillow, Pillow and pillow-heif are one name written three ways */
 const same = (name: string) => name.toLowerCase().replace(/[-_.]+/g, "-")
 
 const read = (path: string): string => {
@@ -181,18 +181,18 @@ const read = (path: string): string => {
   }
 }
 
-/** what a package says it is licensed as, in the three places a wheel may write it */
+/** the three places a wheel writes its licence */
 function licenceOf(text: string): string {
   const said = /^License-Expression:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
   if (said) return said
   const filed = /^Classifier: License :: (?:OSI Approved :: )?(.+)$/m.exec(text)?.[1]?.trim()
   if (filed && filed !== "OSI Approved") return filed
-  // and the free text field, which holds a whole licence as often as its name
+  // the free text field holds a whole licence as often as its name
   const plain = /^License:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim() ?? ""
   return /^[\w.\-+ ()]{1,32}$/.test(plain) ? plain : ""
 }
 
-/** every folder a virtualenv keeps its packages in, at the repo root or one level under */
+/** where a virtualenv keeps its packages, at the root or one level under */
 function sites(root: string): string[] {
   const found: string[] = []
   const look = (at: string) => {
@@ -205,7 +205,7 @@ function sites(root: string): string[] {
         } catch {
           continue
         }
-        // posix nests one python version deep, windows does not
+        // posix nests a version deep, windows does not
         for (const one of listed.includes("site-packages") ? [""] : listed) {
           const site = join(base, one, "site-packages")
           try {
@@ -226,7 +226,7 @@ function sites(root: string): string[] {
   return found
 }
 
-/** the dist-info beside every installed python package: its version, licence and size */
+/** the dist-info beside an installed package: version, licence, size */
 function pythons(root: string): Map<string, Held> {
   const found = new Map<string, Held>()
   for (const site of sites(root)) {
@@ -242,7 +242,7 @@ function pythons(root: string): Map<string, Held> {
       const name = /^Name:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
       const version = /^Version:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
       if (!name || !version) continue
-      // RECORD lists every file it installed and how many bytes each one is
+      // RECORD lists every file it wrote, and its bytes
       const bytes = [...read(join(site, entry, "RECORD")).matchAll(/,(\d+)\s*$/gm)].reduce(
         (sum, one) => sum + Number(one[1]),
         0,
@@ -263,7 +263,7 @@ function pythons(root: string): Map<string, Held> {
   return found
 }
 
-/** a lockfile pins what no venv on disk can be asked: `[[package]]` per package, toml or not */
+/** a lock pins what no venv can be asked: `[[package]]` per package */
 function locked(root: string, tracked: string[]): Map<string, string> {
   const found = new Map<string, string>()
   for (const path of tracked.filter((one) => /(^|\/)(uv|poetry)\.lock$/.test(one)))

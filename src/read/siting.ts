@@ -43,11 +43,11 @@ export interface Sited {
   symbols: Record<string, Symbol>
   /** every file declaring a name, for a method call that names no file */
   declares: Map<string, string[]>
-  /** the files this one's imports name, which is as far as a method call may land */
+  /** the files its imports name, as far as a method call may land */
   reaches: Set<string>
   /** what the file's imports bind, per file, so a re-export can be followed */
   bindings: Map<string, Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>>
-  /** and the files a barrel forwards without naming, since `export *` writes no name down */
+  /** and what a barrel forwards without naming it: `export *` writes no name down */
   doors: Map<string, string[]>
   /** values a file binds that are not declarations, like state setters */
   locals: Map<string, Set<string>>
@@ -77,8 +77,7 @@ export function siting(symbol: Symbol, body: string, at: Sited): number {
         continue
       }
       const held = declares.get(name)
-      // one file declaring it is only an answer if this file reaches that file: otherwise a
-      // helper called `lower` collects every `x.lower()` the repo writes
+      // and only where this file reaches it, or one `lower` takes every `x.lower()`
       if (held?.length === 1 && reaches.has(held[0])) {
         const there = symbols[`${held[0]}#${name}`]
         if (there && there.id !== symbol.id) link(symbol.id, there.id)
@@ -121,7 +120,7 @@ export function siting(symbol: Symbol, body: string, at: Sited): number {
       let target = symbols[`${at}#${called}`] ?? symbols[`${at}#${name}`]
       for (let hop = 0; !target && hop < 4; hop++) {
         const onward = bindings.get(at)?.get(called)
-        // a star re-export names nothing, so the name is looked for in what it forwards
+        // a star re-export names nothing, so look in what it forwards
         if (!onward?.file) {
           const through = doors.get(at)?.find((one) => symbols[`${one}#${called}`])
           if (!through) break

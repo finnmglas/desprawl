@@ -162,8 +162,7 @@ export function reads(one: Asked): boolean {
     const names = kept.stats(false).contributors.map((c) => (c.email || c.name).toLowerCase())
     return json(moved(at(url) || held[0], from, to, names))
   }
-  // what a kpi number was, as far back as the reader asked, read the way it is read now.
-  // A fleet answers about the repo a request names, since one checkout is one repo
+  // what a kpi number was, as far back as the reader asked
   if (url.pathname === "/api/before") {
     const days = Number(url.searchParams.get("days") ?? 0)
     const want = (url.searchParams.get("want") ?? "size") as Want

@@ -1,5 +1,5 @@
 // owner: finn
-// goal: the same bytes read once, and never held past the edit that changed them
+// goal: read once, and never past the edit
 
 import assert from "node:assert/strict"
 import { test } from "node:test"

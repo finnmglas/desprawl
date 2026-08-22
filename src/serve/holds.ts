@@ -221,9 +221,8 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
       return made
     },
     before: (name, days, want) => {
-      // a checkout is of one repo. A folder of them would be that many checkouts, and
-      // answering about the first while the cards add all of them up is a wrong number
-      // said confidently: a fleet gets no arrows until a reader picks one repo
+      // a checkout is of one repo, and the cards add a folder of them up: answering about
+      // the first would be a wrong number said confidently. Pick one and it reads
       const held = mine(name ?? null)
       if (held.length !== 1) return null
       const one = held[0]

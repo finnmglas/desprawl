@@ -21,8 +21,7 @@ interface Props {
 
 export function Headline({ stats, total, span, onCard }: Props) {
   const source = stats.code + stats.comment
-  // lines and commits are in the log; a comment and a character are not, so those two come
-  // off a reading of the repo as it stood, which only a live run can do
+  // lines and commits are in the log, a comment and a character are not
   const { compare } = useDisplay()
   const went = moved(stats.series, compare)
   const then = since(useWas("size")?.size ?? null, compare, {
@@ -59,7 +58,7 @@ export function Headline({ stats, total, span, onCard }: Props) {
             value: `~${num(tokens(stats.chars))}`,
             sub: `${num(stats.chars)} chars`,
             verdict: contextOf(tokens(stats.chars)),
-            // the estimate is a share of the characters, so it moves with them
+            // a share of the characters, so it moves with them
             moved: then.chars && { by: tokens(then.chars.by), over: then.chars.over },
             says: "tokens",
             to: "Files",

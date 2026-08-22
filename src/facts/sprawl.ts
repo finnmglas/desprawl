@@ -51,17 +51,17 @@ const styled = (text: string): boolean => {
   return parts.length > 1 && parts.every((one) => UTILITY.test(one))
 }
 
-// a placeholder, a hash and a key: written by a machine for a machine, and never read
+// a placeholder, a hash, a key: written by a machine for a machine
 const IDENT =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$|^[0-9a-f]{16,}$|^[A-Za-z0-9+/]{24,}={0,2}$/i
 
-/** vector art, coordinates and encoded blobs: nobody typed these, so nobody will name them */
+/** vector art, hashes, blobs: nobody typed these, so nobody will name them */
 const data = (text: string): boolean => {
   if (IDENT.test(text)) return true
   // an svg path is a letter then numbers, over and over
   if (/^[MmLlHhVvCcSsQqTtAaZz][\d\s.,-]/.test(text)) return true
   const digits = (text.match(/[\d\s.,;:%#|/+_-]/g) ?? []).length
-  // more punctuation and digits than letters is a value, not a sentence
+  // more digits than letters is a value, not a sentence
   return digits / text.length > 0.6 && !/\s\w+\s\w+\s/.test(text)
 }
 

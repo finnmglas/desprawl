@@ -1,5 +1,5 @@
 // owner: finn
-// goal: the repo as it was, asked for once per window and reading, and only by whoever wants it
+// goal: the older reading, asked for once
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { wasBefore } from "./live.ts"
@@ -8,17 +8,14 @@ import type { Compare } from "./display.tsx"
 import type { Want, Was } from "../../../src/facts/before.ts"
 
 interface Held {
-  /** the window every reading here belongs to, so a late answer to an old one is dropped */
+  /** the window these belong to */
   days: number
   ask: (want: Want) => Was | null
 }
 
 const Ctx = createContext<Held>({ days: 0, ask: () => null })
 
-/**
- * one reading of the older commit. Asking for one that has not arrived starts it and
- * answers nothing, so a card renders without an arrow until it is there
- */
+/** one reading. Asking starts it and answers nothing, so a card waits without an arrow */
 export function useWas(want: Want): Was | null {
   const { ask } = useContext(Ctx)
   return ask(want)
@@ -35,7 +32,7 @@ export function WasProvider({
   const [held, setHeld] = useState<Record<string, Was | null>>({})
   const [asked, setAsked] = useState<Want[]>([])
 
-  // a new window is a new set of readings: what was on screen belonged to the old one
+  // a new window is a new set of readings
   useEffect(() => {
     setHeld({})
     setAsked([])
@@ -58,7 +55,7 @@ export function WasProvider({
   const ask = (want: Want) => {
     const key = `${days}:${want}`
     if (days && !asked.includes(want))
-      // during a render, so it lands on the next one rather than in the middle of this
+      // queued: this runs during a render
       queueMicrotask(() => setAsked((one) => (one.includes(want) ? one : [...one, want])))
     return held[key] ?? null
   }

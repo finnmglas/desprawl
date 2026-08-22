@@ -9,8 +9,7 @@ import { num } from "../../../lib/say/format.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Moved } from "../../../lib/say/trend.ts"
 
-/** which way it went, beside the number it went from. Standing still is an answer too, so
- * a window with nothing in it says so in grey rather than leaving the card looking unread */
+/** which way it went. Standing still is an answer too, so a quiet window says so in grey */
 function Trend({ moved, what }: { moved: Moved; what: string }) {
   if (!moved.over) return null
   const still = !moved.by
@@ -32,7 +31,7 @@ function Trend({ moved, what }: { moved: Moved; what: string }) {
         )}
       >
         {still ? "–" : <Arrow up={up} className="size-3.5" />}
-        {/* a tenth of a point is a move, and rounding it to zero beside a real zero is a lie */}
+        {/* a tenth of a point is a move, and zero beside a real zero is a lie */}
         {still ? "" : (moved.said ?? (held < 1 ? held.toFixed(2).replace(/0$/, "") : num(held)))}
       </span>
     </Tip>
@@ -53,9 +52,9 @@ export function Kpi({
   value: React.ReactNode
   sub: React.ReactNode
   verdict: Verdict
-  /** how it moved over the window the reader picked, where that can be read at all */
+  /** how it moved over the reader's window, where that can be read */
   moved?: Moved
-  /** what that movement is, in words, since a delta alone does not say what it counted */
+  /** what moved, since a delta does not say what it counted */
   says?: string
   /** the tab it opens, when it opens one */
   opens?: string

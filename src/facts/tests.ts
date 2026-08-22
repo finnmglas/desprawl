@@ -103,8 +103,7 @@ const MEASURE: Record<string, string> = {
 // what declares a test, whichever runner is underneath
 const CASE = /(^|[\s;{}])(test|it)(\.\w+)?\s*\(/g
 
-// a suite no package.json describes: how its files are named, what declares a case in one,
-// and what would run them. A language desprawl reads is a language whose tests it can count
+// a suite no package.json describes: its files, what declares a case, what runs them
 // prettier-ignore
 const SUITES: [runner: string, named: RegExp, one: RegExp, ran: string][] = [
   ["pytest", /(^|\/)(test_[^/]+|[^/]+_test)\.py$/, /^[^\S\n]*(?:async\s+)?def\s+test\w*\s*\(/gm, "pytest"],
@@ -136,7 +135,7 @@ function coverage(root: string): { made: Suite["coverage"]; from: string } {
       from: "coverage/coverage-summary.json",
     }
 
-  // coverage.py writes its own json, with the totals under one key
+  // coverage.py writes its own json
   const python = reading(join(root, "coverage.json"))
   if (python?.totals)
     return {
@@ -209,7 +208,7 @@ export function tests(repo: string): Suite {
     for (const path of tracked) {
       if (!named.test(path) || VENDORED.test(path)) continue
       const count = (code(path).match(one) ?? []).length
-      // a rust file is a test file only where it holds one, since the name says nothing
+      // a rust file is a test file only where it holds one
       if (!count && runner === "cargo test") continue
       held++
       found += count
@@ -229,7 +228,7 @@ export function tests(repo: string): Suite {
         /--coverage|\bc8\b|\bnyc\b|experimental-test-coverage/.test(scripts[one]),
     ) ?? ""
   const made_ = MEASURE[runners[0] ?? ""] ?? ""
-  // a suite outside npm has no script to name, so what would run it is the whole answer
+  // outside npm there is no script, so what would run it is the answer
   const measured = measure
     ? scripts[measure]
     : made_ && runners[0] === "node:test" && script

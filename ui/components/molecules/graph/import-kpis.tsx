@@ -10,16 +10,14 @@ import { useWas } from "../../../lib/app/was.tsx"
 import type { Graph } from "../../../../src/read/graph.ts"
 
 export function ImportKpis({ graph }: { graph: Graph }) {
-  // the graph as it stood then, read off a checkout of that commit, and counted here by the
-  // same lines that count today's: one reading, two dates, no second way to be wrong
+  // the graph as it stood, counted by the same lines: one reading, two dates
   const { compare } = useDisplay()
   const was = useWas("graph")?.graph
   const of = (one: Graph) => ({
     modules: one.stats.files,
     edges: one.stats.edges,
     per: Math.round((one.stats.edges / Math.max(1, one.stats.files)) * 10) / 10,
-    // resolution rather than the count of what failed: the colour here means direction, so
-    // a rise in broken imports drawn green would read as praise for the breakage
+    // resolution, not what failed: green means up, and up on breakage reads as praise
     resolution: Math.round(one.stats.coverage * 10_000) / 100,
   })
   const then = since(was && of(was), compare, of(graph))

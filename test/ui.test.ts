@@ -405,6 +405,8 @@ test("a kpi compares itself against the days the log actually wrote down", () =>
   // the year so far is a calendar window, and the rolling ones are not
   assert.equal(daysBack("ytd", new Date("2026-01-01T12:00:00Z")), 1)
   assert.equal(daysBack("ytd", new Date("2026-03-02T00:00:00Z")), 61)
+  // a local new year read against a utc one is a window of nothing, whatever the machine
+  assert.equal(daysBack("ytd", new Date("2024-12-31T23:59:59Z")), 366, "a leap year, all of it")
   assert.equal(daysBack("yr", new Date("2026-03-02T00:00:00Z")), 365)
   assert.equal(daysBack("none"), 0)
 })

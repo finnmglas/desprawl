@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process"
 import { CODE, scan } from "../src/read/scan.ts"
 import { TS } from "../src/read/langs.ts"
 import { analyze } from "../src/facts/analyze.ts"
+import { ignored } from "../src/read/graph.ts"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { repo } from "./repo.ts"
@@ -135,4 +136,25 @@ test("somebody else's code is counted as skipped, not as this project", () => {
   const held = analyze(dir)
   assert.equal(held.files, 1)
   assert.equal(held.skipped, 31)
+})
+
+test("an exclude is written the way a gitignore is", () => {
+  const held = (pattern: string, path: string) => {
+    const dir = repo({ "a.ts": "export const a = 1\n" })
+    writeFileSync(join(dir, ".desprawlignore"), `${pattern}\n`)
+    return !!ignored(dir)?.test(path)
+  }
+  assert.ok(held("theme/", "x/theme/b.js"), "a folder anywhere")
+  assert.ok(!held("theme/", "themes/c.js"), "and not one whose name merely starts the same")
+  assert.ok(held("*.min.js", "deep/b.min.js"))
+  assert.ok(!held("*.min.js", "deep/b.js"))
+  assert.ok(held("/build/", "build/x.js"), "a leading slash is the root")
+  assert.ok(!held("/build/", "src/build/y.js"))
+  assert.ok(held("a?c/", "abc/x.ts"))
+  // a star star crosses folders, and the group it becomes holds a ? of its own
+  for (const path of ["docs/gen/x.md", "docs/a/gen/x.md", "docs/a/b/gen/x.md"])
+    assert.ok(held("docs/**/gen", path), path)
+  assert.ok(!held("docs/**/gen", "gen/x.md"))
+  // a pattern that will not compile excludes nothing, rather than everything
+  assert.ok(!held("[bad", "anything.ts"))
 })

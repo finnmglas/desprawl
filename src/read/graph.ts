@@ -84,9 +84,11 @@ const globbed = (one: string): string =>
     .replace(/\*\*\//g, "\u0001")
     .replace(/\*\*/g, "\u0002")
     .replace(/\*/g, "[^/]*")
+    // every glob character is gone before the holes are filled, or the `?` of a `(?:` group
+    // written here reads as one of them
+    .replace(/\?/g, "[^/]")
     .replace(/\u0001/g, "(?:[^/]+/)*")
-    .replace(/\u0002/g, ".*")
-    .replace(/\?/g, "[^/]")}${one.endsWith("/") ? "" : "(/|$)"}`
+    .replace(/\u0002/g, ".*")}${one.endsWith("/") ? "" : "(/|$)"}`
 
 /**
  * the one exclude a reader can write down. No heuristic covers a folder only this repo

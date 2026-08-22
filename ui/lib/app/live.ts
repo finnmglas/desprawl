@@ -198,8 +198,7 @@ export interface Sample {
 
 export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
 
-/** every kpi number as it stood that many days ago, read off a checkout of that commit.
- * Live only: a saved page has no repo to read, and says so rather than guessing */
+/** one reading off a checkout of that commit. Live only: a saved page has no repo */
 export const wasBefore = (days: number, want: Want): Promise<Was | null> =>
   isLive() ? ask<Was | null>(`/api/before?days=${days}&want=${want}`, null) : Promise.resolve(null)
 

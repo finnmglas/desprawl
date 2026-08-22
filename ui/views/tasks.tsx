@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { Back } from "../components/atoms/back.tsx"
-import { TOLL, spell, taskColumns } from "../components/molecules/panels/task-rows.tsx"
+import { TOLL, taskColumns } from "../components/molecules/panels/task-rows.tsx"
 import { Face } from "../components/molecules/panels/hands.tsx"
 import { CopyButton } from "../components/molecules/copy-button.tsx"
 import { Dialog } from "../components/atoms/dialog.tsx"
@@ -13,19 +13,17 @@ import { Fix } from "../components/molecules/agent/fix.tsx"
 import { Input } from "../components/atoms/input.tsx"
 import { Agents } from "../components/molecules/agent/agents.tsx"
 import { Section } from "../components/atoms/section.tsx"
-import { Kpi, Kpis } from "../components/molecules/panels/kpi.tsx"
 import { Loading, Onward } from "../components/molecules/onward.tsx"
 import { Save } from "../components/molecules/save.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/app/live.ts"
 import { isFile, useGoing } from "../lib/app/going.tsx"
 import { useKept } from "../lib/app/kept.ts"
-import { since } from "../lib/say/trend.ts"
-import { useDisplay } from "../lib/app/display.tsx"
+import { TaskKpis } from "../components/molecules/panels/task-kpis.tsx"
 import { useWas } from "../lib/app/was.tsx"
 import { hands, handsOf, worked } from "../lib/app/people.ts"
 import { num, plural } from "../lib/say/format.ts"
-import { FELT, IMPACTS, KINDS, tasks, type Task } from "../lib/say/tasks.ts"
+import { FELT, KINDS, tasks, type Task } from "../lib/say/tasks.ts"
 import { balanced, fold } from "../../src/read/layers.ts"
 import { cn } from "../lib/app/ui.ts"
 import type { Calls } from "../../src/read/calls.ts"
@@ -76,10 +74,8 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
     [layout, calls, deps, lines, graph, text],
   )
 
-  // the same list off the repo as it stood then. The dependencies are today's on both sides:
-  // a checkout has no node_modules, so a licence task would read as brand new every time.
-  // What is left moving is the code, which is what this tab is about
-  const { compare } = useDisplay()
+  // the same list off the older reading, with today's deps on both sides: a checkout has no
+  // node_modules, so a licence task would read as brand new every time
   const wasGraph = useWas("graph")?.graph
   const wasCalls = useWas("calls")?.calls
   const wasText = useWas("sprawl")?.sprawl ?? null
@@ -114,15 +110,6 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
         one.title.toLowerCase().includes(hunted) ||
         one.where.toLowerCase().includes(hunted)),
   )
-  const minutes = found.reduce((sum, one) => sum + one.minutes, 0)
-  const easy = found.filter((one) => one.mechanical)
-  const of = (held: Task[]) => ({
-    tasks: held.length,
-    minutes: held.reduce((sum, one) => sum + one.minutes, 0),
-    mechanical: held.filter((one) => one.mechanical).length,
-    runtime: held.filter((one) => one.hits === "runtime").length,
-  })
-  const then = since(before && of(before), compare, of(found))
   // a file, a folder or the repo, so the panel says which
   const walk = (where: string) => {
     const at = where.replace(/\/?\*$/, "")
@@ -187,59 +174,7 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
         />
       </div>
 
-      <Section id="kpis_tasks">
-        <Kpis>
-          <Kpi
-            label="Tasks"
-            value={num(found.length)}
-            moved={then.tasks}
-            says="tasks, dependencies aside,"
-            sub={`from ${plural(new Set(found.map((one) => one.kind)).size, "kind")} of reading`}
-            verdict={{
-              label: found.length ? "collected" : "nothing found",
-              tone: found.length ? "plain" : "fine",
-              why: "every task the other tabs imply. Not a score: each row is a thing found, with what it takes",
-            }}
-          />
-          <Kpi
-            label="Estimated"
-            value={spell(minutes)}
-            // spelled the way the number above it is, or 5 beside 22.1h reads as five hours
-            moved={then.minutes && { ...then.minutes, said: spell(Math.abs(then.minutes.by)) }}
-            says="of it"
-            sub="of an agent's time, all of it"
-            verdict={{
-              label: "a guess",
-              tone: "plain",
-              why: "the files each opens and the lines it reads, off two timed plan runs of 1.2 and 1.9 minutes. A fix writes too, so it counts as a few plans",
-            }}
-          />
-          <Kpi
-            label="Mechanical"
-            value={num(easy.length)}
-            moved={then.mechanical}
-            says="mechanical tasks"
-            sub={`${spell(easy.reduce((sum, one) => sum + one.minutes, 0))} of the total`}
-            verdict={{
-              label: found.length ? `${Math.round((easy.length / found.length) * 100)}%` : "none",
-              tone: "plain",
-              why: "the cure is known: a type import moves, a barrel import is renamed, dead code goes",
-            }}
-          />
-          <Kpi
-            label="Reaches anyone"
-            value={num(found.filter((one) => one.hits === "runtime").length)}
-            moved={then.runtime}
-            says="tasks a user can feel"
-            sub={`of ${plural(found.length, "task")}, the rest cost only us`}
-            verdict={{
-              label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",
-              tone: found.some((one) => one.hits === "runtime") ? "watch" : "fine",
-              why: "how many can be felt by somebody running this rather than working on it. The badge names the worst on the list",
-            }}
-          />
-        </Kpis>
-      </Section>
+      <TaskKpis found={found} before={before} />
 
       <Section id="card_agents">
         <Agents />

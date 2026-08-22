@@ -5,6 +5,9 @@ import assert from "node:assert/strict"
 import { after, test } from "node:test"
 import { serve } from "../src/serve/serve.ts"
 import { execFileSync } from "node:child_process"
+import { existsSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { before, forget } from "../src/facts/before.ts"
 import { folder, repo } from "./repo.ts"
 
@@ -219,4 +222,16 @@ test("a folder of repos gets no arrows until a reader picks one of them", async 
   assert.equal(all, null, "the cards add both repos up, and one checkout is not that")
   const one = await (await ask("&repo=one")).json()
   assert.ok(one && typeof one === "object", "a repo named is a repo that can be read")
+})
+
+test("a checkout a dead run left behind is cleared by the next one", () => {
+  const dir = repo({ "a.ts": "export const a = 1\n" }, { "b.ts": "export const b = 2\n" })
+  const stale = mkdtempSync(join(tmpdir(), "desprawl-was-"))
+  rmSync(stale, { recursive: true, force: true })
+  execFileSync("git", ["worktree", "add", "--detach", "--quiet", stale, "HEAD"], { cwd: dir })
+  assert.ok(existsSync(stale))
+  // git will not reuse a path it still holds, and prune only clears one whose folder went
+  before(dir, (Date.now() - Date.parse("2026-01-02T12:00:00Z")) / 86_400_000 + 0.5, "size")
+  assert.ok(!existsSync(stale), "the one a dead run left is gone")
+  forget()
 })

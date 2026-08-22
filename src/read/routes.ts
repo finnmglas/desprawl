@@ -218,17 +218,11 @@ export function joined(
   repo = "",
   unread = 0,
 ): Api {
-  // a document lists an endpoint and code answers one. Where both exist the code is the
-  // server, wherever the document sits: a frontend holding a codegen snapshot of the
-  // backend's api serves nothing, and letting it stand reverses every edge into it
-  const answered = new Set(
-    endpoints
-      .filter((one) => one.framework !== "openapi")
-      .map((one) => `${one.method} ${one.path}`),
-  )
-  const held = endpoints.filter(
-    (one) => one.framework !== "openapi" || !answered.has(`${one.method} ${one.path}`),
-  )
+  // a document lists an endpoint, code answers one. A frontend holding a snapshot of the
+  // backend's spec serves nothing, and letting it stand reverses every edge into it
+  const said = (one: Endpoint) => [one.method, one.path].join(" ")
+  const answered = new Set(endpoints.filter((one) => one.framework !== "openapi").map(said))
+  const held = endpoints.filter((one) => one.framework !== "openapi" || !answered.has(said(one)))
   const described = endpoints.length - held.length
   const links = link(held, clients, hosts)
   const reached = new Set(links.map((one) => one.call))

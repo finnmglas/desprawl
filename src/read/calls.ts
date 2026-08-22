@@ -169,8 +169,7 @@ const ASSIGNED =
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
-// `stubGlobal("X", class X {})` and `return function go() {}` declare a value rather than a
-// statement, and whatever holds it arrives at it the moment that line runs
+// `stubGlobal("X", class X {})` declares a value, and the line holding it arrives at it
 const VALUE = /[,(\[=:?&|]\s*$|\b(?:return|typeof|new|await|yield|of|in)\s+$/
 
 /** an indented language ends a body where the indentation comes back to the head */
@@ -417,8 +416,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const lang = graph.modules[file]?.lang ?? ""
     const owns = lang && lang !== "ts" ? keywordsOf(lang) : KEYWORD
     const runtime = lang && lang !== "ts" ? runtimeOf(lang) : GLOBAL
-    // what this file's imports name, read once: a method call may land in one of these.
-    // a crate root and a barrel are doorways, so what they hand on counts as reached too
+    // what the imports name, read once. A crate root and a barrel hand theirs on too
     const reaches = new Set<string>()
     if (lang && lang !== "ts")
       for (const one of bindings.get(file)?.values() ?? []) {

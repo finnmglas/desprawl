@@ -1,5 +1,5 @@
 // owner: finn
-// goal: a suite is counted in whatever language it was written in
+// goal: a suite counted in its own language
 
 import assert from "node:assert/strict"
 import { test } from "node:test"
