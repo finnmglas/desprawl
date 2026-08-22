@@ -79,15 +79,28 @@ const said = (part: string) =>
     .replace(/[-_.]+/g, " ")
     .trim()
 
+/** one of them plural is still the same word: `src/sources` reads "source sources" */
+const twice = (a: string, b: string) => {
+  const [one, two] = [a.toLowerCase(), b.toLowerCase()]
+  return (
+    one === two ||
+    `${one}s` === two ||
+    one === `${two}s` ||
+    `${one}es` === two ||
+    one === `${two}es`
+  )
+}
+
 const cased = (phrase: string) => {
-  const words = phrase.split(" ").filter(Boolean)
+  // spelled out first, or `src` and `sources` read as two words rather than one said twice
+  const words = phrase
+    .split(" ")
+    .filter(Boolean)
+    .map((raw) => SPELLED[raw.toLowerCase()] ?? raw)
   // a word the name already says is said once, and the later one keeps its place
   return words
-    .filter(
-      (word, i) => !words.slice(i + 1).some((later) => later.toLowerCase() === word.toLowerCase()),
-    )
-    .map((raw, i) => {
-      const word = SPELLED[raw.toLowerCase()] ?? raw
+    .filter((word, i) => !words.slice(i + 1).some((later) => twice(later, word)))
+    .map((word, i) => {
       if (SHOUT.has(word.toLowerCase())) return word.toUpperCase()
       return i === 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word
     })

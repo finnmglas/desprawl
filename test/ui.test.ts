@@ -354,4 +354,10 @@ test("a folder does not say the same word twice because it borrowed it", () => {
   assert.equal(nameOf("app_ui/lib"), "App UI library", "a different word still gets borrowed")
   assert.equal(nameOf("api/api"), "API")
   assert.equal(nameOf("packages/core/lib"), "Core library")
+  // src spells out to source, so borrowing it beside sources reads "Source sources"
+  assert.equal(nameOf("crates/fix-core/src/sources", 0, 1), "Sources")
+  assert.equal(nameOf("a/spec/specs", 0, 1), "Specifications")
+  assert.equal(nameOf("a/docs/documentation", 0, 1), "Documentation")
+  // and a folder above that says something else is still worth borrowing
+  assert.equal(nameOf("fix-ui/components/sources", 0, 1), "Components sources")
 })
