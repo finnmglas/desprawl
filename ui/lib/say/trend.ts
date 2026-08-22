@@ -11,6 +11,8 @@ export interface Moved {
   by: number
   /** the window said the way a person would read it back */
   over: string
+  /** and the size of it spelled the way its own card spells one, when that is not a count */
+  said?: string
 }
 
 const OVER: Record<Compare, string> = {
@@ -59,4 +61,21 @@ export function moved(series: Series[], compare: Compare, now = Date.now()): Rec
     lines: { by: of("insertions") - of("deletions"), over },
     commits: { by: of("commits"), over },
   }
+}
+
+/**
+ * and the same window read off the repo as it stood then, which is the only way a number
+ * the log never wrote down can move: comments, characters, every edge in the import graph
+ */
+export function since(
+  was: Record<string, number> | null | undefined,
+  compare: Compare,
+  now: Record<string, number>,
+): Record<string, Moved> {
+  const over = OVER[compare]
+  if (!was || !over) return {}
+  const held: Record<string, Moved> = {}
+  for (const [key, value] of Object.entries(now))
+    if (typeof was[key] === "number") held[key] = { by: value - was[key], over }
+  return held
 }

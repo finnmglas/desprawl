@@ -23,6 +23,9 @@ import { group as asGroup, holds, useGoing } from "../lib/app/going.tsx"
 import { useKept } from "../lib/app/kept.ts"
 import { hands, worked } from "../lib/app/people.ts"
 import { namesUnder } from "../../src/read/naming.ts"
+import { since } from "../lib/say/trend.ts"
+import { useDisplay } from "../lib/app/display.tsx"
+import { useWas } from "../lib/app/was.tsx"
 import { layeringOf, shapeOf, spreadOf, tanglesOf, type Shape } from "../lib/say/verdict.ts"
 import { balanced, fold, unitOf, type Layout, type Unit } from "../../src/read/layers.ts"
 import type { Sort } from "../lib/say/format.ts"
@@ -41,6 +44,22 @@ const JOINS: Record<string, string> = {
 const KEEP = ["source only", "all folders"]
 
 const real = (unit: Unit) => unit.role === "source"
+
+/** the same four numbers off any reading of the graph, folded the way the reader folds it */
+function folded(graph: Graph, at: string, keep: string) {
+  const layout = fold(graph, at === AUTO ? balanced(graph) : DEPTH[at])
+  const units = layout.units.filter((u) => keep === KEEP[1] || real(u))
+  const kept = new Set(units.map((u) => u.path))
+  return {
+    groups: units.length,
+    levels: units.length ? Math.max(...units.map((u) => u.level)) + 1 : 0,
+    cycles: layout.cycles.length,
+    links: units.reduce(
+      (sum, u) => sum + Object.keys(u.out).filter((to) => kept.has(to)).length,
+      0,
+    ),
+  }
+}
 
 const count = (edges: Record<string, number>) => Object.values(edges).reduce((sum, n) => sum + n, 0)
 
@@ -93,6 +112,8 @@ export function Modules({
   const [keep, setKeep] = useKept("modules.keep", KEEP[0])
 
   const [sort, setSort] = useKept<Sort | null>("modules.sort", null)
+  const { compare } = useDisplay()
+  const was = useWas("graph")?.graph
 
   const where = useMemo(() => worked(stats.tree), [stats.tree])
   const [find, setFind] = useKept("modules.find", "")
@@ -144,6 +165,13 @@ export function Modules({
   }
   const levels = Math.max(...units.map((u) => u.level)) + 1
   const files = units.reduce((sum, u) => sum + u.files, 0)
+  // the same fold over the graph as it stood then, at whichever grouping the reader picked
+  const then = since(was && folded(was, at, keep), compare, {
+    groups: units.length,
+    levels,
+    cycles: cycles.length,
+    links,
+  })
   const dropped = layout.units.length - units.length
   // grid size still understandable, nothing hidden
   const hunted = find.trim().toLowerCase()
@@ -210,6 +238,8 @@ export function Modules({
           <Kpi
             label="Module groups"
             value={num(units.length)}
+            moved={then.groups}
+            says="groups"
             sub={`${plural(files, "file")}, grouped ${at === AUTO ? "by weight" : `by ${at}`}`}
             verdict={{
               label: at,
@@ -223,12 +253,16 @@ export function Modules({
           <Kpi
             label="Depth"
             value={num(levels)}
+            moved={then.levels}
+            says="levels"
             sub={levels > 1 ? "steps from top to bottom" : "everything side by side"}
             verdict={layeringOf(levels, units.length)}
           />
           <Kpi
             label="Cycles"
             value={num(cycles.length)}
+            moved={then.cycles}
+            says="file cycles"
             sub={
               cycles.length
                 ? `${plural(
@@ -242,6 +276,8 @@ export function Modules({
           <Kpi
             label="Module links"
             value={num(links)}
+            moved={then.links}
+            says="links between groups"
             sub={`from ${num(graph.stats.edges)} imports between files`}
             verdict={{
               label: `${(links / units.length).toFixed(1)} each`,

@@ -37,6 +37,7 @@ import { pdf, pptx } from "./lib/app/paper.ts"
 import { download, named } from "./lib/app/export.ts"
 import { canPrint, printed, printing as paperOnly } from "./lib/app/live.ts"
 import { DisplayProvider } from "./lib/app/display.tsx"
+import { WasProvider } from "./lib/app/was.tsx"
 import { loadFaces } from "./lib/app/faces.ts"
 import { useView } from "./lib/app/hash.ts"
 import { GoingProvider, type Target } from "./lib/app/going.tsx"
@@ -242,107 +243,109 @@ function App({
 
   return (
     <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows, compare: prefs.compare }}>
-      <GoingProvider value={{ at, go, was, open: setTarget }}>
-        <div
-          data-hunting={said || undefined}
-          className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6"
-        >
-          <Banners name={name} repo={stats.repo} online={online} />
+      <WasProvider compare={prefs.compare}>
+        <GoingProvider value={{ at, go, was, open: setTarget }}>
+          <div
+            data-hunting={said || undefined}
+            className="mx-auto flex max-w-7xl flex-col gap-4 p-4 sm:gap-6 sm:p-6"
+          >
+            <Banners name={name} repo={stats.repo} online={online} />
 
-          <Masthead
-            stats={stats}
-            name={name}
-            tabs={TABS}
-            icons={BAR}
-            tab={tab}
-            onTab={(next) => go({ tab: next, panel: "", pick: "" })}
-            typed={typed}
-            setTyped={setTyped}
-            said={said}
-            found={found}
-            slow={slow}
-            repos={repos}
-            only={only}
-            onRepo={onRepo}
-            onHome={() => {
-              setTyped("")
-              hunt("")
-              go({
-                tab: TABS[0],
-                path: [],
-                lang: "",
-                kind: "",
-                pick: "",
-                panel: "",
-                from: "",
-                to: "",
-              })
-            }}
-            prefs={prefs}
-            change={change}
-            reload={reload}
-            onPaper={paper}
-            themed={themed}
-          />
+            <Masthead
+              stats={stats}
+              name={name}
+              tabs={TABS}
+              icons={BAR}
+              tab={tab}
+              onTab={(next) => go({ tab: next, panel: "", pick: "" })}
+              typed={typed}
+              setTyped={setTyped}
+              said={said}
+              found={found}
+              slow={slow}
+              repos={repos}
+              only={only}
+              onRepo={onRepo}
+              onHome={() => {
+                setTyped("")
+                hunt("")
+                go({
+                  tab: TABS[0],
+                  path: [],
+                  lang: "",
+                  kind: "",
+                  pick: "",
+                  panel: "",
+                  from: "",
+                  to: "",
+                })
+              }}
+              prefs={prefs}
+              change={change}
+              reload={reload}
+              onPaper={paper}
+              themed={themed}
+            />
 
-          {/* searching answers with panels, so every tab is mounted and each one shows
+            {/* searching answers with panels, so every tab is mounted and each one shows
               only what matched */}
-          {(printing
-            ? TABS
-            : said
-              ? TABS.filter(
-                  (one) => onTab(said, one) || viewsOf(one).some((v) => built.includes(v)),
-                )
-              : [tab]
-          ).map((one, i) => (
-            <section
-              key={one}
-              className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
-            >
-              {printing && (
-                <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
-              )}
-              <div
-                data-shot={one}
-                className={cn("flex flex-col gap-4 sm:gap-6", printing && "p-6")}
+            {(printing
+              ? TABS
+              : said
+                ? TABS.filter(
+                    (one) => onTab(said, one) || viewsOf(one).some((v) => built.includes(v)),
+                  )
+                : [tab]
+            ).map((one, i) => (
+              <section
+                key={one}
+                className={cn("flex flex-col gap-4", i > 0 && "print:break-before-page")}
               >
-                {view(one)}
-              </div>
-            </section>
-          ))}
+                {printing && (
+                  <h2 className="mt-2 border-b pb-1 text-lg font-semibold print:mt-0">{one}</h2>
+                )}
+                <div
+                  data-shot={one}
+                  className={cn("flex flex-col gap-4 sm:gap-6", printing && "p-6")}
+                >
+                  {view(one)}
+                </div>
+              </section>
+            ))}
 
-          {said && found === 0 && (
-            <Card>
-              <CardContent className="flex flex-col items-start gap-3 p-6">
-                <p className="text-sm">
-                  Nothing here matches <span className="font-medium">{said}</span>.
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  A panel answers to what it is called and what it holds, and one this repo has
-                  nothing for is not here at all. Try{" "}
-                  {SUGGEST.map((one, i) => (
-                    <span key={one}>
-                      {i > 0 && ", "}
-                      <button
-                        onClick={() => setTyped(one)}
-                        className="hover:text-foreground cursor-pointer underline decoration-dotted"
-                      >
-                        {one}
-                      </button>
-                    </span>
-                  ))}
-                  .
-                </p>
-                <Button variant="outline" size="sm" onClick={() => setTyped("")}>
-                  Clear search
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+            {said && found === 0 && (
+              <Card>
+                <CardContent className="flex flex-col items-start gap-3 p-6">
+                  <p className="text-sm">
+                    Nothing here matches <span className="font-medium">{said}</span>.
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    A panel answers to what it is called and what it holds, and one this repo has
+                    nothing for is not here at all. Try{" "}
+                    {SUGGEST.map((one, i) => (
+                      <span key={one}>
+                        {i > 0 && ", "}
+                        <button
+                          onClick={() => setTyped(one)}
+                          className="hover:text-foreground cursor-pointer underline decoration-dotted"
+                        >
+                          {one}
+                        </button>
+                      </span>
+                    ))}
+                    .
+                  </p>
+                  <Button variant="outline" size="sm" onClick={() => setTyped("")}>
+                    Clear search
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-          <Picked target={target} stats={stats} onClose={() => setTarget(null)} />
-        </div>
-      </GoingProvider>
+            <Picked target={target} stats={stats} onClose={() => setTarget(null)} />
+          </div>
+        </GoingProvider>
+      </WasProvider>
     </DisplayProvider>
   )
 }

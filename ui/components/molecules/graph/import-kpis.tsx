@@ -4,15 +4,33 @@
 import { Kpi, Kpis } from "../panels/kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
 import { num, plural } from "../../../lib/say/format.ts"
+import { since } from "../../../lib/say/trend.ts"
+import { useDisplay } from "../../../lib/app/display.tsx"
+import { useWas } from "../../../lib/app/was.tsx"
 import type { Graph } from "../../../../src/read/graph.ts"
 
 export function ImportKpis({ graph }: { graph: Graph }) {
+  // the graph as it stood then, read off a checkout of that commit, and counted here by the
+  // same lines that count today's: one reading, two dates, no second way to be wrong
+  const { compare } = useDisplay()
+  const was = useWas("graph")?.graph
+  const of = (one: Graph) => ({
+    modules: one.stats.files,
+    edges: one.stats.edges,
+    per: Math.round((one.stats.edges / Math.max(1, one.stats.files)) * 10) / 10,
+    // resolution rather than the count of what failed: the colour here means direction, so
+    // a rise in broken imports drawn green would read as praise for the breakage
+    resolution: Math.round(one.stats.coverage * 10_000) / 100,
+  })
+  const then = since(was && of(was), compare, of(graph))
   return (
     <Section id="kpis_modules_imports">
       <Kpis>
         <Kpi
           label="Importing files"
           value={num(graph.stats.files)}
+          moved={then.modules}
+          says="files in the graph"
           sub={`reaching ${plural(Object.keys(graph.packages).length, "installed package")}`}
           verdict={{
             label: "in graph",
@@ -23,6 +41,8 @@ export function ImportKpis({ graph }: { graph: Graph }) {
         <Kpi
           label="Imports"
           value={num(graph.stats.edges)}
+          moved={then.edges}
+          says="imports between files"
           sub={`${num(graph.stats.external)} more into packages`}
           verdict={{
             label: "file to file",
@@ -33,6 +53,8 @@ export function ImportKpis({ graph }: { graph: Graph }) {
         <Kpi
           label="Imports/file"
           value={(graph.stats.edges / Math.max(1, graph.stats.files)).toFixed(1)}
+          moved={then.per}
+          says="imports per file"
           sub="imports per average file"
           verdict={{
             label: "average",
@@ -43,6 +65,8 @@ export function ImportKpis({ graph }: { graph: Graph }) {
         <Kpi
           label="Resolution"
           value={`${(graph.stats.coverage * 100).toFixed(graph.stats.coverage === 1 ? 0 : 2)}%`}
+          moved={then.resolution}
+          says="percentage points resolved"
           sub={
             graph.missing.length
               ? `${plural(graph.missing.length, "import")} are unresolved`

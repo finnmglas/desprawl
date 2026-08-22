@@ -5,8 +5,9 @@ import { Kpi, Kpis } from "./kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
 import { num, pct, plural, tokens } from "../../../lib/say/format.ts"
 import { commentsOf, contextOf, historyOf, sizeOf } from "../../../lib/say/verdict.ts"
-import { moved } from "../../../lib/say/trend.ts"
+import { moved, since } from "../../../lib/say/trend.ts"
 import { useDisplay } from "../../../lib/app/display.tsx"
+import { useWas } from "../../../lib/app/was.tsx"
 import type { Stats } from "../../../../src/read/model.ts"
 
 interface Props {
@@ -20,9 +21,15 @@ interface Props {
 
 export function Headline({ stats, total, span, onCard }: Props) {
   const source = stats.code + stats.comment
-  // only what the log writes down every day: nothing here knows what a comment did last week
+  // lines and commits are in the log; a comment and a character are not, so those two come
+  // off a reading of the repo as it stood, which only a live run can do
   const { compare } = useDisplay()
   const went = moved(stats.series, compare)
+  const then = since(useWas("size")?.size ?? null, compare, {
+    comment: stats.comment,
+    chars: stats.chars,
+    code: stats.code,
+  })
   return (
     <Section id="kpis_overview">
       <Kpis>
@@ -42,6 +49,8 @@ export function Headline({ stats, total, span, onCard }: Props) {
             value: num(stats.comment),
             sub: `${pct(stats.comment, source)} of source`,
             verdict: commentsOf(stats.comment, source),
+            moved: then.comment,
+            says: "comment lines",
             to: "Files",
             shade: "Comments",
           },
@@ -50,6 +59,9 @@ export function Headline({ stats, total, span, onCard }: Props) {
             value: `~${num(tokens(stats.chars))}`,
             sub: `${num(stats.chars)} chars`,
             verdict: contextOf(tokens(stats.chars)),
+            // the estimate is a share of the characters, so it moves with them
+            moved: then.chars && { by: tokens(then.chars.by), over: then.chars.over },
+            says: "tokens",
             to: "Files",
           },
           {

@@ -2,6 +2,7 @@
 // goal: what one served run holds, read once and kept until the head moves
 
 import { analyze } from "../facts/analyze.ts"
+import { before, type Want, type Was } from "../facts/before.ts"
 import { calls } from "../read/calls.ts"
 import { deps, joined } from "../facts/deps.ts"
 import { build } from "../read/graph.ts"
@@ -43,6 +44,8 @@ export interface Holds {
   commits: (name?: string | null) => number
   /** every repo a request is about, for a reader that reads them one at a time */
   about: (name?: string | null) => string[]
+  /** one reading off an older commit, for the kpis that say which way they went */
+  before: (name: string | null, days: number, want: Want) => Was | null
   /** what a run has read so far, for the page that carries everything it can */
   read: { graph: Graph | null; calls: Calls | null; deps: Deps | null; tests: Suite | null }
 }
@@ -61,6 +64,8 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
   const asked = new Map<string, Promise<Deps>>()
   const loose = new Map<string, Sprawl>()
   const suite = new Map<string, Suite>()
+  // keyed by repo and window: reading one is a checkout, and nobody wants two of those
+  const was = new Map<string, Was>()
 
   // a folder of repos is read as one, and each of them is still readable on its own
   const many_ = fleet(repo)
@@ -213,6 +218,20 @@ export function holds(repo: string, cap?: number, anon = false): Holds {
       }
       const made = [...by].map(([date, bytes]) => ({ date, bytes }))
       sizes.set(held_, made)
+      return made
+    },
+    before: (name, days, want) => {
+      // a checkout is of one repo. A folder of them would be that many checkouts, and
+      // answering about the first while the cards add all of them up is a wrong number
+      // said confidently: a fleet gets no arrows until a reader picks one repo
+      const held = mine(name ?? null)
+      if (held.length !== 1) return null
+      const one = held[0]
+      const held_ = `${one}@${days}@${want}`
+      const seen = was.get(held_)
+      if (seen) return seen
+      const made = before(one, days, want)
+      if (made) was.set(held_, made)
       return made
     },
     commits: (name) => {

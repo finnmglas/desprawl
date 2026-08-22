@@ -20,6 +20,9 @@ import { Tabs } from "../components/atoms/tabs.tsx"
 import { callGraph, dependencies, importGraph, isLive, sprawlHere } from "../lib/app/live.ts"
 import { isFile, useGoing } from "../lib/app/going.tsx"
 import { useKept } from "../lib/app/kept.ts"
+import { since } from "../lib/say/trend.ts"
+import { useDisplay } from "../lib/app/display.tsx"
+import { useWas } from "../lib/app/was.tsx"
 import { hands, handsOf, worked } from "../lib/app/people.ts"
 import { num, plural } from "../lib/say/format.ts"
 import { FELT, IMPACTS, KINDS, tasks, type Task } from "../lib/say/tasks.ts"
@@ -73,6 +76,26 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
     [layout, calls, deps, lines, graph, text],
   )
 
+  // the same list off the repo as it stood then. The dependencies are today's on both sides:
+  // a checkout has no node_modules, so a licence task would read as brand new every time.
+  // What is left moving is the code, which is what this tab is about
+  const { compare } = useDisplay()
+  const wasGraph = useWas("graph")?.graph
+  const wasCalls = useWas("calls")?.calls
+  const wasText = useWas("sprawl")?.sprawl ?? null
+  const before = useMemo(() => {
+    if (!wasGraph) return null
+    const held = new Map(Object.values(wasGraph.modules).map((one) => [one.path, one.lines]))
+    return tasks(
+      fold(wasGraph, balanced(wasGraph)),
+      wasCalls ?? null,
+      deps,
+      held,
+      wasGraph,
+      wasText,
+    )
+  }, [wasGraph, wasCalls, wasText, deps])
+
   if (!graph)
     return (
       <Loading
@@ -93,6 +116,13 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
   )
   const minutes = found.reduce((sum, one) => sum + one.minutes, 0)
   const easy = found.filter((one) => one.mechanical)
+  const of = (held: Task[]) => ({
+    tasks: held.length,
+    minutes: held.reduce((sum, one) => sum + one.minutes, 0),
+    mechanical: held.filter((one) => one.mechanical).length,
+    runtime: held.filter((one) => one.hits === "runtime").length,
+  })
+  const then = since(before && of(before), compare, of(found))
   // a file, a folder or the repo, so the panel says which
   const walk = (where: string) => {
     const at = where.replace(/\/?\*$/, "")
@@ -162,6 +192,8 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
           <Kpi
             label="Tasks"
             value={num(found.length)}
+            moved={then.tasks}
+            says="tasks, dependencies aside,"
             sub={`from ${plural(new Set(found.map((one) => one.kind)).size, "kind")} of reading`}
             verdict={{
               label: found.length ? "collected" : "nothing found",
@@ -172,6 +204,9 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
           <Kpi
             label="Estimated"
             value={spell(minutes)}
+            // spelled the way the number above it is, or 5 beside 22.1h reads as five hours
+            moved={then.minutes && { ...then.minutes, said: spell(Math.abs(then.minutes.by)) }}
+            says="of it"
             sub="of an agent's time, all of it"
             verdict={{
               label: "a guess",
@@ -182,6 +217,8 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
           <Kpi
             label="Mechanical"
             value={num(easy.length)}
+            moved={then.mechanical}
+            says="mechanical tasks"
             sub={`${spell(easy.reduce((sum, one) => sum + one.minutes, 0))} of the total`}
             verdict={{
               label: found.length ? `${Math.round((easy.length / found.length) * 100)}%` : "none",
@@ -192,6 +229,8 @@ export function Tasks({ stats, faces }: { stats: Stats; faces: Record<string, st
           <Kpi
             label="Reaches anyone"
             value={num(found.filter((one) => one.hits === "runtime").length)}
+            moved={then.runtime}
+            says="tasks a user can feel"
             sub={`of ${plural(found.length, "task")}, the rest cost only us`}
             verdict={{
               label: IMPACTS.find((one) => found.some((task) => task.hits === one)) ?? "nothing",

@@ -5,6 +5,7 @@ import { toast } from "./toast.ts"
 import type { Calls } from "../../../src/read/calls.ts"
 import type { Deps } from "../../../src/facts/deps.ts"
 import type { Sprawl } from "../../../src/facts/work.ts"
+import type { Want, Was } from "../../../src/facts/before.ts"
 import type { Run, Suite } from "../../../src/facts/tests.ts"
 import type { Action, Alive } from "../../../src/serve/actions.ts"
 import type { Agent } from "../../../src/serve/agent.ts"
@@ -196,6 +197,11 @@ export interface Sample {
 }
 
 export const sizeCurve = (): Promise<Sample[]> => ask<Sample[]>("/api/size", [])
+
+/** every kpi number as it stood that many days ago, read off a checkout of that commit.
+ * Live only: a saved page has no repo to read, and says so rather than guessing */
+export const wasBefore = (days: number, want: Want): Promise<Was | null> =>
+  isLive() ? ask<Was | null>(`/api/before?days=${days}&want=${want}`, null) : Promise.resolve(null)
 
 /** too fine to carry in the payload */
 export const hourCurve = (from: string, to: string): Promise<Hours | null> =>

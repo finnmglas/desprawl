@@ -2,6 +2,7 @@
 // goal: the endpoints that only read, answered from what the run holds
 
 import { detail, moved, page } from "../facts/history.ts"
+import type { Want } from "../facts/before.ts"
 import { hourly } from "../facts/samples.ts"
 import { browser } from "./print.ts"
 import { page as onePage } from "./view.ts"
@@ -161,6 +162,17 @@ export function reads(one: Asked): boolean {
     const names = kept.stats(false).contributors.map((c) => (c.email || c.name).toLowerCase())
     return json(moved(at(url) || held[0], from, to, names))
   }
+  // what a kpi number was, as far back as the reader asked, read the way it is read now.
+  // A fleet answers about the repo a request names, since one checkout is one repo
+  if (url.pathname === "/api/before") {
+    const days = Number(url.searchParams.get("days") ?? 0)
+    const want = (url.searchParams.get("want") ?? "size") as Want
+    if (!(days > 0) || days > 4000) return json({ error: "days is a window, 1 to 4000" }, 400)
+    if (!["size", "graph", "calls", "sprawl"].includes(want))
+      return json({ error: `no such reading as ${want}` }, 400)
+    return json(kept.before(url.searchParams.get("repo"), days, want))
+  }
+
   if (url.pathname === "/api/sprawl") return json(kept.sprawl(url.searchParams.get("repo")))
 
   if (url.pathname === "/api/deps") {

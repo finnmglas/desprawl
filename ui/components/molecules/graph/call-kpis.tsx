@@ -3,8 +3,13 @@
 
 import { Kpi, Kpis } from "../panels/kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
+import { useMemo } from "react"
 import { num, plural, shortPath } from "../../../lib/say/format.ts"
 import { deadOf } from "../../../lib/say/verdict.ts"
+import { since } from "../../../lib/say/trend.ts"
+import { useDisplay } from "../../../lib/app/display.tsx"
+import { useWas } from "../../../lib/app/was.tsx"
+import { reachOf, reached, rings, twins } from "../../../../src/read/reach.ts"
 import type { Calls, Symbol } from "../../../../src/read/calls.ts"
 
 interface Props {
@@ -24,9 +29,47 @@ interface Props {
   rooted: string
 }
 
+/** the same numbers off any reading of the call graph, counted the way the view counts them */
+function of(one: Calls, exports: boolean) {
+  const live = reached(one, exports)
+  const held = Object.values(one.symbols).filter((s) => s.kind !== "module")
+  const state = (symbol: Symbol) => reachOf(symbol, live)
+  return {
+    declarations: held.length,
+    calls: one.stats.edges,
+    // resolution rather than what failed to resolve: the colour means direction, and a rise
+    // in call sites nobody could place drawn green would read as praise for the gap
+    resolution: Math.round(one.stats.coverage * 10_000) / 100,
+    dead: held.filter((s) => state(s) === "dead").length,
+    open: held.filter((s) => state(s) === "open").length,
+    busiest: Math.max(0, ...held.map((s) => s.callers.length)),
+    loops: rings(one).length,
+    repeated: twins(one).length,
+  }
+}
+
 export function CallKpis(props: Props) {
   const { calls, declared, dead, only, deadLines, declaredLines, busiest } = props
   const { repeated, loops, roots, rooted } = props
+  // the graph as it stood then, counted by the same lines. Held, since an scc over every
+  // declaration is not something to run on each render
+  const { compare } = useDisplay()
+  const was = useWas("calls")?.calls
+  const exports = roots === rooted
+  const then = since(
+    useMemo(() => was && of(was, exports), [was, exports]),
+    compare,
+    {
+      declarations: declared.length,
+      calls: calls.stats.edges,
+      resolution: Math.round(calls.stats.coverage * 10_000) / 100,
+      dead: dead.length,
+      open: only.length,
+      busiest: busiest?.callers.length ?? 0,
+      loops: loops.length,
+      repeated: repeated.length,
+    },
+  )
   return (
     <>
       <Section id="kpis_execution_general">
@@ -34,6 +77,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Declarations"
             value={num(declared.length)}
+            moved={then.declarations}
+            says="declarations"
             sub={`${num(calls.stats.functions)} functions, ${num(calls.stats.components)} components, ${num(calls.stats.classes)} classes`}
             verdict={{
               label: `${plural(calls.stats.files, "file")}`,
@@ -44,6 +89,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Calls"
             value={num(calls.stats.edges)}
+            moved={then.calls}
+            says="call edges"
             sub={`${num(calls.stats.external)} into packages, ${num(calls.stats.builtin)} into the runtime`}
             verdict={{
               label: `${(calls.stats.edges / Math.max(1, declared.length)).toFixed(1)} each`,
@@ -54,6 +101,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Resolution"
             value={`${(calls.stats.coverage * 100).toFixed(calls.stats.coverage === 1 ? 0 : 1)}%`}
+            moved={then.resolution}
+            says="percentage points placed"
             sub={
               calls.stats.unresolved
                 ? `${plural(calls.stats.unresolved, "call")} land nowhere we can name`
@@ -76,6 +125,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Unreachable"
             value={num(dead.length)}
+            moved={then.dead}
+            says="declarations nothing reaches"
             sub={`${plural(deadLines, "line")} nothing arrives at`}
             verdict={deadOf(deadLines, declaredLines)}
           />
@@ -86,6 +137,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Only exported"
             value={num(only.length)}
+            moved={then.open}
+            says="exports nothing here calls"
             sub="handed out, never called in here"
             verdict={{
               label: roots === rooted ? "counted as reached" : "counted as dead",
@@ -96,6 +149,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Most called"
             value={busiest ? num(busiest.callers.length) : "0"}
+            moved={then.busiest}
+            says="callers of the busiest one"
             sub={busiest ? `callers of ${busiest.name}` : "nothing is called twice"}
             verdict={{
               label: busiest ? shortPath(busiest.file, 24) : "none",
@@ -106,6 +161,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Recursion"
             value={num(loops.length)}
+            moved={then.loops}
+            says="rings"
             sub={
               loops.length
                 ? `${plural(
@@ -123,6 +180,8 @@ export function CallKpis(props: Props) {
           <Kpi
             label="Repeated names"
             value={num(repeated.length)}
+            moved={then.repeated}
+            says="names declared in several files"
             sub={`declared in ${plural(new Set(repeated.flatMap((t) => t.files)).size, "file")}`}
             verdict={{
               label: repeated[0] ? `${repeated[0].name} in ${repeated[0].files.length}` : "none",

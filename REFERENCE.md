@@ -96,6 +96,8 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 
 Somebody else's code is left out of every number: `node_modules`, a vendored copy, a venv, build output near the top of the tree. The masthead says how many files that was rather than quietly dropping them. For the folder no heuristic will know about, write a **`.desprawlignore`** beside the repo, in gitignore shape (`theme/`, `*.min.js`, `docs/**/generated`); the stats and the graph both honour it.
 
+Every KPI carries an arrow saying which way its number went, over a window set in the header menu (none, 24h, 7d, month, rolling year, year to date; 24h by default), and a grey dash where a window passed and nothing moved. Lines and commits are read off the git log. Everything else is not written down anywhere, so it is read off a throwaway checkout of the commit that window opens on and counted the same way today's is: one checkout per commit, made when a tab asks for it, live runs only. A saved page shows arrows only on the two the log knows.
+
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 
 Given a git url instead of path, it clones into `Downloads/desprawl/<host>/<owner>/<repo>` and analyses, or uses the copy it already has.

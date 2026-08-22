@@ -9,21 +9,31 @@ import { num } from "../../../lib/say/format.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Moved } from "../../../lib/say/trend.ts"
 
-/** which way it went, beside the number it went from. Nothing at all when it went nowhere,
- * since a row of zeroes says only that the window was quiet */
+/** which way it went, beside the number it went from. Standing still is an answer too, so
+ * a window with nothing in it says so in grey rather than leaving the card looking unread */
 function Trend({ moved, what }: { moved: Moved; what: string }) {
-  if (!moved.by || !moved.over) return null
+  if (!moved.over) return null
+  const still = !moved.by
   const up = moved.by > 0
+  const held = Math.abs(moved.by)
   return (
-    <Tip text={`${what} ${moved.over}`} side="bottom">
+    <Tip
+      text={still ? `no change in ${what} ${moved.over}` : `${what} ${moved.over}`}
+      side="bottom"
+    >
       <span
         className={cn(
           "inline-flex items-center gap-0.5 text-sm font-medium",
-          up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+          still
+            ? "text-muted-foreground"
+            : up
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400",
         )}
       >
-        <Arrow up={up} className="size-3.5" />
-        {num(Math.abs(moved.by))}
+        {still ? "–" : <Arrow up={up} className="size-3.5" />}
+        {/* a tenth of a point is a move, and rounding it to zero beside a real zero is a lie */}
+        {still ? "" : (moved.said ?? (held < 1 ? held.toFixed(2).replace(/0$/, "") : num(held)))}
       </span>
     </Tip>
   )
