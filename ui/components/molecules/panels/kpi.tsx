@@ -4,10 +4,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "../../atoms/card.tsx"
 import { Tip } from "../../atoms/tip.tsx"
 import { Arrow } from "../../atoms/icons.tsx"
-import { TONES, type Verdict } from "../../../lib/say/verdict.ts"
-import { num } from "../../../lib/say/format.ts"
+import { TONES, type Verdict } from "../../../lib/text/verdict.ts"
+import { num } from "../../../lib/text/format.ts"
 import { cn } from "../../../lib/app/ui.ts"
-import type { Moved } from "../../../lib/say/trend.ts"
+import type { Moved } from "../../../lib/text/trend.ts"
 
 /** which way it went. Standing still is an answer too, so a quiet window says so in grey */
 function Trend({ moved, what }: { moved: Moved; what: string }) {

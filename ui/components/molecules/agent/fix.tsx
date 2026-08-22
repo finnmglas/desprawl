@@ -14,7 +14,7 @@ import { readPrefs, savePrefs, type Prefs } from "../../../lib/app/prefs.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Agent } from "../../../../src/serve/agent.ts"
 import type { Talk } from "../../../../src/serve/talk.ts"
-import type { Task } from "../../../lib/say/tasks.ts"
+import type { Task } from "../../../lib/text/tasks.ts"
 
 /** asked once for the page, not once per row */
 let asked: Promise<Agent | null> | null = null

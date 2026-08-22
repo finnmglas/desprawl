@@ -5,7 +5,7 @@ import type { ReactNode, RefObject } from "react"
 import { Button } from "../../atoms/button.tsx"
 import { Card, CardContent } from "../../atoms/card.tsx"
 import { CardHead } from "../card-head.tsx"
-import { num } from "../../../lib/say/format.ts"
+import { num } from "../../../lib/text/format.ts"
 import type { Grain } from "../../../lib/draw/network.ts"
 
 interface Props {

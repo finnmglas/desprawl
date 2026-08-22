@@ -7,7 +7,7 @@ import { Card, CardContent, Note } from "../../atoms/card.tsx"
 import { CardHead } from "../card-head.tsx"
 import { Badge } from "../../atoms/badge.tsx"
 import { Sparkle } from "../../atoms/icons.tsx"
-import { plural } from "../../../lib/say/format.ts"
+import { plural } from "../../../lib/text/format.ts"
 import { Transcript } from "./transcript.tsx"
 import { toast } from "../../atoms/toast.tsx"
 import {
@@ -19,7 +19,7 @@ import {
   talksNow,
 } from "../../../lib/app/live.ts"
 import { readPrefs } from "../../../lib/app/prefs.ts"
-import { OUTLINE } from "../../../lib/say/verdict.ts"
+import { OUTLINE } from "../../../lib/text/verdict.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Talk } from "../../../../src/serve/talk.ts"
 

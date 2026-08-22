@@ -9,7 +9,7 @@ import { Tabs } from "../../atoms/tabs.tsx"
 import { toast } from "../../atoms/toast.tsx"
 import { copy } from "../../../lib/app/export.ts"
 import { resetSections, useCustomized } from "../../../lib/app/sections.ts"
-import { CHOICES, LABELS, locale, setLocale } from "../../../lib/say/locale.ts"
+import { CHOICES, LABELS, locale, setLocale } from "../../../lib/text/locale.ts"
 import {
   BRANDINGS,
   COMPARES,
@@ -24,7 +24,7 @@ import {
   type Scale,
   type Shown,
 } from "../../../lib/app/display.tsx"
-import { num } from "../../../lib/say/format.ts"
+import { num } from "../../../lib/text/format.ts"
 import { THEMES, type ThemeState } from "../../../lib/app/theme.tsx"
 import type { Prefs } from "../../../lib/app/prefs.ts"
 import type { Stats } from "../../../../src/read/model.ts"

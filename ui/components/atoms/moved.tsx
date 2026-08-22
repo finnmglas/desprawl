@@ -1,7 +1,7 @@
 // owner: finn
 // goal: lines added and removed, coloured the one way
 
-import { num } from "../../lib/say/format.ts"
+import { num } from "../../lib/text/format.ts"
 import { ADDED, REMOVED } from "../../lib/draw/series.ts"
 import { cn } from "../../lib/app/ui.ts"
 

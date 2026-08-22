@@ -20,7 +20,7 @@ import {
   useGoing,
 } from "../lib/app/going.tsx"
 import { useKept } from "../lib/app/kept.ts"
-import { plural } from "../lib/say/format.ts"
+import { plural } from "../lib/text/format.ts"
 import { hands, worked } from "../lib/app/people.ts"
 import { type Grain, type Spot, type Wire } from "../lib/draw/network.ts"
 import { grainOf } from "../../src/facts/knowledge.ts"

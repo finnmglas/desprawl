@@ -2,7 +2,7 @@
 // goal: dependency ring
 
 import { useEffect, useRef, useState } from "react"
-import { num, plural, shortPath } from "../../../lib/say/format.ts"
+import { num, plural, shortPath } from "../../../lib/text/format.ts"
 import { PAINT, fit } from "../../../lib/draw/canvas.ts"
 import type { Unit } from "../../../../src/read/layers.ts"
 

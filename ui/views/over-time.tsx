@@ -35,12 +35,12 @@ import {
   num,
   stamp,
   startsAt,
-} from "../lib/say/format.ts"
+} from "../lib/text/format.ts"
 
 import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/app/live.ts"
 import { GROUPS, SERIES, expand, rows } from "../lib/draw/series.ts"
 import { cn } from "../lib/app/ui.ts"
-import type { Grain } from "../lib/say/format.ts"
+import type { Grain } from "../lib/text/format.ts"
 import type { Hours, Timeline } from "../../src/facts/samples.ts"
 import type { Stats } from "../../src/read/model.ts"
 

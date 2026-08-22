@@ -3,8 +3,8 @@
 
 import { Kpi, Kpis } from "../panels/kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
-import { num, plural } from "../../../lib/say/format.ts"
-import { since } from "../../../lib/say/trend.ts"
+import { num, plural } from "../../../lib/text/format.ts"
+import { since } from "../../../lib/text/trend.ts"
 import { useDisplay } from "../../../lib/app/display.tsx"
 import { useWas } from "../../../lib/app/was.tsx"
 import type { Graph } from "../../../../src/read/graph.ts"

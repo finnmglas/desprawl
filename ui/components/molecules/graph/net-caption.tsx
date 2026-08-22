@@ -2,7 +2,7 @@
 // goal: what is under the cursor, said under the graph
 
 import { HEADS, REQUEST } from "../../../lib/draw/paint.ts"
-import { plural, shortPath } from "../../../lib/say/format.ts"
+import { plural, shortPath } from "../../../lib/text/format.ts"
 import type { Net, Spot, Wire } from "../../../lib/draw/network.ts"
 
 interface Props {

@@ -2,7 +2,7 @@
 // goal: settings
 
 import type { Brands, Compare, Curve, Scale, Shown } from "./display.tsx"
-import type { Choice } from "../say/locale.ts"
+import type { Choice } from "../text/locale.ts"
 import type { Theme } from "./theme.tsx"
 
 export interface Prefs {

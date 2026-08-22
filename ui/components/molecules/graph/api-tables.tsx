@@ -5,7 +5,7 @@ import { Badge } from "../../atoms/badge.tsx"
 import { Section } from "../../atoms/section.tsx"
 import { DataTable, type Column } from "../panels/data-table.tsx"
 import { file as asFile, useGoing } from "../../../lib/app/going.tsx"
-import { shortPath } from "../../../lib/say/format.ts"
+import { shortPath } from "../../../lib/text/format.ts"
 import type { Api, Client, Endpoint } from "../../../../src/read/specs.ts"
 
 interface Served extends Endpoint {

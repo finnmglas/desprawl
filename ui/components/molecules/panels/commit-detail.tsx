@@ -3,7 +3,7 @@
 
 import { Note } from "../../atoms/card.tsx"
 import { Moved } from "../../atoms/moved.tsx"
-import { day, num } from "../../../lib/say/format.ts"
+import { day, num } from "../../../lib/text/format.ts"
 import type { Detail } from "../../../../src/facts/history.ts"
 
 /** Fixed, so the rails beside the list can account for the gap exactly. */

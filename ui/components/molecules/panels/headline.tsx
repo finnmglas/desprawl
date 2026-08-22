@@ -3,9 +3,9 @@
 
 import { Kpi, Kpis } from "./kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
-import { num, pct, plural, tokens } from "../../../lib/say/format.ts"
-import { commentsOf, contextOf, historyOf, sizeOf } from "../../../lib/say/verdict.ts"
-import { moved, since } from "../../../lib/say/trend.ts"
+import { num, pct, plural, tokens } from "../../../lib/text/format.ts"
+import { commentsOf, contextOf, historyOf, sizeOf } from "../../../lib/text/verdict.ts"
+import { moved, since } from "../../../lib/text/trend.ts"
 import { useDisplay } from "../../../lib/app/display.tsx"
 import { useWas } from "../../../lib/app/was.tsx"
 import type { Stats } from "../../../../src/read/model.ts"

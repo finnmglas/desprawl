@@ -3,7 +3,7 @@
 
 import { transform } from "./curve.ts"
 import type { Curve } from "../app/display.tsx"
-import { spans, type Grain } from "../say/format.ts"
+import { spans, type Grain } from "../text/format.ts"
 import type { Hours, Timeline } from "../../../src/facts/samples.ts"
 import type { Stats } from "../../../src/read/model.ts"
 

@@ -2,7 +2,7 @@
 // goal: what a line carries, and the connection it opens as
 
 import { link } from "../app/going.tsx"
-import { plural, shortPath } from "../say/format.ts"
+import { plural, shortPath } from "../text/format.ts"
 import type { Held } from "./wires.ts"
 import type { Api, Link } from "../../../src/read/specs.ts"
 import type { Grain } from "./network.ts"

@@ -3,11 +3,11 @@
 
 import { Kpi, Kpis } from "./kpi.tsx"
 import { Section } from "../../atoms/section.tsx"
-import { num, plural } from "../../../lib/say/format.ts"
+import { num, plural } from "../../../lib/text/format.ts"
 import { spell } from "./task-rows.tsx"
-import { since } from "../../../lib/say/trend.ts"
+import { since } from "../../../lib/text/trend.ts"
 import { useDisplay } from "../../../lib/app/display.tsx"
-import { IMPACTS, type Task } from "../../../lib/say/tasks.ts"
+import { IMPACTS, type Task } from "../../../lib/text/tasks.ts"
 
 /** the four numbers off any list of tasks, counted once for each date */
 const of = (held: Task[]) => ({

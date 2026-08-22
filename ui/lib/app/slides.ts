@@ -3,8 +3,8 @@
 
 import { balanced, fold } from "../../../src/read/layers.ts"
 import { nameOf, namesOf } from "../../../src/read/naming.ts"
-import { num, pct, plural, tokens } from "../say/format.ts"
-import { shapeOf } from "../say/verdict.ts"
+import { num, pct, plural, tokens } from "../text/format.ts"
+import { shapeOf } from "../text/verdict.ts"
 import type { Graph } from "../../../src/read/graph.ts"
 import type { Stats } from "../../../src/read/model.ts"
 import type { Slide } from "./paper.ts"

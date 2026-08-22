@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react"
 import { wasBefore } from "./live.ts"
-import { daysBack } from "../say/trend.ts"
+import { daysBack } from "../text/trend.ts"
 import type { Compare } from "./display.tsx"
 import type { Want, Was } from "../../../src/facts/before.ts"
 

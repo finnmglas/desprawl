@@ -6,8 +6,8 @@ import { Chip } from "../chip.tsx"
 import { CardHead } from "../card-head.tsx"
 import { CopyButton } from "../copy-button.tsx"
 import { Tip } from "../../atoms/tip.tsx"
-import { num, pct } from "../../../lib/say/format.ts"
-import { HINTS } from "../../../lib/say/hints.ts"
+import { num, pct } from "../../../lib/text/format.ts"
+import { HINTS } from "../../../lib/text/hints.ts"
 import type { Ai } from "../../../../src/read/model.ts"
 
 /** The rows, shared by the panel and the copy */

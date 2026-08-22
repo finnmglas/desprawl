@@ -11,7 +11,7 @@ import { Circle } from "./circle.tsx"
 import { CopyButton } from "../copy-button.tsx"
 import { Matrix } from "./matrix.tsx"
 import { Save } from "../save.tsx"
-import { plural } from "../../../lib/say/format.ts"
+import { plural } from "../../../lib/text/format.ts"
 import { useKept } from "../../../lib/app/kept.ts"
 import type { Unit } from "../../../../src/read/layers.ts"
 

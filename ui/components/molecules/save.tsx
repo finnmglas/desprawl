@@ -4,7 +4,7 @@
 import { Download } from "../atoms/icons.tsx"
 import { Menu, MenuItem } from "./menu.tsx"
 import { toast } from "../atoms/toast.tsx"
-import { FORMATS, type Matrix } from "../../lib/say/formats.ts"
+import { FORMATS, type Matrix } from "../../lib/text/formats.ts"
 import { download, named } from "../../lib/app/export.ts"
 import { toSvg } from "html-to-image"
 import { shoot } from "../../lib/app/paper.ts"

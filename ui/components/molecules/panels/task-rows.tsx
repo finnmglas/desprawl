@@ -5,10 +5,10 @@ import { Badge } from "../../atoms/badge.tsx"
 import { Face, Hands } from "./hands.tsx"
 import { Fix } from "../agent/fix.tsx"
 import { Path, Tip } from "../../atoms/tip.tsx"
-import { shortPath } from "../../../lib/say/format.ts"
-import { OUTLINE } from "../../../lib/say/verdict.ts"
+import { shortPath } from "../../../lib/text/format.ts"
+import { OUTLINE } from "../../../lib/text/verdict.ts"
 import type { Column } from "./data-table.tsx"
-import { FELT, type Hits, type Task } from "../../../lib/say/tasks.ts"
+import { FELT, type Hits, type Task } from "../../../lib/text/tasks.ts"
 import type { Hand } from "../../../lib/app/people.ts"
 
 const TONES: Record<string, string> = {

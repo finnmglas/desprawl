@@ -4,7 +4,7 @@
 import { BRANDS } from "./brands.ts"
 import { LANGS } from "../../../src/read/langs.ts"
 import { hued } from "./paint.ts"
-import { shapeOf } from "../say/verdict.ts"
+import { shapeOf } from "../text/verdict.ts"
 import type { Box, Grain, Net, Spot } from "./network.ts"
 import type { Graph } from "../../../src/read/graph.ts"
 import type { Unit } from "../../../src/read/layers.ts"

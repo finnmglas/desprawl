@@ -17,7 +17,7 @@ import { Network } from "./views/network.tsx"
 import { Tasks } from "./views/tasks.tsx"
 import { Modules } from "./views/modules.tsx"
 import { Overview } from "./views/overview.tsx"
-import { setLocale } from "./lib/say/locale.ts"
+import { setLocale } from "./lib/text/locale.ts"
 import { pullPrefs, readPrefs, savePrefs, type Prefs } from "./lib/app/prefs.ts"
 import {
   hunt,
@@ -31,7 +31,7 @@ import {
   viewsOf,
 } from "./lib/app/sections.ts"
 import { describes } from "./lib/app/export.ts"
-import { setSimple } from "./lib/say/format.ts"
+import { setSimple } from "./lib/text/format.ts"
 import { cn } from "./lib/app/ui.ts"
 import { pdf, pptx } from "./lib/app/paper.ts"
 import { download, named } from "./lib/app/export.ts"

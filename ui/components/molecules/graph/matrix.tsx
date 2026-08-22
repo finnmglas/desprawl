@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { Tip } from "../../atoms/tip.tsx"
 import { PAINT } from "../../../lib/draw/canvas.ts"
 import { grid } from "./grid-paint.ts"
-import { num, plural, shortPath } from "../../../lib/say/format.ts"
+import { num, plural, shortPath } from "../../../lib/text/format.ts"
 import { cn } from "../../../lib/app/ui.ts"
 import type { Unit } from "../../../../src/read/layers.ts"
 

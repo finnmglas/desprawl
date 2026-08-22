@@ -2,7 +2,7 @@
 // goal: number modes
 
 import { createContext, useContext } from "react"
-import type { Curve } from "../say/format.ts"
+import type { Curve } from "../text/format.ts"
 
 /** simple abbreviates, repo divides by the column total, row by the row's own lines */
 export type Scale = "simple" | "abs" | "repo" | "row"

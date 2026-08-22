@@ -2,7 +2,7 @@
 // goal: a handful of things, and the rest of them on ask
 
 import { useState } from "react"
-import { num } from "../../../lib/say/format.ts"
+import { num } from "../../../lib/text/format.ts"
 
 export const FEW = 6
 

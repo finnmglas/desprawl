@@ -2,8 +2,8 @@
 // goal: the picture itself, drawn from what the view decided to show
 
 import { PAINT, plain } from "./canvas.ts"
-import { num, shortPath } from "../say/format.ts"
-import { shapeOf } from "../say/verdict.ts"
+import { num, shortPath } from "../text/format.ts"
+import { shapeOf } from "../text/verdict.ts"
 import { runs, type Held, type Seat } from "./wires.ts"
 import type { Box, Grain, Net, Spot } from "./network.ts"
 import type { Unit } from "../../../src/read/layers.ts"
