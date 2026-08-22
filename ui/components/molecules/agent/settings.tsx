@@ -12,11 +12,14 @@ import { resetSections, useCustomized } from "../../../lib/app/sections.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../../../lib/say/locale.ts"
 import {
   BRANDINGS,
+  COMPARES,
   CURVES,
   EXPLAIN,
   SCALES,
   SHOWN,
+  SINCE,
   type Brands,
+  type Compare,
   type Curve,
   type Scale,
   type Shown,
@@ -33,16 +36,25 @@ function Choice({
   tabs,
   value,
   onChange,
+  tight,
 }: {
   label: string
   hint: string
   tabs: string[]
   value: string
   onChange: (next: string) => void
+  /** six of them: a strip that scrolls hides the last choice from a reader looking for it */
+  tight?: boolean
 }) {
   return (
     <MenuSection label={label} hint={hint}>
-      <Tabs grow tabs={tabs} value={value} onChange={onChange} />
+      <Tabs
+        grow
+        tabs={tabs}
+        value={value}
+        onChange={onChange}
+        className={tight ? "[&>button]:px-1.5" : undefined}
+      />
     </MenuSection>
   )
 }
@@ -63,7 +75,7 @@ export function Settings({
   onPaper?: (kind: "pdf" | "pptx") => void
   themed: ThemeState
 }) {
-  const { scale, curve, region, brands, rows } = prefs
+  const { scale, curve, region, brands, rows, compare } = prefs
   const customized = useCustomized()
   const [exporting, setExporting] = useState(false)
 
@@ -131,6 +143,14 @@ export function Settings({
           tabs={SHOWN}
           value={rows}
           onChange={(next) => change({ rows: next as Shown })}
+        />
+        <Choice
+          tight
+          label="KPI comparison"
+          hint={SINCE[compare]}
+          tabs={COMPARES}
+          value={compare}
+          onChange={(next) => change({ compare: next as Compare })}
         />
         <Choice
           label="Number relation"

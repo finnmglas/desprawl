@@ -3,14 +3,39 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "../../atoms/card.tsx"
 import { Tip } from "../../atoms/tip.tsx"
+import { Arrow } from "../../atoms/icons.tsx"
 import { TONES, type Verdict } from "../../../lib/say/verdict.ts"
+import { num } from "../../../lib/say/format.ts"
 import { cn } from "../../../lib/app/ui.ts"
+import type { Moved } from "../../../lib/say/trend.ts"
+
+/** which way it went, beside the number it went from. Nothing at all when it went nowhere,
+ * since a row of zeroes says only that the window was quiet */
+function Trend({ moved, what }: { moved: Moved; what: string }) {
+  if (!moved.by || !moved.over) return null
+  const up = moved.by > 0
+  return (
+    <Tip text={`${what} ${moved.over}`} side="bottom">
+      <span
+        className={cn(
+          "inline-flex items-center gap-0.5 text-sm font-medium",
+          up ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
+        )}
+      >
+        <Arrow up={up} className="size-3.5" />
+        {num(Math.abs(moved.by))}
+      </span>
+    </Tip>
+  )
+}
 
 export function Kpi({
   label,
   value,
   sub,
   verdict,
+  moved,
+  says,
   opens,
   onClick,
 }: {
@@ -18,6 +43,10 @@ export function Kpi({
   value: React.ReactNode
   sub: React.ReactNode
   verdict: Verdict
+  /** how it moved over the window the reader picked, where that can be read at all */
+  moved?: Moved
+  /** what that movement is, in words, since a delta alone does not say what it counted */
+  says?: string
   /** the tab it opens, when it opens one */
   opens?: string
   onClick?: () => void
@@ -40,7 +69,10 @@ export function Kpi({
         </Tip>
       </CardHeader>
       <CardContent className="pt-0">
-        <div className="text-2xl font-semibold tabular-nums">{value}</div>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="text-2xl font-semibold tabular-nums">{value}</span>
+          {moved && <Trend moved={moved} what={says ?? label} />}
+        </div>
         <div className="text-muted-foreground text-xs">{sub}</div>
       </CardContent>
     </Card>

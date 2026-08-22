@@ -10,6 +10,7 @@ import { effective, shares } from "../ui/lib/draw/scale.ts"
 import { asMatrix, type Column } from "../ui/lib/say/columns.ts"
 import { bucket, defaultGrain, grainsFor, nearestGrain } from "../ui/lib/say/format.ts"
 import { expand, rows } from "../ui/lib/draw/series.ts"
+import { daysBack, moved } from "../ui/lib/say/trend.ts"
 import { isId, nameOf, namesOf } from "../src/read/naming.ts"
 import { FORMATS } from "../ui/lib/say/formats.ts"
 import { shapeOf } from "../ui/lib/say/verdict.ts"
@@ -360,4 +361,50 @@ test("a folder does not say the same word twice because it borrowed it", () => {
   assert.equal(nameOf("a/docs/documentation", 0, 1), "Documentation")
   // and a folder above that says something else is still worth borrowing
   assert.equal(nameOf("fix-ui/components/sources", 0, 1), "Components sources")
+})
+
+test("a kpi compares itself against the days the log actually wrote down", () => {
+  const day = 86_400_000
+  const at = (back: number) =>
+    new Date(Date.parse("2026-08-22") - back * day).toISOString().slice(0, 10)
+  // eight days, oldest first, with the busy days at either end
+  const series = [
+    {
+      metric: "commits",
+      start: at(7),
+      end: at(0),
+      granularity: "1d",
+      data: [4, 0, 0, 0, 1, 0, 0, 3],
+    },
+    {
+      metric: "insertions",
+      start: at(7),
+      end: at(0),
+      granularity: "1d",
+      data: [900, 0, 0, 0, 50, 0, 0, 120],
+    },
+    {
+      metric: "deletions",
+      start: at(7),
+      end: at(0),
+      granularity: "1d",
+      data: [100, 0, 0, 0, 10, 0, 0, 20],
+    },
+  ]
+  const now = Date.parse("2026-08-22T15:00:00Z")
+  // the day a reader stands in counts as the whole of its own 24h, whatever the clock says
+  assert.deepEqual(moved(series, "24h", now).lines, { by: 100, over: "past 24h" })
+  assert.equal(moved(series, "24h", now).commits.by, 3)
+  assert.equal(moved(series, "7d", now).lines.by, 140, "the 50 three days back joins it")
+  assert.equal(moved(series, "7d", now).commits.by, 4)
+  // eight days back is outside a week and inside a month
+  assert.equal(moved(series, "mo", now).lines.by, 940)
+  assert.equal(moved(series, "none", now).lines.by, 0, "none compares against nothing")
+  assert.deepEqual(moved([], "24h", now).lines, { by: 0, over: "past 24h" })
+
+  // the year so far is a calendar window, and the rolling ones are not
+  assert.equal(daysBack("ytd", new Date("2026-01-01T12:00:00Z")), 1)
+  assert.equal(daysBack("ytd", new Date("2026-03-02T00:00:00Z")), 61)
+  assert.equal(daysBack("yr", new Date("2026-03-02T00:00:00Z")), 365)
+  assert.equal(daysBack("none"), 0)
 })

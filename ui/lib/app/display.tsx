@@ -21,6 +21,19 @@ export const EXPLAIN: Record<Scale, string> = {
 export type Brands = "focus" | "flashy" | "off"
 export const BRANDINGS: Brands[] = ["focus", "flashy", "off"]
 
+/** what a kpi holds its number against: a rolling window, or the year so far */
+export type Compare = "none" | "24h" | "7d" | "mo" | "yr" | "ytd"
+export const COMPARES: Compare[] = ["none", "24h", "7d", "mo", "yr", "ytd"]
+
+export const SINCE: Record<Compare, string> = {
+  none: "the number on its own",
+  "24h": "against a day ago",
+  "7d": "against a week ago",
+  mo: "against thirty days ago",
+  yr: "against a year ago, rolling",
+  ytd: "since the first of january",
+}
+
 export type Shown = "5" | "10" | "virtual" | "all"
 export const SHOWN: Shown[] = ["5", "10", "virtual", "all"]
 
@@ -32,6 +45,7 @@ export interface Display {
   curve: Curve
   brands: Brands
   rows: Shown
+  compare: Compare
 }
 
 const Ctx = createContext<Display>({
@@ -39,6 +53,7 @@ const Ctx = createContext<Display>({
   curve: "linear",
   brands: "focus",
   rows: "virtual",
+  compare: "24h",
 })
 
 export const DisplayProvider = Ctx.Provider

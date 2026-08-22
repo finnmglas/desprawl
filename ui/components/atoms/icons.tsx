@@ -114,6 +114,11 @@ export const Blocks = ({ className }: { className?: string }) => (
   />
 )
 
+// which way a number moved, said in the one glance a kpi gets
+export const Arrow = ({ up, className }: { up: boolean; className?: string }) => (
+  <Line className={className} d={up ? "M12 19V5M6 11l6-6 6 6" : "M12 5v14M6 13l6 6 6-6"} />
+)
+
 export const Caret = ({ className }: { className?: string }) => (
   <Line className={className} d="m6 9 6 6 6-6" />
 )

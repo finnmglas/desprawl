@@ -1,7 +1,7 @@
 // owner: finn
 // goal: settings
 
-import type { Brands, Curve, Scale, Shown } from "./display.tsx"
+import type { Brands, Compare, Curve, Scale, Shown } from "./display.tsx"
 import type { Choice } from "../say/locale.ts"
 import type { Theme } from "./theme.tsx"
 
@@ -13,6 +13,8 @@ export interface Prefs {
   brands: Brands
   /** how many rows every table shows before it folds, scrolls or prints the lot */
   rows: Shown
+  /** how far back a kpi holds its number against, and nothing when none */
+  compare: Compare
   /** open by default: it answers what is this repo */
   metadata: boolean
   /** what the fix panel was last set to: nobody picks a different cli every time */
@@ -30,6 +32,7 @@ export const FALLBACK: Prefs = {
   region: "auto",
   brands: "flashy",
   rows: "virtual",
+  compare: "24h",
   metadata: true,
   agent: { install: "", model: "", mode: "local", trust: "auto" },
   hidden: [],

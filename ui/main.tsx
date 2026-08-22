@@ -241,7 +241,7 @@ function App({
     )
 
   return (
-    <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows }}>
+    <DisplayProvider value={{ scale, curve, brands, rows: prefs.rows, compare: prefs.compare }}>
       <GoingProvider value={{ at, go, was, open: setTarget }}>
         <div
           data-hunting={said || undefined}
