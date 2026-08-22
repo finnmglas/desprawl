@@ -1,11 +1,11 @@
 // owner: finn
 // goal: one file read for the routes it serves and the calls it makes
 
-import { readFileSync } from "node:fs"
+import { scrubbed } from "./held.ts"
 import { join } from "node:path"
 import { build, type Graph } from "./graph.ts"
 import { candidates, dialectOf } from "./dialects.ts"
-import { MARK, breaks, lineAt, scrub } from "./specifiers.ts"
+import { MARK, breaks, lineAt } from "./specifiers.ts"
 import { URL, normal, under, verbOf } from "./specs.ts"
 import type { Client, Endpoint } from "./specs.ts"
 
@@ -65,6 +65,9 @@ export interface Found {
   actions: Record<string, Action[]>
   /** every declaration name to the file declaring it, when only one does */
   declares: Map<string, string[]>
+  /** call sites shaped like a request whose path was not written at the call: a wrapper
+   * took it from a constants file, and saying nothing about them reads as none existing */
+  unread: number
 }
 
 const empty = (): Found => ({
@@ -76,6 +79,7 @@ const empty = (): Found => ({
   routers: {},
   actions: {},
   declares: new Map(),
+  unread: 0,
 })
 
 /** the file declaring a name, or the nearest one when two files declare it alike */
@@ -130,13 +134,8 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
     const path = module.path
     const dialect = dialectOf(path)
     const lang = dialect?.id ?? ""
-    let text = ""
-    try {
-      text = readFileSync(join(repo, path), "utf8")
-    } catch {
-      continue
-    }
-    const { code, strings } = scrub(text, dialect?.flavour ?? "js", true)
+    const { code, strings } = scrubbed(join(repo, path), dialect?.flavour ?? "js", true)
+    if (!code) continue
     const starts = breaks(code)
     const at = (index: number) => lineAt(starts, index)
     const said = (index: string | undefined) =>
@@ -194,6 +193,11 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
         })
     }
 
+    // a span two rules both read is one thing: `@router.post("/x")` serves, and the wrapper
+    // rule sees the same `.post(` and calls it a request. What served cannot also ask
+    const served = new Set<number>()
+    // and the call sites whose path this file never wrote down, counted once each
+    const unread = new Set<number>()
     for (const rule of COMPILED) {
       if (!rule.langs.includes(lang)) continue
       if (rule.files && !rule.files.test(path)) continue
@@ -203,7 +207,14 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
         const held = said(groups.p) || (groups.v ? (consts.get(groups.v) ?? "") : "")
         const after = code.slice(m.index + m[0].length, m.index + m[0].length + 120)
         const raw = filled(held && groups.p ? held + stretch(after, strings) : held, consts)
-        if (!raw ? !rule.bare : !(rule.side === "server" ? soft(raw) : pathy(raw))) continue
+        if (!raw ? !rule.bare : !(rule.side === "server" ? soft(raw) : pathy(raw))) {
+          // a call written like a request, holding a path this file never spells out
+          if (rule.side !== "server" && !unread.has(m.index) && HOLDS.test(groups.who ?? "")) {
+            unread.add(m.index)
+            all.unread++
+          }
+          continue
+        }
         if (rule.strict === "root" && !raw.startsWith("/") && !URL.test(raw)) continue
         if (rule.strict === "host" && !URL.test(raw)) continue
         const line = at(m.index)
@@ -254,6 +265,8 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
                 (one) => one[1],
               )
             : []
+          // both rules stop just past the path they read, so that offset is the one span
+          served.add(m.index + m[0].length)
           for (const verb of listed.length ? listed : keys.length ? keys : [method])
             all.endpoints.push({
               id: `${path}:${line}:${verb}:${clean}`,
@@ -266,6 +279,7 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
               handler: handlerOf(after, path, holds),
             })
         } else {
+          if (served.has(m.index + m[0].length)) continue
           all.clients.push({
             id: `${path}:${line}:${method}:${clean}`,
             file: path,

@@ -8,7 +8,8 @@ import { calls } from "../src/read/calls.ts"
 import { api, filled, pathy, reading } from "../src/read/routes.ts"
 import { normal } from "../src/read/specs.ts"
 import { joined } from "../src/read/routes.ts"
-import { repo } from "./repo.ts"
+import { everyApi } from "../src/facts/many.ts"
+import { folder, repo } from "./repo.ts"
 
 /** every endpoint as "VERB path", sorted, so a test says what it means */
 const served = (dir: string) => {
@@ -359,9 +360,14 @@ test("a document that lists endpoints is read as endpoints", () => {
   assert.ok(!said.includes("GET /components"), "nothing below the paths block is a path")
   // every collection entry lands on the endpoint the spec described
   const asked = sites(found)
-  assert.ok(asked.includes("GET /*/v3/things"), asked.join(", "))
-  assert.ok(asked.includes("DELETE /*/v3/things/7"))
-  assert.ok(asked.includes("PUT /*/v2/orders"))
+  // a leading {{host}} names which service answers, so it is a host and not a first segment
+  assert.ok(asked.includes("GET /v3/things"), asked.join(", "))
+  assert.ok(asked.includes("DELETE /v3/things/7"))
+  assert.ok(asked.includes("PUT /v2/orders"))
+  assert.deepEqual(
+    [...new Set(found.clients.filter((one) => one.host).map((one) => one.host))].sort(),
+    ["*base", "*host", "api.example.com"],
+  )
   // the spec says which host it answers on, so a request naming that host lands here
   assert.ok(
     found.links.some((one) => one.call.includes("api.http") && one.path === "/v3/things"),
@@ -505,4 +511,137 @@ test("a flutter app's calls are read, and a dart server's routes are not one of 
   )
   assert.deepEqual(sites(found), ["GET /api/v1/users/*", "POST /api/v1/notes"].sort())
   assert.deepEqual(ends(found), ["GET /api/v1/health"])
+})
+
+test("a graphql request is named by its operation, since its url names nothing", () => {
+  const found = served(
+    repo({
+      "bruno/schema.bru": [
+        "meta {",
+        "  name: 00 List Schema Types",
+        "  type: graphql",
+        "  seq: 1",
+        "}",
+        "",
+        "post {",
+        "  url: {{baseUrl}}",
+        "  body: graphql",
+        "  auth: inherit",
+        "}",
+        "",
+        "body:graphql {",
+        "  query ListAllTypes {",
+        "    __schema { types { name } }",
+        "  }",
+        "}",
+      ].join("\n"),
+      "bruno/orders.bru": [
+        "meta {",
+        "  name: orders",
+        "  type: graphql",
+        "}",
+        "",
+        "post {",
+        "  url: {{baseUrl}}",
+        "}",
+        "",
+        "body:graphql {",
+        "  mutation PlaceOrder { place(id: 1) { ok } }",
+        "}",
+      ].join("\n"),
+      // and a rest call in the same collection still reads as a path
+      "bruno/native.bru":
+        "meta {\n  name: native\n}\n\nget {\n  url: {{ServiceUrl}}/api/things/one\n}\n",
+    }),
+  )
+  assert.deepEqual(
+    found.clients.map((one) => one.name ?? one.path).sort(),
+    ["/api/things/one", "mutation PlaceOrder", "query ListAllTypes"],
+    "two operations and one path, not three copies of POST /*",
+  )
+  assert.equal(
+    found.clients.find((one) => one.path === "/api/things/one")?.host,
+    "*ServiceUrl",
+    "the variable says which service answers, so it is a host",
+  )
+})
+
+test("a route decorator is a route, and never also a request", () => {
+  const found = served(
+    repo({
+      "pyproject.toml": '[project]\nname = "api"\ndependencies = ["fastapi"]\n',
+      "app/routes.py": [
+        "from fastapi import APIRouter",
+        "from starlette.status import HTTP_200_OK",
+        "",
+        "router = APIRouter(prefix='/admin')",
+        "",
+        "",
+        "@router.post('/account/{uuid}/refresh', status_code=HTTP_200_OK)",
+        "def refresh(uuid: str):",
+        "    return 1",
+        "",
+      ].join("\n"),
+    }),
+  )
+  assert.deepEqual(ends(found), ["POST /admin/account/*/refresh"])
+  assert.deepEqual(sites(found), [], "the same line is not also an outbound request")
+})
+
+test("a document describing another repo's api serves nothing", () => {
+  const serves = {
+    "pyproject.toml": '[project]\nname = "back"\ndependencies = ["fastapi"]\n',
+    "app/main.py": [
+      "from fastapi import APIRouter",
+      "",
+      "router = APIRouter(prefix='/api/v1')",
+      "",
+      "",
+      "@router.get('/users')",
+      "def users():",
+      "    return []",
+      "",
+    ].join("\n"),
+  }
+  const holds = {
+    "package.json": '{"name":"portal"}',
+    // the codegen snapshot a frontend keeps of the backend it calls
+    "spec/openapi.json": JSON.stringify({
+      openapi: "3.0.0",
+      paths: { "/api/v1/users": { get: {} }, "/api/v1/gone": { get: {} } },
+    }),
+    "src/a.ts": "export const go = () => 1\n",
+  }
+  const together = everyApi(folder({ service: [serves], portal: [holds] }))
+  assert.deepEqual(
+    together.endpoints.map((one) => `${one.file} ${one.path}`).sort(),
+    ["portal/spec/openapi.json /api/v1/gone", "service/app/main.py /api/v1/users"],
+    "the described one folds into the code, the one nobody answers stands",
+  )
+  assert.equal(together.stats.described, 1)
+
+  // and alone, a spec is the only thing that can say what a repo serves
+  const alone = api(repo(holds))
+  assert.equal(alone.endpoints.length, 2)
+  assert.equal(alone.stats.described, 0)
+})
+
+test("a request whose path lives in a constants file is counted, not silently dropped", () => {
+  const found = served(
+    repo({
+      "package.json": '{"name":"held","dependencies":{"ky":"1.0.0"}}',
+      "src/constants.ts": "export const ENDPOINT = { GET: (id: string) => `x/${id}` }\n",
+      "src/data.ts": [
+        "import { ENDPOINT } from './constants'",
+        "const apiClient = { get: (u: string) => u, post: (u: string, b: string) => u }",
+        "",
+        "export const one = (id: string) => apiClient.get(ENDPOINT.GET(id))",
+        "export const two = (b: string) => apiClient.post(ENDPOINT.GET('a'), b)",
+        "export const three = () => apiClient.get('/health')",
+        "",
+      ].join("\n"),
+    }),
+  )
+  assert.deepEqual(sites(found), ["GET /health"])
+  assert.equal(found.stats.unread, 2, "two calls were made, and neither path was written here")
 })

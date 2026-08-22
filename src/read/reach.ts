@@ -10,7 +10,7 @@ export type Reach = "runs" | "called" | "open" | "dead"
 /** every file's top level is a root, and an export optionally is one */
 export function reached(calls: Calls, exports: boolean): Set<string> {
   const roots = Object.values(calls.symbols)
-    .filter((s) => s.kind === "module" || (exports && s.exported))
+    .filter((s) => s.kind === "module" || s.value || (exports && s.exported))
     .map((s) => s.id)
   const seen = new Set(roots)
   const queue = [...roots]
@@ -25,7 +25,7 @@ export function reached(calls: Calls, exports: boolean): Set<string> {
 
 /** dead means nothing running here arrives at it, not that it is never mentioned */
 export const reachOf = (symbol: Symbol, live: Set<string>): Reach =>
-  symbol.kind === "module"
+  symbol.kind === "module" || symbol.value
     ? "runs"
     : !live.has(symbol.id)
       ? "dead"
@@ -37,7 +37,7 @@ export const REACHES: Record<Reach, { label: string; tone: string; why: string }
   runs: {
     label: "runs",
     tone: "text-muted-foreground",
-    why: "the top level of a file, which runs the moment anything imports it",
+    why: "a file's top level, or a value declared inline: both run where they sit",
   },
   called: { label: "called", tone: "", why: "something that runs arrives at it" },
   open: {

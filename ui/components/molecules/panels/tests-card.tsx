@@ -135,8 +135,14 @@ export function TestsCard() {
                 />
                 <Fact
                   label="Command"
-                  value={suite.script || "none"}
-                  note={suite.command || "no test script in the manifest"}
+                  value={suite.script || suite.command || "none"}
+                  note={
+                    suite.script
+                      ? suite.command
+                      : suite.command
+                        ? "what these files are written for, and no manifest script runs it"
+                        : "no test script in the manifest"
+                  }
                 />
               </div>
               {/* a file cannot run anything, and a number in one is as old as the file */}

@@ -212,7 +212,13 @@ function fromCalls(calls: Calls | null): Task[] {
   const found: Task[] = []
   const live = reached(calls, true)
   const dead = Object.values(calls.symbols).filter(
-    (one) => one.kind !== "module" && reachOf(one, live) === "dead",
+    (one) =>
+      one.kind !== "module" &&
+      reachOf(one, live) === "dead" &&
+      // a test, and a file a framework loads by name, each prove nothing. Somebody else's
+      // copy never reaches here at all: the graph left it out before any of this was read
+      !isTest(one.file) &&
+      !isEntry(one.file),
   )
   for (const one of dead)
     found.push({
@@ -263,9 +269,6 @@ export const isTest = (path: string) =>
 // a framework loads these by their name, so nothing here calling them proves nothing
 const ROUTES =
   /(^|\/)(page|layout|route|middleware|error|loading|not-found|template|default|head|sitemap|robots|manifest|icon|apple-icon|opengraph-image|twitter-image|instrumentation|_app|_document|\+page|\+layout|\+server)\.[jt]sx?$/
-
-const VENDORED =
-  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|\.yarn|dist|build|out|coverage|\.next|\.nuxt|\.output)\//
 
 export const isEntry = (path: string) =>
   ROUTES.test(path) ||
@@ -354,7 +357,7 @@ function fromOpen(calls: Calls | null): Task[] {
   const open = Object.values(calls.symbols)
     .filter((one) => one.kind !== "module" && reachOf(one, live) === "open")
     // a test, a vendored copy and a file a framework loads by name each prove nothing
-    .filter((one) => !isTest(one.file) && !isEntry(one.file) && !VENDORED.test(one.file))
+    .filter((one) => !isTest(one.file) && !isEntry(one.file))
   if (open.length < LOOSE) return []
   const worst = [
     ...open.reduce(

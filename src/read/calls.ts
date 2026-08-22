@@ -3,10 +3,10 @@
 
 import { made } from "./model.ts"
 import type { Made } from "./model.ts"
-import { readFileSync } from "node:fs"
+import { reading as text, scrubbed } from "./held.ts"
 import { join } from "node:path"
 import { build, packageOf, type Graph } from "./graph.ts"
-import { MARK, breaks, declared, foreign, lineAt, scrub, specifiers } from "./specifiers.ts"
+import { MARK, breaks, declared, foreign, lineAt, specifiers } from "./specifiers.ts"
 import { dialectOf, keywordsOf, runtimeOf } from "./dialects.ts"
 import { siting, type Symbol } from "./siting.ts"
 
@@ -169,6 +169,10 @@ const ASSIGNED =
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
 
+// `stubGlobal("X", class X {})` and `return function go() {}` declare a value rather than a
+// statement, and whatever holds it arrives at it the moment that line runs
+const VALUE = /[,(\[=:?&|]\s*$|\b(?:return|typeof|new|await|yield|of|in)\s+$/
+
 /** an indented language ends a body where the indentation comes back to the head */
 function block(code: string, from: number): number {
   const head = code.lastIndexOf("\n", from) + 1
@@ -258,13 +262,8 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   let builtin = 0
   // the files that were readable, not what was in them: a kernel is a gigabyte of text
   const read_: string[] = []
-  const reading = (path: string): string => {
-    try {
-      return scrub(readFileSync(join(repo, path), "utf8"), dialectOf(path)?.flavour).code
-    } catch {
-      return ""
-    }
-  }
+  const reading = (path: string): string =>
+    scrubbed(join(repo, path), dialectOf(path)?.flavour).code
   // file to local name, to where that name came from
   const bindings = new Map<
     string,
@@ -272,16 +271,14 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   >()
   // values it binds, like state setters
   const locals = new Map<string, Set<string>>()
+  // and the files a barrel hands names on from without naming any of them
+  const doors = new Map<string, string[]>()
 
   for (const module of Object.values(graph.modules)) {
-    let text = ""
-    try {
-      text = readFileSync(join(repo, module.path), "utf8")
-    } catch {
-      continue
-    }
+    const source = text(join(repo, module.path))
+    if (!source) continue
     const dialect = dialectOf(module.path)
-    const read = scrub(text, dialect?.flavour)
+    const read = scrubbed(join(repo, module.path), dialect?.flavour)
     const { code } = read
     read_.push(module.path)
     const starts = breaks(code)
@@ -289,7 +286,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const local = new Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>()
     // a language of its own says the name last: `import android.content.Intent` binds Intent
     if (dialect && dialect.id !== "ts")
-      for (const spec of foreign(text, dialect, read)) {
+      for (const spec of foreign(source, dialect, read)) {
         const file = module.imports[spec.text]
         const tail =
           spec.text
@@ -300,9 +297,12 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         if (file) local.set(tail, { file, name: tail })
         else if (!spec.guess) local.set(tail, { name: tail, pkg: outside(dialect.id, spec.text) })
       }
-    for (const spec of dialect && dialect.id !== "ts" ? [] : specifiers(text, read)) {
+    for (const spec of dialect && dialect.id !== "ts" ? [] : specifiers(source, read)) {
       const file = module.imports[spec.text]
       const pkg = file ? undefined : packageOf(spec.text)
+      // `export * from "./x"` hands on names it never writes down, so the file is the binding
+      if (spec.via && file && !spec.names.length)
+        doors.set(module.path, [...(doors.get(module.path) ?? []), file])
       for (const bound of spec.names)
         local.set(bound.local, { file, name: bound.name, pkg, type: spec.type })
     }
@@ -321,7 +321,13 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     for (const m of code.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*[=:]/g)) held.add(m[1])
     locals.set(module.path, held)
 
-    const add = (name: string, at: number, exported: boolean, kind: Symbol["kind"]) => {
+    const add = (
+      name: string,
+      at: number,
+      exported: boolean,
+      kind: Symbol["kind"],
+      value = false,
+    ) => {
       const id = `${module.path}#${name}`
       // `= class extends Base {` declares no name, and extends is not one
       if (symbols[id] || KEYWORD.has(name)) return
@@ -338,6 +344,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         line: lineAt(starts, at),
         lines: lineAt(starts, end) - lineAt(starts, at) + 1,
         exported,
+        value,
         calls: [],
         callers: [],
         packages: [],
@@ -355,6 +362,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
           m.index,
           !!m[1],
           m[4] === "class" ? "class" : /^[A-Z]/.test(m[5]) ? "component" : "function",
+          VALUE.test(code.slice(Math.max(0, m.index - 40), m.index)),
         )
       for (const m of code.matchAll(ASSIGNED))
         add(m[2], m.index, !!m[1], /^[A-Z]/.test(m[2]) ? "component" : "function")
@@ -392,7 +400,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   }
 
   for (const file of read_) {
-    // read again rather than held: every file's text at once is most of the memory
+    // held between the stages that want it, and dropped past what one run may hold
     const code = reading(file)
     // what is left when every body is taken out runs on import, or an entry point reads as dead
     const spans = (mine.get(file) ?? []).map((id) => bodies.get(id)!).sort((a, b) => a[0] - b[0])
@@ -456,6 +464,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         declares,
         reaches,
         bindings,
+        doors,
         locals,
         takes,
         link,
@@ -468,6 +477,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   // one of these is hundreds of megabytes and holding two copies at once is what runs out
   bodies.clear()
   bindings.clear()
+  doors.clear()
   locals.clear()
   mine.clear()
   declares.clear()

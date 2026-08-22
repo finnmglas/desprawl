@@ -7,6 +7,8 @@ import { join } from "node:path"
 import { git } from "../read/model.ts"
 import { CODE } from "../read/scan.ts"
 import { manifests as readManifests } from "./manifests.ts"
+import { VENDORED } from "../read/graph.ts"
+import { roleOf } from "../read/layers.ts"
 import type { Ai, Manifest, Node, Pinning, Stack } from "../read/model.ts"
 import {
   AGENTS,
@@ -35,10 +37,6 @@ const CONFIGS: [RegExp, "linters" | "formatters"][] = [
   [/^(.*\/)?oxfmt\.config\.[cm]?[jt]s$/, "formatters"],
   [/^(.*\/)?dprint\.jsonc?$/, "formatters"],
 ]
-
-// copies of other people's code, and build output. Neither describes this project
-const VENDORED =
-  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|Godeps|Pods|Carthage|\.yarn|\.pnp|\.gradle|\.tox|\.venv|venv|site-packages|__pycache__|dist|build|out|target|coverage|\.next|\.nuxt|\.output|__fixtures__|fixtures)\/|(^|\/)wwwroot\/lib\//
 
 const read = (repo: string, path: string): string => {
   try {
@@ -147,7 +145,7 @@ function markers(repo: string, paths: string[]) {
   }
 
   for (const path of paths) {
-    if (VENDORED.test(path)) continue
+    if (VENDORED.test(path) || roleOf(path) === "test") continue
 
     for (const [match, where, name] of FILES) {
       if (!match.test(path)) continue
@@ -274,7 +272,8 @@ export function stack(repo: string, languages: Node[] = []): Stack {
 
   // every manifest, wherever it sits, so a monorepo is read whole
   const manifests = paths
-    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !VENDORED.test(p))
+    // a manifest somebody vendored, or one a fixture holds, describes neither this project
+    .filter((p) => /^(.*\/)?package\.json$/.test(p) && !VENDORED.test(p) && roleOf(p) !== "test")
     .map((p) => manifest(repo, p))
     .filter((m): m is Manifest => !!m)
 

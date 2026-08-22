@@ -180,7 +180,7 @@ export function reading(
   graph: Graph = build(repo),
   // a route names the thing that answers it, and only the call graph knows where that is
   calls: Calls = callGraph(repo, graph),
-): Omit<Api, "links" | "stats"> & { hosts: string[] } {
+): Omit<Api, "links" | "stats"> & { hosts: string[]; unread: number } {
   const found = collect(repo, graph, calls)
   // a spec, a collection and a proto file each list endpoints without holding any code
   const said = specs(repo, tracked(repo))
@@ -189,6 +189,7 @@ export function reading(
     endpoints: once([...serving(found), ...said.endpoints]),
     clients: once([...found.clients, ...said.clients]),
     hosts: said.hosts,
+    unread: found.unread,
   }
 }
 
@@ -205,8 +206,8 @@ function tracked(repo: string): string[] {
 
 /** one repo's endpoints, its call sites, and every edge between them */
 export function api(repo: string, graph?: Graph, calls?: Calls): Api {
-  const { endpoints, clients, hosts } = reading(repo, graph, calls)
-  return joined(endpoints, clients, hosts)
+  const { endpoints, clients, hosts, unread } = reading(repo, graph, calls)
+  return joined(endpoints, clients, hosts, "", unread)
 }
 
 /** the same, once several repos have been read into one list */
@@ -215,20 +216,35 @@ export function joined(
   clients: Client[],
   hosts: string[] = [],
   repo = "",
+  unread = 0,
 ): Api {
-  const links = link(endpoints, clients, hosts)
+  // a document lists an endpoint and code answers one. Where both exist the code is the
+  // server, wherever the document sits: a frontend holding a codegen snapshot of the
+  // backend's api serves nothing, and letting it stand reverses every edge into it
+  const answered = new Set(
+    endpoints
+      .filter((one) => one.framework !== "openapi")
+      .map((one) => `${one.method} ${one.path}`),
+  )
+  const held = endpoints.filter(
+    (one) => one.framework !== "openapi" || !answered.has(`${one.method} ${one.path}`),
+  )
+  const described = endpoints.length - held.length
+  const links = link(held, clients, hosts)
   const reached = new Set(links.map((one) => one.call))
   return {
     ...made(repo),
-    endpoints,
+    endpoints: held,
     clients,
     links,
     stats: {
-      endpoints: endpoints.length,
+      endpoints: held.length,
+      described,
       clients: clients.length,
+      unread,
       linked: reached.size,
       outside: clients.length - reached.size,
-      frameworks: [...new Set([...endpoints, ...clients].map((one) => one.framework))].sort(),
+      frameworks: [...new Set([...held, ...clients].map((one) => one.framework))].sort(),
     },
   }
 }

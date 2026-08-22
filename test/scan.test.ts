@@ -4,7 +4,11 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { execFileSync } from "node:child_process"
-import { scan } from "../src/read/scan.ts"
+import { CODE, scan } from "../src/read/scan.ts"
+import { TS } from "../src/read/langs.ts"
+import { analyze } from "../src/facts/analyze.ts"
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import { repo } from "./repo.ts"
 
 const langs = (dir: string) => Object.fromEntries(scan(dir).map((f) => [f.name, f]))
@@ -93,4 +97,42 @@ test("markup uses its own comment marker", () => {
   const f = langs(repo({ "a.html": "<!-- note -->\n<div></div>\n" }))
   assert.equal(f["a.html"].comment, 1)
   assert.equal(f["a.html"].code, 1)
+})
+
+test("a format that is binary by definition is never a language", () => {
+  // a spec pdf is plain ascii for pages before its first null byte, so the sniff passes it
+  const ascii = `%PDF-1.4\n${"% openTRANS specification, uncompressed header\n".repeat(400)}`
+  const found = scan(
+    repo({
+      "docs/spec.pdf": ascii,
+      "art/logo.svg": "<svg></svg>\n",
+      "src/a.ts": "export const go = () => 1\n",
+      "data/rows.x81": "one|two|three\n",
+    }),
+  )
+  const by = (path: string) => found.find((one) => one.path === path)!
+  assert.equal(by("docs/spec.pdf").lang, "PDF")
+  assert.equal(by("docs/spec.pdf").code, 0, "a document carries no lines to count")
+  assert.equal(by("src/a.ts").lang, TS)
+  // an extension nobody knows is still counted, it just never names the repo
+  assert.equal(by("data/rows.x81").lang, "x81")
+  assert.ok(!CODE.has("x81") && !CODE.has("PDF"))
+})
+
+test("somebody else's code is counted as skipped, not as this project", () => {
+  const files: Record<string, string> = { "src/a.ts": "export const go = () => 1\n" }
+  for (let i = 0; i < 20; i++) files[`node_modules/dep/f${i}.js`] = "module.exports = 1\n"
+  for (let i = 0; i < 10; i++)
+    files[`auth/site-theme/common/resources/lib/ace${i}.js`] = "function ace() {}\n"
+  files["weird/one.ts"] = "export const odd = () => 2\n"
+  const dir = repo(files)
+  const stats = analyze(dir)
+  assert.equal(stats.files, 2, "its own file, and the one folder no heuristic knows about")
+  assert.equal(stats.skipped, 30)
+
+  // and the one exclude a reader can write down covers what nothing else could
+  writeFileSync(join(dir, ".desprawlignore"), "# not ours\nweird/*.ts\n")
+  const held = analyze(dir)
+  assert.equal(held.files, 1)
+  assert.equal(held.skipped, 31)
 })

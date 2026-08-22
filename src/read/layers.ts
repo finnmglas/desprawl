@@ -83,10 +83,11 @@ export interface Layout {
   depth: number
 }
 
+// a python repo writes its suites as underscore compounds, and none of them is source
 const TEST =
-  /(^|\/)(__tests__|__mocks__|tests?|specs?|e2e|cypress|fixtures?|mocks?|stories)(\/|$)|\.(test|spec|stories)\.[cm]?[jt]sx?$/
+  /(^|\/)(__tests__|__mocks__|tests?|specs?|e2e|cypress|fixtures?|mocks?|stories|[\w-]*_(tests?|testing)|(e2e|integration|unit|acceptance|smoke)-tests?|test_[\w-]+)(\/|$)|\.(test|spec|stories)\.[cm]?[jt]sx?$/
 const SUPPORT =
-  /(^|\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|\.\w+)(\/|$)|\.config\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.(config|setup|rc)\.[cm]?[jt]sx?$/
+  /(^|\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|documentations?|archives?|notebooks?|benchmarks?|\.\w+)(\/|$)|\.config\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.(config|setup|rc)\.[cm]?[jt]sx?$/
 
 /** loose at the root is config */
 const LOOSE = /^[^/]+\.[cm]?[jt]sx?$/
@@ -195,10 +196,15 @@ export function balanced(
     const inside = [...branches.values()].filter(
       (branch) => branch.path && !chosen.has(branch.path) && owner(branch.path) === worst,
     )
-    const parts = inside
-      .filter((b) => !inside.some((o) => o !== b && b.path.startsWith(`${o.path}/`)))
-      // a child too small stays in what is left of its parent
-      .filter((branch) => branch.weight >= goal / share)
+    const under = inside.filter(
+      (b) => !inside.some((o) => o !== b && b.path.startsWith(`${o.path}/`)),
+    )
+    // a child too small stays in what is left of its parent
+    let parts = under.filter((branch) => branch.weight >= goal / share)
+    // unless what is left is the heaviest thing on the board: a leftover box bigger than the
+    // boxes beside it is not a footnote, and 24 packages folded into `common/*` answer to a
+    // name nobody wrote. Open it on a lower bar rather than showing the sweep as a module
+    if (!parts.length) parts = under.filter((branch) => branch.weight >= goal / (share * 4))
     // a group of nothing but its own files cannot be opened any further
     if (!parts.length || chosen.size + parts.length > max) {
       stuck.add(worst)

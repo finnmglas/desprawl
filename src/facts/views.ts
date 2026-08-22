@@ -284,7 +284,13 @@ function wired(repo: string, ask: Asked) {
       ? [
           `${n(found.stats.endpoints)} endpoints, ${n(found.stats.clients)} call sites, ` +
             `${n(found.stats.linked)} of them land here and ${n(found.stats.outside)} go elsewhere` +
-            (found.stats.frameworks.length ? `, off ${found.stats.frameworks.join(", ")}` : ""),
+            (found.stats.frameworks.length ? `, off ${found.stats.frameworks.join(", ")}` : "") +
+            (found.stats.described
+              ? `. ${n(found.stats.described)} more are listed by a document that code here answers`
+              : "") +
+            (found.stats.unread
+              ? `. ${n(found.stats.unread)} call sites were written without a path to read`
+              : ""),
           "",
           grid([
             ["ENDPOINT", "VERB", "CALLED FROM", "BY", "WHERE"],
@@ -304,7 +310,7 @@ function wired(repo: string, ask: Asked) {
             ...sites
               .slice(0, take)
               .map((one) => [
-                cut(one.path, 44),
+                cut(one.name ?? one.path, 44),
                 one.method,
                 cut(one.host || "-", 24),
                 cut(to.get(one.id) ?? "outside", 36),

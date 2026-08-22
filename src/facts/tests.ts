@@ -4,7 +4,8 @@
 import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
-import { reading } from "../read/graph.ts"
+import { VENDORED, reading } from "../read/graph.ts"
+import { dialectOf } from "../read/dialects.ts"
 import { git, made, type Made } from "../read/model.ts"
 import { roleOf } from "../read/layers.ts"
 import { scrub } from "../read/specifiers.ts"
@@ -89,6 +90,8 @@ export function settle(
 
 // what a runner is asked to report with, absent a script
 const MEASURE: Record<string, string> = {
+  pytest: "pytest --cov --cov-report=lcov:coverage/lcov.info",
+  "go test": "go test ./... -coverprofile=coverage.out",
   vitest: "npx vitest run --coverage --coverage.reporter=lcov",
   jest: "npx jest --coverage --coverageReporters=lcov",
   "node:test":
@@ -99,6 +102,15 @@ const MEASURE: Record<string, string> = {
 
 // what declares a test, whichever runner is underneath
 const CASE = /(^|[\s;{}])(test|it)(\.\w+)?\s*\(/g
+
+// a suite no package.json describes: how its files are named, what declares a case in one,
+// and what would run them. A language desprawl reads is a language whose tests it can count
+// prettier-ignore
+const SUITES: [runner: string, named: RegExp, one: RegExp, ran: string][] = [
+  ["pytest", /(^|\/)(test_[^/]+|[^/]+_test)\.py$/, /^[^\S\n]*(?:async\s+)?def\s+test\w*\s*\(/gm, "pytest"],
+  ["go test", /_test\.go$/, /^func\s+(?:Test|Fuzz|Example)\w*\s*\(/gm, "go test ./..."],
+  ["cargo test", /\.rs$/, /#\[(?:\w+::)?test\]/g, "cargo test"],
+]
 const RUNNERS: [string, RegExp][] = [
   ["vitest", /^vitest$/],
   ["jest", /^jest$/],
@@ -124,8 +136,23 @@ function coverage(root: string): { made: Suite["coverage"]; from: string } {
       from: "coverage/coverage-summary.json",
     }
 
-  const lcov = join(root, "coverage", "lcov.info")
-  if (existsSync(lcov)) {
+  // coverage.py writes its own json, with the totals under one key
+  const python = reading(join(root, "coverage.json"))
+  if (python?.totals)
+    return {
+      made: {
+        lines: python.totals.percent_covered ?? 0,
+        statements: python.totals.percent_covered ?? 0,
+        branches: python.totals.percent_covered_branches ?? 0,
+        functions: 0,
+      },
+      from: "coverage.json",
+    }
+
+  const lcov = [join(root, "coverage", "lcov.info"), join(root, "coverage.lcov")].find((one) =>
+    existsSync(one),
+  )
+  if (lcov) {
     const text = readFileSync(lcov, "utf8")
     const add = (key: string) =>
       [...text.matchAll(new RegExp(`^${key}:(\\d+)$`, "gm"))].reduce((sum, m) => sum + +m[1], 0)
@@ -137,7 +164,7 @@ function coverage(root: string): { made: Suite["coverage"]; from: string } {
         branches: pct(add("BRH"), add("BRF")),
         functions: pct(add("FNH"), add("FNF")),
       },
-      from: "coverage/lcov.info",
+      from: lcov.slice(root.length + 1),
     }
   }
   return { made: null, from: "" }
@@ -159,15 +186,39 @@ export function tests(repo: string): Suite {
 
   let files = 0
   let cases = 0
-  for (const path of git(root, "ls-files", "-z")
-    .split("\0")
-    .filter((one) => one && roleOf(one) === "test" && /\.[cm]?[jt]sx?$/.test(one))) {
-    files++
+  const tracked = git(root, "ls-files", "-z").split("\0").filter(Boolean)
+  const code = (path: string) => {
     try {
-      cases += (scrub(readFileSync(join(root, path), "utf8")).code.match(CASE) ?? []).length
+      return scrub(readFileSync(join(root, path), "utf8"), dialectOf(path)?.flavour).code
     } catch {
       // unreadable is still a test file, it just contributes no cases
+      return ""
     }
+  }
+  for (const path of tracked)
+    if (roleOf(path) === "test" && /\.[cm]?[jt]sx?$/.test(path)) {
+      files++
+      cases += (code(path).match(CASE) ?? []).length
+    }
+
+  // and the suites written in every other language, which no manifest lists
+  let ran = ""
+  for (const [runner, named, one, run] of SUITES) {
+    let held = 0
+    let found = 0
+    for (const path of tracked) {
+      if (!named.test(path) || VENDORED.test(path)) continue
+      const count = (code(path).match(one) ?? []).length
+      // a rust file is a test file only where it holds one, since the name says nothing
+      if (!count && runner === "cargo test") continue
+      held++
+      found += count
+    }
+    if (!held) continue
+    runners.push(runner)
+    files += held
+    cases += found
+    ran ||= run
   }
 
   // a repo that already writes a report says how, and otherwise the runner decides
@@ -178,6 +229,7 @@ export function tests(repo: string): Suite {
         /--coverage|\bc8\b|\bnyc\b|experimental-test-coverage/.test(scripts[one]),
     ) ?? ""
   const made_ = MEASURE[runners[0] ?? ""] ?? ""
+  // a suite outside npm has no script to name, so what would run it is the whole answer
   const measured = measure
     ? scripts[measure]
     : made_ && runners[0] === "node:test" && script
@@ -189,7 +241,7 @@ export function tests(repo: string): Suite {
   return {
     ...made(root),
     script,
-    command: script ? scripts[script] : "",
+    command: script ? scripts[script] : ran,
     measure,
     measured,
     files,

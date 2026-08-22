@@ -242,6 +242,8 @@ export interface Stats extends Split {
   active: number[][]
   remotes: Remote[]
   languages: Node[] // folded, so they carry churn too
+  /** tracked files left out as somebody else's code, or by an exclude the reader gave */
+  skipped: number
   stack: Stack
   tree: Node
   series: Series[]

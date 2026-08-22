@@ -14,6 +14,7 @@ import { deps, joined } from "./facts/deps.ts"
 import { merged, tests } from "./facts/tests.ts"
 import { human, nest, pct, tokens } from "./facts/human.ts"
 import { VERSION, blank, git, merge } from "./read/model.ts"
+import { CODE } from "./read/scan.ts"
 import { explain, needs } from "./facts/needs.ts"
 import { isUrl, local } from "./serve/remote.ts"
 import { serve } from "./serve/serve.ts"
@@ -187,6 +188,15 @@ function branch(n: Node, total: number, level = 0): string[][] {
 const wrapped = (kind: string, repo: string, data: unknown) =>
   JSON.stringify({ desprawl: VERSION, kind, repo, made: new Date().toISOString(), data }, null, 2)
 
+/** how much of it is a language somebody writes, since json fixtures are not an ai cost */
+function written(s: Stats): string {
+  const code = s.languages.filter((one) => CODE.has(one.name))
+  const chars = code.reduce((sum, one) => sum + one.chars, 0)
+  if (!chars || chars === s.chars) return ""
+  const loc = code.reduce((sum, one) => sum + one.code, 0)
+  return `  code only: ${big(loc)} loc, ~${big(tokens(chars))} tokens`
+}
+
 function report(s: Stats): string {
   if (!s.files)
     return (
@@ -202,7 +212,8 @@ function report(s: Stats): string {
     `${s.repo}  @${s.head}`,
     `${big(s.code)} loc  ${big(s.comment)} comment (${pct(s.comment, source)} of source)  ` +
       `${big(s.blank)} blank  ${num(s.files)} files`,
-    `${big(s.chars)} chars  ~${big(tokens(s.chars))} tokens`,
+    `${big(s.chars)} chars  ~${big(tokens(s.chars))} tokens${written(s)}`,
+    ...(s.skipped ? [`${num(s.skipped)} files left out as somebody else's code`] : []),
     `${num(s.commits)} commits  ${num(s.contributors.length)} contributors  ` +
       `${day(s.first)} to ${day(s.last)}`,
     section(

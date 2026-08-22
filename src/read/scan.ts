@@ -4,6 +4,7 @@
 import { closeSync, openSync, readFileSync, readSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { blank, git } from "./model.ts"
+import { VENDORED } from "./graph.ts"
 import type { Node, Split } from "./model.ts"
 export { LANGS } from "./langs.ts"
 import { JS, LANGS, TS } from "./langs.ts"
@@ -34,6 +35,10 @@ const DOCS: Record<string, string> = {
   class: "Binary", jar: "Binary", pyc: "Binary", wasm: "WebAssembly",
   db: "Database", sqlite: "Database", sqlite3: "Database", mdb: "Database",
 }
+
+// binary by definition, whatever its first bytes look like: a pdf is ascii for pages before
+// its first null, and 19 of them read as a language called "pdf" on one workspace
+const BINARY = new Set(Object.keys(DOCS))
 
 // the other way a file says what it is
 const RUNS: Record<string, string> = {
@@ -127,26 +132,33 @@ function classify(text: string, lang: string): Split {
   return split
 }
 
-export function scan(repo: string): Node[] {
+/** somebody else's code, counted rather than dropped: a number nobody explains is a wrong one */
+export function scan(repo: string, exclude?: RegExp, skipped?: { files: number }): Node[] {
   const files: Node[] = []
+  if (skipped) skipped.files = 0
 
   for (const path of git(repo, "ls-files", "-z").split("\0").filter(Boolean)) {
+    // somebody else's code is not this project's size, its languages or its ai bill
+    if (VENDORED.test(path) || exclude?.test(path)) {
+      if (skipped) skipped.files++
+      continue
+    }
     const dot = path.lastIndexOf(".")
     const slash = path.lastIndexOf("/")
     const ext = dot > slash + 1 ? path.slice(dot + 1).toLowerCase() : ""
 
     const file = join(repo, path)
+    // a document has no lines to count, but it is still a file the repo carries
+    if (BINARY.has(ext)) {
+      files.push({ ...blank(path.slice(slash + 1), path), lang: DOCS[ext], files: 1, langs: {} })
+      continue
+    }
+
     // submodule, symlink and raced delete all come back null
     const peek = head(file)
     if (!peek) continue
-
-    // a document has no lines to count, but it is still a file the repo carries
-    if (peek.includes(0)) {
-      const kind = DOCS[ext]
-      if (kind)
-        files.push({ ...blank(path.slice(slash + 1), path), lang: kind, files: 1, langs: {} })
-      continue
-    }
+    // and everything else the sniff can tell is not text
+    if (peek.includes(0)) continue
 
     // a name we know beats an extension, or CMakeLists.txt would be txt
     const named = NAMES[path.slice(slash + 1).toLowerCase()]

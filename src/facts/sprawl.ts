@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { VENDORED } from "../read/graph.ts"
+import { roleOf } from "../read/layers.ts"
 import { specifiers } from "../read/specifiers.ts"
 
 export interface Said {
@@ -33,6 +34,8 @@ const RUN = 5
 const COMMON = 60
 
 const CODE = /\.(tsx?|jsx?|mts|cts)$/
+// a stub beside the thing it stands in for, which no folder name gives away
+const MOCK = /(^|\/|\.)(mock|mocks|stub|stubs|fake|fakes|fixture|fixtures)\.[cm]?[jt]sx?$/i
 // vendored code is somebody else's copy, and a minified file is one line
 const ours = (path: string) =>
   CODE.test(path) && !VENDORED.test(path) && !/\.min\.[jt]s$/.test(path)
@@ -48,6 +51,20 @@ const styled = (text: string): boolean => {
   return parts.length > 1 && parts.every((one) => UTILITY.test(one))
 }
 
+// a placeholder, a hash and a key: written by a machine for a machine, and never read
+const IDENT =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$|^[0-9a-f]{16,}$|^[A-Za-z0-9+/]{24,}={0,2}$/i
+
+/** vector art, coordinates and encoded blobs: nobody typed these, so nobody will name them */
+const data = (text: string): boolean => {
+  if (IDENT.test(text)) return true
+  // an svg path is a letter then numbers, over and over
+  if (/^[MmLlHhVvCcSsQqTtAaZz][\d\s.,-]/.test(text)) return true
+  const digits = (text.match(/[\d\s.,;:%#|/+_-]/g) ?? []).length
+  // more punctuation and digits than letters is a value, not a sentence
+  return digits / text.length > 0.6 && !/\s\w+\s\w+\s/.test(text)
+}
+
 function saidIn(text: string): string[] {
   const found: string[] = []
   // an import already names the module it asks for
@@ -57,6 +74,7 @@ function saidIn(text: string): string[] {
     if (one.length < LONG) continue
     // a path or a url is already the name of the thing
     if (/^[./~@]|^https?:|^node:/.test(one)) continue
+    if (data(one)) continue
     if (asked.has(one)) continue
     found.push(one)
   }
@@ -80,15 +98,19 @@ export function repeated(repo: string, paths: string[]): Said[] {
       else seen.set(one, [path])
     }
   }
-  return [...seen]
-    .map(([text, files]) => ({ text, files, times: files.length, styled: styled(text) }))
-    .filter(({ text, times, styled: look }) =>
-      look ? times >= WIDE && text.split(/\s+/).length >= FEW : times >= SPREAD,
-    )
-    .map(({ text, files, times, styled: look }) =>
-      look ? { text, files, times, styled: true as const } : { text, files, times },
-    )
-    .sort((a, b) => b.times * b.text.length - a.times * a.text.length)
+  return (
+    [...seen]
+      .map(([text, files]) => ({ text, files, times: files.length, styled: styled(text) }))
+      // a string only fixtures repeat is a fixture, whatever it says
+      .filter(({ files }) => files.some((one) => roleOf(one) !== "test" && !MOCK.test(one)))
+      .filter(({ text, times, styled: look }) =>
+        look ? times >= WIDE && text.split(/\s+/).length >= FEW : times >= SPREAD,
+      )
+      .map(({ text, files, times, styled: look }) =>
+        look ? { text, files, times, styled: true as const } : { text, files, times },
+      )
+      .sort((a, b) => b.times * b.text.length - a.times * a.text.length)
+  )
 }
 
 const bare = (line: string) => line.trim().replace(/\s+/g, " ")

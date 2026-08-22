@@ -4,6 +4,7 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { calls, TOP } from "../src/read/calls.ts"
+import { build } from "../src/read/graph.ts"
 import { REACHES, reachOf, reached, rings, twins } from "../src/read/reach.ts"
 import { repo } from "./repo.ts"
 
@@ -63,4 +64,52 @@ test("a ring needs two, since a call to itself is never recorded", () => {
   const found2 = rings(found)
   assert.equal(found2.length, 1, "recursing on itself is not a ring anything can see here")
   assert.deepEqual(found2[0].map((id) => id.split("#")[1]).sort(), ["ping", "pong"])
+})
+
+test("a value declared inline runs where it sits, and is never a delete task", () => {
+  const dir = repo({
+    "src/setup.ts": [
+      "import { stub } from './stub'",
+      "",
+      "stub('ResizeObserver', class ResizeObserver {",
+      "  observe() {}",
+      "})",
+      "",
+      "export function make() {",
+      "  return function isPersistableKey(key: string) {",
+      "    return key.length > 0",
+      "  }",
+      "}",
+      "",
+      "function reallyDead() {",
+      "  return 1",
+      "}",
+      "",
+    ].join("\n"),
+    "src/stub.ts":
+      "export function stub(name: string, made: unknown) {\n  return [name, made]\n}\n",
+  })
+  const found = calls(dir, build(dir))
+  const live = reached(found, true)
+  const of = (name: string) => reachOf(found.symbols[`src/setup.ts#${name}`], live)
+  assert.equal(of("ResizeObserver"), "runs", "a class passed as an argument is constructed")
+  assert.equal(of("isPersistableKey"), "runs", "a factory hands its return value on")
+  assert.equal(of("reallyDead"), "dead", "and a statement nothing reaches still is")
+})
+
+test("a caller through a star barrel is still a caller", () => {
+  const dir = repo({
+    "utils/datetime.ts": "export function formatAsUTCDate(at: string) {\n  return at\n}\n",
+    "utils/index.ts": "export * from './datetime'\n",
+    "app/page.ts": [
+      "import { formatAsUTCDate } from '../utils'",
+      "",
+      "export function show(at: string) {",
+      "  return formatAsUTCDate(at)",
+      "}",
+      "",
+    ].join("\n"),
+  })
+  const found = calls(dir, build(dir))
+  assert.deepEqual(found.symbols["utils/datetime.ts#formatAsUTCDate"].callers, ["app/page.ts#show"])
 })

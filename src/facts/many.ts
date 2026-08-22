@@ -5,6 +5,7 @@ import { existsSync, readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { analyze } from "./analyze.ts"
 import { build } from "../read/graph.ts"
+import { forget } from "../read/held.ts"
 import { calls } from "../read/calls.ts"
 import { near, norm } from "./history.ts"
 import { made, blank, merge, rank, VERSION } from "../read/model.ts"
@@ -312,6 +313,7 @@ export function many(
       repo: path,
       head: `${each.length} repos`,
       commits: each.reduce((sum, one) => sum + one.commits, 0),
+      skipped: each.reduce((sum, one) => sum + one.skipped, 0),
       truncated: each.some((one) => one.truncated),
       thin: each.some((one) => one.thin),
       contributors,
@@ -373,7 +375,10 @@ export function everyApi(path: string, only?: string[]): Api {
   const endpoints: Endpoint[] = []
   const clients: Client[] = []
   const hosts: string[] = []
+  let unread = 0
   for (const one of held(path, only)) {
+    // one repo's text is held while it is read, and dropped before the next one starts
+    forget()
     const under = named(one)
     const at = (file: string) => `${under}/${file}`
     const graph = build(one)
@@ -391,8 +396,9 @@ export function everyApi(path: string, only?: string[]): Api {
     )
     // a host one repo says it serves is that host for every repo beside it
     hosts.push(...found.hosts)
+    unread += found.unread
   }
-  return joined(endpoints, clients, hosts)
+  return joined(endpoints, clients, hosts, "", unread)
 }
 
 /** and every call graph, on the same prefixed keys */

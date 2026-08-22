@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path"
 import { made, git, type Made } from "./model.ts"
 import { declared, foreign, scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
 import { READS, candidates, dialectOf, type Dialect } from "./dialects.ts"
+import { reading as text, scrubbed } from "./held.ts"
 
 export interface Edge {
   to: string
@@ -58,8 +59,58 @@ export interface Graph extends Made {
 }
 
 const SOURCE = /\.(m|c)?(t|j)sx?$/
-export const VENDORED =
-  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|third_party|\.yarn|dist|build|out|coverage|\.next|\.nuxt|\.output)\//
+
+// somebody else's code, and build output. Neither is this project, and both drown it:
+// one repo committing its node_modules read as 437k lines for a fifteen file project.
+// The one copy every reader shares, since three that disagreed is how that happened.
+// A copy is a copy wherever it sits, but `build` and `out` are words a route uses too,
+// so output only counts near the top, where a build actually writes it
+// prettier-ignore
+const COPIES =
+  /(^|\/)(node_modules|bower_components|jspm_packages|web_modules|vendor|vendored|third_party|thirdparty|Godeps|Pods|Carthage|\.yarn|\.pnp|\.gradle|\.tox|\.venv|venv|virtualenv|site-packages|__pycache__|\.mypy_cache|\.pytest_cache|eggs|\.eggs)\/|(^|\/)wwwroot\/lib\/|(^|\/)[\w.-]*(theme|themes)\/[\w.-]*\/?(resources|static)\/lib\//
+// prettier-ignore
+const OUTPUT =
+  /^(?:[^/]+\/){0,2}(dist|build|out|target|coverage|\.next|\.nuxt|\.output|\.svelte-kit)\//
+
+export const VENDORED = {
+  test: (path: string) => COPIES.test(path) || OUTPUT.test(path),
+}
+
+/** a line of .desprawlignore as a pattern: `theme/`, `*.min.js`, `docs/**\/gen` */
+const globbed = (one: string): string =>
+  `${one.startsWith("/") ? "^" : "(^|/)"}${one
+    .replace(/^\//, "")
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*\//g, "\u0001")
+    .replace(/\*\*/g, "\u0002")
+    .replace(/\*/g, "[^/]*")
+    .replace(/\u0001/g, "(?:[^/]+/)*")
+    .replace(/\u0002/g, ".*")
+    .replace(/\?/g, "[^/]")}${one.endsWith("/") ? "" : "(/|$)"}`
+
+/**
+ * the one exclude a reader can write down. No heuristic covers a folder only this repo
+ * knows about, and until this existed the answer to a wrong number was nothing at all
+ */
+export function ignored(root: string): RegExp | undefined {
+  let text: string
+  try {
+    text = readFileSync(join(root, ".desprawlignore"), "utf8")
+  } catch {
+    return undefined
+  }
+  const lines = text
+    .split("\n")
+    .map((one) => one.replace(/#.*$/, "").trim())
+    .filter(Boolean)
+  if (!lines.length) return undefined
+  try {
+    return new RegExp(lines.map(globbed).join("|"))
+  } catch {
+    // a pattern that will not compile excludes nothing, rather than everything
+    return undefined
+  }
+}
 
 // the order typescript probes in
 const TRIES = [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"]
@@ -271,10 +322,11 @@ function naming(root: string, tracked: Set<string>): Map<string, string> {
 
 export function build(repo: string): Graph {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
+  const skip = ignored(root)
   const tracked = new Set(
     git(root, "ls-files", "-z")
       .split("\0")
-      .filter((p) => p && !VENDORED.test(p)),
+      .filter((p) => p && !VENDORED.test(p) && !skip?.test(p)),
   )
   // a bundle is output, never a module of its own
   const sources = [...tracked].filter(
@@ -321,12 +373,8 @@ export function build(repo: string): Graph {
 
   for (const from of sources) {
     const full = join(root, from)
-    let source = ""
-    try {
-      source = readFileSync(full, "utf8")
-    } catch {
-      continue
-    }
+    const source = text(full)
+    if (!source) continue
 
     const dialect = dialectOf(from)
     modules[from].lines = source.split("\n").length
@@ -334,7 +382,7 @@ export function build(repo: string): Graph {
 
     // a language of its own: its specifiers name paths through its own idea of a project
     if (dialect && dialect.id !== "ts") {
-      const done = scrub(source, dialect.flavour)
+      const done = scrubbed(full, dialect.flavour)
       modules[from].symbols = counted(done.code, dialect)
       for (const spec of foreign(source, dialect, done)) {
         if (!spec.guess) seen++

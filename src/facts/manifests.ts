@@ -141,13 +141,24 @@ function python(root: string, path: string): Read {
     // [project.optional-dependencies] and [tool.poetry.group.dev.dependencies]
     if (!/optional-dependencies|group\..*\.dependencies|^tool\.poetry\.dependencies$/.test(name))
       continue
-    const dev = /dev|test|lint|doc/i.test(name)
-    const body = lines.join("\n")
-    for (const one of body.match(/"[^"]+"/g) ?? []) {
-      const held_ = requirement(one.replace(/"/g, ""))
-      if (held_) asked.push({ ...held_, dev })
-    }
+    // an extra is `dev = ["pytest"]`: the key names the group, the strings name the packages
+    const extras = /optional-dependencies$/.test(name)
+    let group = ""
     for (const line of lines) {
+      if (extras) {
+        const head = /^([\w.-]+)\s*=/.exec(line)?.[1]
+        if (head) group = head
+        for (const one of line.match(/"[^"]+"/g) ?? []) {
+          const held_ = requirement(one.replace(/"/g, ""))
+          if (held_) asked.push({ ...held_, dev: /dev|test|lint|doc/i.test(group) })
+        }
+        continue
+      }
+      const dev = /dev|test|lint|doc/i.test(name)
+      for (const one of line.match(/"[^"]+"/g) ?? []) {
+        const held_ = requirement(one.replace(/"/g, ""))
+        if (held_) asked.push({ ...held_, dev })
+      }
       const one = named(line)
       if (one && one !== "python")
         asked.push({ name: one, range: range(line), dev, ecosystem: "PyPI" })

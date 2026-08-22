@@ -32,6 +32,8 @@ export interface Client {
   framework: string
   /** the host it names, when it names one */
   host: string
+  /** what it asks for when the path does not say: a graphql operation */
+  name?: string
 }
 
 /** one call site reaching one endpoint, which is the edge drawn in red */
@@ -52,6 +54,10 @@ export interface Api extends Made {
   links: Link[]
   stats: {
     endpoints: number
+    /** listed by a document that code elsewhere answers, so folded into the code */
+    described: number
+    /** shaped like a request, but the path was not written where the call was made */
+    unread: number
     clients: number
     /** call sites that found an endpoint here */
     linked: number
@@ -69,6 +75,13 @@ export function normal(raw: string): { path: string; host: string } {
   if (url) {
     host = url[1]
     text = url[2] ?? "/"
+  }
+  // a collection writes the service it asks as a variable, and that names a host, not a segment
+  const named = /^\{\{\s*([\w.-]+)\s*\}\}(?=$|[/?#])/.exec(text)
+  if (!url && named) {
+    // starred the way a path hole is, since which host it stands for is not written down
+    host = `*${named[1]}`
+    text = text.slice(named[0].length) || "/"
   }
   // a regex route holds a question mark of its own, so the holes go before the query does
   text = text.replace(/\\\//g, "/").replace(HOLE, "*")
@@ -189,8 +202,11 @@ function events(text: string): { path: string; method: string; line: number }[] 
 }
 
 /** every request a collection file holds, whichever tool wrote it */
-function asked(kind: string, text: string): { url: string; method: string; line: number }[] {
-  const found: { url: string; method: string; line: number }[] = []
+function asked(
+  kind: string,
+  text: string,
+): { url: string; method: string; line: number; name?: string }[] {
+  const found: { url: string; method: string; line: number; name?: string }[] = []
   const lineOf = (index: number) => text.slice(0, index).split("\n").length
   if (kind === "rest")
     for (const m of text.matchAll(
@@ -199,12 +215,19 @@ function asked(kind: string, text: string): { url: string; method: string; line:
       found.push({ url: m[2], method: m[1], line: lineOf(m.index) })
   if (kind === "bruno") {
     const verb = /^\s*(get|post|put|patch|delete|head|options)\s*\{/m.exec(text)
+    // graphql puts nothing in its url: the operation in the body is what it asks for
+    const gql =
+      /^\s*body\s*:\s*graphql\b/m.test(text) || /\btype\s*:\s*graphql\b/.test(text)
+        ? (/\b(query|mutation|subscription)\s+(\w+)/.exec(text)?.slice(1, 3).join(" ") ??
+          /^\s*name\s*:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim())
+        : ""
     // an empty url line reads the next key as its value
     for (const m of text.matchAll(/^\s*url\s*:[^\S\n]*(\S*[/{][^\s]*)/gm))
       found.push({
         url: m[1],
         method: (verb?.[1] ?? "any").toUpperCase(),
         line: lineOf(m.index),
+        name: gql || "",
       })
   }
   if (kind === "postman") {
@@ -339,16 +362,18 @@ export function specs(
     }
     for (const one of asked(what, text)) {
       const { path: held, host } = normal(one.url)
-      if (held === "/") continue
+      // a request naming no path at all says nothing, unless its operation names it
+      if (held === "/" && !one.name) continue
       clients.push({
-        id: `${path}:${one.line}:${verbOf(one.method)}:${held}`,
+        id: `${path}:${one.line}:${verbOf(one.method)}:${one.name || held}`,
         file: path,
         line: one.line,
         method: verbOf(one.method),
         path: held,
         raw: one.url,
-        framework: what,
+        framework: one.name ? "graphql" : what,
         host,
+        ...(one.name ? { name: one.name } : {}),
       })
     }
   }

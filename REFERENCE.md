@@ -39,8 +39,8 @@ Analyze git-tracked repos (files, history, imports, calls):
 - **imports** are graphed, mapped and structured into groups logically to show module structure
 - **cycles** read off the files themselves (so nothing invented or lost)
 - **calls** followed from what runs, naming hotspots, unreachable code, recursion and repeated names
-- **dependencies** licence of every installed package + version advisories
-- **tests** counted read-only, run from interface w/ coverage
+- **dependencies** licence of every installed package + version advisories, off `node_modules` and off the `.dist-info` in a python venv, with lockfiles pinning what is not installed
+- **tests** counted read-only in every language it reads, run from interface w/ coverage where a manifest script runs them
 - **actions** git and scripts a repo declares, servers controllable from panel
 - **tasks** what to clean up, sized, each handed to an agent that streams back into the panel
 - **search** one box finds any panel by what it is called and what it holds
@@ -93,6 +93,8 @@ desprawl [cli|view] [path|url] [--static] [--anon] [--out FILE] [--keep] [--dept
 | `--raw`       | exact numbers instead of scaled ones                                                                                                                                                                                                                                                 |
 | `--json`      | machine readable, numbers exact, wrapped in an envelope saying which desprawl wrote it                                                                                                                                                                                               |
 | `--base REF`  | what `check` compares against                                                                                                                                                                                                                                                        |
+
+Somebody else's code is left out of every number: `node_modules`, a vendored copy, a venv, build output near the top of the tree. The masthead says how many files that was rather than quietly dropping them. For the folder no heuristic will know about, write a **`.desprawlignore`** beside the repo, in gitignore shape (`theme/`, `*.min.js`, `docs/**/generated`); the stats and the graph both honour it.
 
 `desprawl` opens interface locally, reanalysing on request. Binds `127.0.0.1:7423`, falling back to a free port when that one is taken. Settings saved between runs. Closing tab ends the tool, nothing is left listening, `--keep` turns that off.
 

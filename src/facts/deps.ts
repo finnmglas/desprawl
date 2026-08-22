@@ -1,7 +1,7 @@
 // owner: finn
 // goal: what each dependency is licensed as, and what is filed against it
 
-import { readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
+import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
 import { join } from "node:path"
 import { made, git, type Made } from "../read/model.ts"
 export { familyOf, type Family } from "./licence.ts"
@@ -170,6 +170,113 @@ function tree(root: string): Map<string, Held> {
   return found
 }
 
+/** pep 503: pillow, Pillow and pillow_heif's `pillow-heif` are one name written four ways */
+const same = (name: string) => name.toLowerCase().replace(/[-_.]+/g, "-")
+
+const read = (path: string): string => {
+  try {
+    return readFileSync(path, "utf8")
+  } catch {
+    return ""
+  }
+}
+
+/** what a package says it is licensed as, in the three places a wheel may write it */
+function licenceOf(text: string): string {
+  const said = /^License-Expression:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
+  if (said) return said
+  const filed = /^Classifier: License :: (?:OSI Approved :: )?(.+)$/m.exec(text)?.[1]?.trim()
+  if (filed && filed !== "OSI Approved") return filed
+  // and the free text field, which holds a whole licence as often as its name
+  const plain = /^License:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim() ?? ""
+  return /^[\w.\-+ ()]{1,32}$/.test(plain) ? plain : ""
+}
+
+/** every folder a virtualenv keeps its packages in, at the repo root or one level under */
+function sites(root: string): string[] {
+  const found: string[] = []
+  const look = (at: string) => {
+    for (const name of [".venv", "venv", "env"])
+      for (const lib of ["lib", "Lib"]) {
+        const base = join(at, name, lib)
+        let listed: string[]
+        try {
+          listed = readdirSync(base)
+        } catch {
+          continue
+        }
+        // posix nests one python version deep, windows does not
+        for (const one of listed.includes("site-packages") ? [""] : listed) {
+          const site = join(base, one, "site-packages")
+          try {
+            if (statSync(site).isDirectory()) found.push(site)
+          } catch {
+            // not this one
+          }
+        }
+      }
+  }
+  look(root)
+  try {
+    for (const one of readdirSync(root, { withFileTypes: true }))
+      if (one.isDirectory() && one.name !== "node_modules") look(join(root, one.name))
+  } catch {
+    // no repo to walk
+  }
+  return found
+}
+
+/** the dist-info beside every installed python package: its version, licence and size */
+function pythons(root: string): Map<string, Held> {
+  const found = new Map<string, Held>()
+  for (const site of sites(root)) {
+    let listed: string[]
+    try {
+      listed = readdirSync(site)
+    } catch {
+      continue
+    }
+    for (const entry of listed) {
+      if (!entry.endsWith(".dist-info")) continue
+      const text = read(join(site, entry, "METADATA"))
+      const name = /^Name:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
+      const version = /^Version:[^\S\n]*(.+)$/m.exec(text)?.[1]?.trim()
+      if (!name || !version) continue
+      // RECORD lists every file it installed and how many bytes each one is
+      const bytes = [...read(join(site, entry, "RECORD")).matchAll(/,(\d+)\s*$/gm)].reduce(
+        (sum, one) => sum + Number(one[1]),
+        0,
+      )
+      found.set(`${same(name)}@${version}`, {
+        ecosystem: "PyPI",
+        name,
+        version,
+        license: licenceOf(text),
+        needs: [...text.matchAll(/^Requires-Dist:[^\S\n]*([A-Za-z0-9._-]+)/gm)].map((one) =>
+          same(one[1]),
+        ),
+        bytes,
+        top: true,
+      })
+    }
+  }
+  return found
+}
+
+/** a lockfile pins what no venv on disk can be asked: `[[package]]` per package, toml or not */
+function locked(root: string, tracked: string[]): Map<string, string> {
+  const found = new Map<string, string>()
+  for (const path of tracked.filter((one) => /(^|\/)(uv|poetry)\.lock$/.test(one)))
+    for (const block of read(join(root, path))
+      .split(/^\[\[package\]\]$/m)
+      .slice(1)) {
+      const name = /^name\s*=\s*"([^"]+)"/m.exec(block)?.[1]
+      const version = /^version\s*=\s*"([^"]+)"/m.exec(block)?.[1]
+      if (name && version && !found.has(same(name))) found.set(same(name), version)
+    }
+  return found
+}
+
 /** the one version a range names, when it names exactly one */
 const pinned = (range: string): string =>
   /^[=~^]?v?(\d+\.\d+(\.\d+)?)$/.exec(range.trim())?.[1] ?? ""
@@ -331,16 +438,52 @@ export async function deps(repo: string): Promise<Deps> {
   if (!list.length)
     list.push(...[...wanted].map(([name, dev]) => blank(name, range(name), dev, "npm")))
 
-  // nothing on disk, so the range is all there is
   const tracked = git(root, "ls-files", "-z").split("\0").filter(Boolean)
   const found = manifests(root, tracked).filter((one) => one.path !== "package.json")
   // a crate or module this repo itself builds is not something it depends on
   const own = new Set(found.map((one) => one.name).filter(Boolean) as string[])
+  // what a venv holds is the python half of what node_modules holds
+  const asked = new Map<string, boolean>()
   for (const one of found)
-    for (const asked of one.asked) {
-      if (own.has(asked.name) || list.some((held) => held.name === asked.name)) continue
-      list.push(blank(asked.name, asked.range, asked.dev, asked.ecosystem))
+    for (const dep of one.asked) if (one.kind === "python") asked.set(same(dep.name), dep.dev)
+  const pinned_ = locked(root, tracked)
+  const site = pythons(root)
+  const shipped = new Set<string>()
+  for (const one of site.values())
+    if (asked.get(same(one.name)) === false) shipped.add(same(one.name))
+  for (const one of site.values())
+    if (shipped.has(same(one.name))) for (const next of one.needs) shipped.add(next)
+  for (const one of site.values())
+    list.push({
+      ...one,
+      range: "",
+      // nothing that ships reaches it, however it got installed
+      dev: !shipped.has(same(one.name)),
+      direct: asked.has(same(one.name)),
+      released: "",
+      used: "",
+      latest: "",
+      advisories: [],
+    })
+
+  // nothing on disk, so a lockfile, and then the range, is all there is
+  for (const one of found)
+    for (const dep of one.asked) {
+      const key = same(dep.name)
+      if (own.has(dep.name) || list.some((held) => same(held.name) === key)) continue
+      const held = blank(dep.name, dep.range, dep.dev, dep.ecosystem)
+      // a lock pins exactly what a venv would have installed, which osv can be asked about
+      if (dep.ecosystem === "PyPI") held.version = pinned_.get(key) ?? ""
+      list.push(held)
     }
+  for (const [name, version] of pinned_) {
+    if (list.some((held) => same(held.name) === name)) continue
+    // a lock names what was resolved, and nothing there says this repo asked for it
+    const held = blank(name, "", true, "PyPI")
+    held.version = version
+    held.direct = false
+    list.push(held)
+  }
 
   let offline = false
   let missed = 0

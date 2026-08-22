@@ -62,3 +62,52 @@ test("only the copy the manifest resolved to is direct", async () => {
   assert.equal(at("vite", "7.3.6")?.dev, true, "a dev dependency says so")
   assert.equal(at("lodash", "4.17.21")?.direct, false, "nothing here asked for it")
 })
+
+test("a venv is read the way node_modules is, and a lock pins what no venv holds", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "desprawl-venv-"))
+  const site = join(dir, ".venv", "lib", "python3.12", "site-packages")
+  const put = (path: string, text: string) => {
+    mkdirSync(join(site, path.split("/")[0]), { recursive: true })
+    writeFileSync(join(site, path), text)
+  }
+  put(
+    "fastapi-0.110.0.dist-info/METADATA",
+    "Name: fastapi\nVersion: 0.110.0\nClassifier: License :: OSI Approved :: MIT License\nRequires-Dist: pydantic >=1.7.4\n",
+  )
+  put("fastapi-0.110.0.dist-info/RECORD", "fastapi/__init__.py,sha256=a,1024\nfastapi/m.py,,2048\n")
+  // the free text field holds a whole licence as often as its name, so a classifier wins
+  put(
+    "pydantic-2.6.4.dist-info/METADATA",
+    "Name: pydantic\nVersion: 2.6.4\nLicense: The MIT License (MIT)\n\nCopyright (c) 2017 to present.\nClassifier: License :: OSI Approved :: MIT License\n",
+  )
+  put("pytest-8.1.1.dist-info/METADATA", "Name: pytest\nVersion: 8.1.1\nLicense-Expression: MIT\n")
+  writeFileSync(
+    join(dir, "pyproject.toml"),
+    '[project]\nname = "svc"\ndependencies = ["fastapi>=0.110"]\n\n[project.optional-dependencies]\ndev = ["pytest"]\n',
+  )
+  writeFileSync(
+    join(dir, "uv.lock"),
+    'version = 1\n\n[[package]]\nname = "fastapi"\nversion = "0.110.0"\n\n[[package]]\nname = "httpx"\nversion = "0.27.0"\n',
+  )
+  writeFileSync(join(dir, "app.py"), "def go():\n    return 1\n")
+  execFileSync("git", ["init", "-q"], { cwd: dir })
+  execFileSync("git", ["add", "-A"], { cwd: dir })
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"], {
+    cwd: dir,
+  })
+
+  const found = await deps(dir)
+  rmSync(dir, { recursive: true, force: true })
+  const by = (name: string) => found.list.find((one) => one.name === name)!
+  assert.equal(by("fastapi").version, "0.110.0")
+  assert.equal(by("fastapi").license, "MIT License")
+  assert.equal(by("fastapi").bytes, 3072, "RECORD says how many bytes it put on disk")
+  assert.ok(by("fastapi").direct)
+  assert.equal(by("pydantic").license, "MIT License")
+  assert.equal(by("pydantic").direct, false, "nothing here asked for it, fastapi did")
+  assert.equal(by("pytest").license, "MIT")
+  assert.ok(by("pytest").dev, "an extra called dev is a dev dependency")
+  assert.equal(by("httpx").version, "0.27.0", "the lock pins what the venv never installed")
+  assert.equal(by("httpx").direct, false)
+  assert.ok(!found.list.some((one) => one.name === "dev"), "an extras group is not a package")
+})

@@ -248,3 +248,35 @@ test("a group says whether one file is carrying its shape", () => {
   assert.equal(hub.without.into, 0, "and without it nothing arrives at the group at all")
   assert.equal(hub.without.out, 6, "while the rest still reaches out")
 })
+
+test("a folder writes its suites with underscores, and none of them is source", () => {
+  for (const path of [
+    "e2e_tests/flow.py",
+    "end_to_end_tests/flow.py",
+    "manual_testing/poke.py",
+    "load_testing/hit.py",
+    "e2e-tests/flow.ts",
+    "svc/test_helpers/one.py",
+  ])
+    assert.equal(roleOf(path), "test", path)
+  for (const path of ["archive/old.py", "documentations/spec.md"])
+    assert.equal(roleOf(path), "support", path)
+  // and a word that merely ends in one of those is still somebody's code
+  for (const path of ["src/latest/one.ts", "src/contest/two.ts", "scripts/paper-test/README.md"])
+    assert.notEqual(roleOf(path), "test", path)
+})
+
+test("a leftover box bigger than the boxes beside it is opened, not shown as a module", () => {
+  const files: Record<string, string> = { "package.json": "{}" }
+  // one named child that clears the bar, and eight small ones that would sweep together
+  for (let i = 0; i < 14; i++) files[`common/big/one${i}.ts`] = "export const a = 1\n".repeat(30)
+  for (const name of ["alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta"])
+    for (let i = 0; i < 3; i++)
+      files[`common/${name}/one${i}.ts`] = "export const a = 1\n".repeat(20)
+  files["app/main.ts"] = 'import "../common/big/one0"\n'.repeat(1)
+  const graph = build(repo(files))
+  const held = new Set(Object.values(balanced(graph)))
+  assert.ok(held.has("common/alpha"), `alpha stands on its own, found ${[...held].join(", ")}`)
+  const loose = Object.values(balanced(graph)).filter((one) => one === "common/*").length
+  assert.ok(loose < 14, `what is left of common is a footnote, not ${loose} files`)
+})

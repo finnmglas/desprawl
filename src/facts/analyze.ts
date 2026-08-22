@@ -4,6 +4,7 @@
 import { history } from "./history.ts"
 import { VERSION, fold, git, grow } from "../read/model.ts"
 import { scan } from "../read/scan.ts"
+import { ignored } from "../read/graph.ts"
 import { stack } from "./stack.ts"
 import type { Remote, Stats } from "../read/model.ts"
 
@@ -36,10 +37,11 @@ function remotes(repo: string): Remote[] {
   return [...found.values()]
 }
 
-export function analyze(repo: string, cap?: number): Stats {
+export function analyze(repo: string, cap?: number, exclude?: RegExp): Stats {
   const root = git(repo, "rev-parse", "--show-toplevel").trim()
   const head = git(root, "rev-parse", "--short", "HEAD").trim()
-  const files = scan(root)
+  const skipped = { files: 0 }
+  const files = scan(root, exclude ?? ignored(root), skipped)
   const { byPath, byWho, ...hist } = history(root, cap)
   for (const f of files) Object.assign(f, byPath.get(f.path), { by: byWho.get(f.path) ?? {} })
 
@@ -58,6 +60,7 @@ export function analyze(repo: string, cap?: number): Stats {
     stack: stack(root, languages),
     tree,
     remotes: remotes(root),
+    skipped: skipped.files,
     ...totals,
   }
 }

@@ -48,7 +48,8 @@ const ENDS: Column<Served>[] = [
 // prettier-ignore
 const SITES: Column<Asked>[] = [
   { key: "method", label: "verb", get: (one) => one.method, cell: (one) => VERB(one.method), left: true },
-  { key: "path", label: "path", get: (one) => one.path, cell: (one) => PATH(one.path) },
+  // a graphql call carries its operation, since its path says nothing about what it asks
+  { key: "path", label: "path", get: (one) => one.name ?? one.path, cell: (one) => PATH(one.name ?? one.path) },
   { key: "host", label: "host", get: (one) => one.host || "", cell: (one) => one.host || "-" },
   { key: "reaches", label: "reaches", get: (one) => one.reaches || "outside",
     cell: (one) => one.reaches ? FILE(one.reaches) : <span className="text-muted-foreground">outside</span> },
@@ -92,7 +93,11 @@ export function ApiTables({ routes }: { routes: Api | null }) {
         <Section id="table_requests">
           <DataTable
             title="Call sites"
-            hint="every http request this code makes, and the endpoint it lands on when one is here"
+            hint={`every http request this code makes, and the endpoint it lands on when one is here${
+              routes.stats.unread
+                ? `. ${routes.stats.unread} more were written without a path to read, through a wrapper or a constant`
+                : ""
+            }`}
             rows={asked}
             id={(one) => one.id}
             columns={SITES}

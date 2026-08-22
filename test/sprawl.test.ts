@@ -105,3 +105,38 @@ test("a file that is mostly prose is one to read, a commented one is not", () =>
   )
   assert.ok(found[0].share > 0.9)
 })
+
+test("what a machine wrote never outranks what a person typed", () => {
+  const svg = "M3.56877 17.1909C3.64064 17.4532 3.91564 17.6106 4.1812 17.5417"
+  const uuid = "11111111-1111-4111-8111-111111111111"
+  const copy = "Daten konnten nicht geladen werden."
+  const held = (text: string) => `export const one = "${text}"\n`
+  const found = repeated(
+    ...(() => {
+      const dir = repo({
+        "src/a.tsx": held(svg) + held(copy),
+        "src/b.tsx": held(svg) + held(copy),
+        "src/c.tsx": held(svg) + held(copy),
+        "src/data/mock.ts": held(uuid),
+        "src/data/other.mock.ts": held(uuid),
+        "src/data/third.mock.ts": held(uuid),
+      })
+      return [
+        dir,
+        [
+          "src/a.tsx",
+          "src/b.tsx",
+          "src/c.tsx",
+          "src/data/mock.ts",
+          "src/data/other.mock.ts",
+          "src/data/third.mock.ts",
+        ],
+      ] as const
+    })(),
+  )
+  assert.deepEqual(
+    found.map((one) => one.text),
+    [copy],
+    "an svg path is vector art and a placeholder uuid is a fixture, neither is copy",
+  )
+})

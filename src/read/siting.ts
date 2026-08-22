@@ -14,6 +14,8 @@ export interface Symbol {
   /** lines its body spans */
   lines: number
   exported: boolean
+  /** declared where a value goes, so the line holding it reaches it */
+  value?: boolean
   /** what it reaches, and what reaches it */
   calls: string[]
   callers: string[]
@@ -45,6 +47,8 @@ export interface Sited {
   reaches: Set<string>
   /** what the file's imports bind, per file, so a re-export can be followed */
   bindings: Map<string, Map<string, { file?: string; name: string; pkg?: string; type?: boolean }>>
+  /** and the files a barrel forwards without naming, since `export *` writes no name down */
+  doors: Map<string, string[]>
   /** values a file binds that are not declarations, like state setters */
   locals: Map<string, Set<string>>
   /** the parameters of this body, which name themselves rather than anything outside */
@@ -56,7 +60,7 @@ export interface Sited {
 /** the runtime names it reached for, which is what coverage counts against */
 export function siting(symbol: Symbol, body: string, at: Sited): number {
   const { file, lang, top, owns, runtime, symbols, declares, bindings, locals, takes } = at
-  const { reaches, link, lost } = at
+  const { reaches, doors, link, lost } = at
   const local = bindings.get(file)!
   let builtin = 0
   const seen = new Set<string>()
@@ -117,7 +121,14 @@ export function siting(symbol: Symbol, body: string, at: Sited): number {
       let target = symbols[`${at}#${called}`] ?? symbols[`${at}#${name}`]
       for (let hop = 0; !target && hop < 4; hop++) {
         const onward = bindings.get(at)?.get(called)
-        if (!onward?.file) break
+        // a star re-export names nothing, so the name is looked for in what it forwards
+        if (!onward?.file) {
+          const through = doors.get(at)?.find((one) => symbols[`${one}#${called}`])
+          if (!through) break
+          at = through
+          target = symbols[`${at}#${called}`]
+          continue
+        }
         called = onward.name === "default" || onward.name === "*" ? called : onward.name
         at = onward.file
         target = symbols[`${at}#${called}`]

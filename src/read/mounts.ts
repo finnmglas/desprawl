@@ -1,7 +1,7 @@
 // owner: finn
 // goal: where a route is mounted: the folders themselves, or whatever the app was handed
 
-import { readFileSync } from "node:fs"
+import { reading } from "./held.ts"
 import { join } from "node:path"
 import { foreign, specifiers } from "./specifiers.ts"
 import { dialectOf } from "./dialects.ts"
@@ -111,12 +111,8 @@ export function wiring(repo: string, graph: Graph): Map<string, Map<string, stri
   const all = new Map<string, Map<string, string>>()
   for (const module of Object.values(graph.modules)) {
     const local = new Map<string, string>()
-    let text = ""
-    try {
-      text = readFileSync(join(repo, module.path), "utf8")
-    } catch {
-      continue
-    }
+    const text = reading(join(repo, module.path))
+    if (!text) continue
     const dialect = dialectOf(module.path)
     if (dialect && dialect.id !== "ts") {
       for (const spec of foreign(text, dialect)) {
