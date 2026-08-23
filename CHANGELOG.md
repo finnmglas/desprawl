@@ -27,6 +27,8 @@ Notable changes per release. Dates are the day the tag shipped.
 
 - **A graphql request is named by its operation.** A collection of them used to read as N copies of `POST /*`, since graphql puts nothing in its url. A `{{Host}}` variable now names a host rather than folding into the path as a phantom first segment.
 
+- **The timeline has a second axis.** A share says how a shape moved and nothing about its size, so where one of the drawn series counts lines the right hand axis reads those same heights back as lines, in the colour of the series it belongs to. It says nothing below the axis, where nothing it counts goes, and both axes stand on one scale so a height means the same on either side.
+
 - **Every KPI says which way it went.** An arrow to the right of the number, green rising, red falling, a grey dash when a window passed and nothing moved, over a window the ellipsis menu sets: none, 24h, 7d, a month, a rolling year or the year so far. Lines and commits come off the daily log. The other twenty cannot: comments, characters, imports, resolution, declarations, calls, unreachable code, recursion, module groups, cycles, tasks and the rest are read off a throwaway checkout of the commit the window opens on, and counted by the same lines that count today's. One checkout per commit, made when a tab asks and not before, live runs only. A saved page keeps the two the log knows and shows no arrow on the rest, rather than a number nobody measured.
 
 ### Fixed

@@ -19,6 +19,8 @@ export interface Spec {
   down?: boolean
   /** a headcount is not a volume, so it is a line with nothing filled under it */
   heads?: boolean
+  /** what it counts, where that is a thing an axis of its own can be read in */
+  unit?: "lines"
 }
 
 // one definition, the tables use these too
@@ -40,6 +42,7 @@ export const SERIES: Record<string, Spec> = {
     group: "changes",
     how: "sum",
     about: "lines inserted",
+    unit: "lines",
   },
   removed: {
     label: "removed",
@@ -48,6 +51,7 @@ export const SERIES: Record<string, Spec> = {
     down: true,
     how: "sum",
     about: "lines deleted, drawn below the axis",
+    unit: "lines",
   },
   lines: {
     label: "net lines",
@@ -55,6 +59,7 @@ export const SERIES: Record<string, Spec> = {
     group: "lines",
     how: "last",
     about: "insertions minus deletions accumulated, a growth curve rather than a true size",
+    unit: "lines",
   },
   size: {
     label: "git_byte_size",
@@ -219,6 +224,15 @@ export function rows(
   }
 
   return finish({ groups, raw }, picked, curve, shares)
+}
+
+/** what a group's hundred percent stands for, so a share can be read back in what it counts */
+export function peakOf(rows: Row[], keys: string[], group: string): number {
+  const held = keys.filter((key) => SERIES[key].group === group)
+  let peak = 0
+  for (const row of rows)
+    for (const key of held) peak = Math.max(peak, Math.abs(Number(row[`${key}_raw`] ?? 0)))
+  return peak
 }
 
 // magnitudes differ across groups, so each is drawn against its own peak

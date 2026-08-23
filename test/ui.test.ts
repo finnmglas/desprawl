@@ -9,7 +9,7 @@ import { place } from "../ui/lib/draw/lanes.ts"
 import { effective, shares } from "../ui/lib/draw/scale.ts"
 import { asMatrix, type Column } from "../ui/lib/text/columns.ts"
 import { bucket, defaultGrain, grainsFor, nearestGrain } from "../ui/lib/text/format.ts"
-import { expand, rows } from "../ui/lib/draw/series.ts"
+import { expand, peakOf, rows } from "../ui/lib/draw/series.ts"
 import { daysBack, moved } from "../ui/lib/text/trend.ts"
 import { isId, nameOf, namesOf } from "../src/read/naming.ts"
 import { FORMATS } from "../ui/lib/text/formats.ts"
@@ -80,6 +80,21 @@ test("the size series stays empty until the samples arrive", () => {
   assert.equal(filled(rows(stats, expand(["size"]), "day", "linear", null)), 0)
   const samples = [{ date: stats.first.slice(0, 10), bytes: 10 }]
   assert.ok(filled(rows(stats, expand(["size"]), "day", "linear", null, samples)) > 0)
+})
+
+test("a share can be read back as the thing it is a share of", () => {
+  const stats = analyze(
+    repo({ "a.ts": "one\n" }, { "a.ts": "one\ntwo\nthree\n" }, { "a.ts": "one\n" }),
+  )
+  const keys = expand(["commits", "lines"])
+  const out = rows(stats, keys, "day", "linear", null)
+  const peak = peakOf(out, keys, "lines")
+  assert.ok(peak > 0, "the peak is what a hundred percent stands for")
+  for (const row of out) {
+    if (typeof row.lines !== "number") continue
+    // what the right hand axis does at every tick, against the number it was drawn from
+    assert.equal(Math.round((row.lines / 100) * peak), row.lines_raw, `${row.day} reads back`)
+  }
 })
 
 test("days become weeks and months as a repo ages", () => {

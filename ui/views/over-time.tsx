@@ -25,7 +25,7 @@ import {
 } from "../components/atoms/chart.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Working, useSlow } from "../components/atoms/working.tsx"
-import { untransform } from "../lib/draw/curve.ts"
+import { transform, untransform } from "../lib/draw/curve.ts"
 import { useDisplay } from "../lib/app/display.tsx"
 import {
   defaultGrain,
@@ -38,7 +38,7 @@ import {
 } from "../lib/text/format.ts"
 
 import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/app/live.ts"
-import { GROUPS, SERIES, expand, rows } from "../lib/draw/series.ts"
+import { GROUPS, SERIES, expand, peakOf, rows } from "../lib/draw/series.ts"
 import { cn } from "../lib/app/ui.ts"
 import type { Grain } from "../lib/text/format.ts"
 import type { Hours, Timeline } from "../../src/facts/samples.ts"
@@ -177,6 +177,33 @@ export function OverTime({
     ]),
   ]
   const share = picked.length > 1
+  // a share says how a shape moved and nothing about its size, so where one of the series
+  // counts lines the right hand axis reads that share back as the lines it stands for
+  const loc = useMemo(() => {
+    // the size curve first, since that is the one a reader means by lines of code
+    const held = share ? series.filter((one) => SERIES[one].unit === "lines") : []
+    const key = held.find((one) => SERIES[one].group === "lines") ?? held[0]
+    const peak = key ? peakOf(days, series, SERIES[key].group) : 0
+    return key && peak ? { key, peak } : null
+  }, [share, series, days])
+  // both axes have to stand on one scale, or the right one reads off the wrong height
+  const [scale, marks] = useMemo(() => {
+    let low = 0
+    let high = 0
+    for (const row of shown)
+      for (const key of series) {
+        low = Math.min(low, Number(row[key] ?? 0))
+        high = Math.max(high, Number(row[key] ?? 0))
+      }
+    // a tick lands on a number somebody would have chosen, and the ends move out to meet it
+    const wide = (high - low) / 4 || 1
+    const power = 10 ** Math.floor(Math.log10(wide))
+    const step = [1, 2, 2.5, 5, 10].map((one) => one * power).find((one) => one >= wide) ?? wide
+    const [from, to] = [Math.floor(low / step) * step, Math.ceil(high / step) * step || step]
+    const at: number[] = []
+    for (let mark = from; mark <= to + step / 100; mark += step) at.push(Math.round(mark))
+    return [[from, to] as [number, number], at]
+  }, [shown, series])
   // a line needs two points, below that a bar is the only honest shape
   const sparse = shown.length < 2
 
@@ -196,7 +223,9 @@ export function OverTime({
           : all && mixed
             ? `commits and devs span all ${num(total)} commits, the rest the latest ${num(stats.commits)}`
             : share
-              ? "each drawn against its own peak, so shapes compare. Hover for real numbers"
+              ? loc
+                ? `each drawn against its own peak, so shapes compare. The right axis reads ${SERIES[loc.key].label} off the same heights`
+                : "each drawn against its own peak, so shapes compare. Hover for real numbers"
               : (GROUPS.find((g) => g.key === picked[0])?.about ?? "")
 
   return (
@@ -242,10 +271,30 @@ export function OverTime({
                 tickLine={false}
                 axisLine={false}
                 width={44}
+                domain={loc ? scale : undefined}
+                ticks={loc ? marks : undefined}
                 tickFormatter={(v: number) =>
                   share ? `${Math.abs(v)}%` : num(untransform(Math.abs(v), curve))
                 }
               />
+              {loc && (
+                <YAxis
+                  yAxisId="lines"
+                  orientation="right"
+                  tickLine={false}
+                  axisLine={false}
+                  width={52}
+                  domain={scale}
+                  // nothing it counts goes below the axis, so it says nothing down there
+                  ticks={marks.filter((mark) => mark >= 0)}
+                  // coloured as the series it reads, since only that one can be read off it.
+                  // A style, because the chart paints every tick in the muted colour by class
+                  tick={{ style: { fill: SERIES[loc.key].color } }}
+                  tickFormatter={(v: number) =>
+                    num(untransform((Math.abs(v) / 100) * transform(loc.peak, curve), curve))
+                  }
+                />
+              )}
               <ChartTooltip
                 cursor={CURSOR}
                 content={<ChartTooltipContent config={config} curve={curve} />}
