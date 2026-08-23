@@ -99,7 +99,9 @@ You want to do this very smartly, you may use as many subagents as you need to b
 Agent 2:
 
 ```sh
-You are Agent 2.
+You are Agent 2. Your goal is to use this conformance specification `[original]-cleanroom-rewrite-spec` alone, and no other directories, to build in an adjacent folder `[original]-cleanroom-rewrite` containing a full git repository new implementation of the specification you are given. It must be fully conformant, in itself consistent, concise and smartly written and re-verified by yourself multiple times to be really smartly done. Wherever you can, use subagents, that may also only read the cleanroom-rewrite-spec and only build on the cleanroom-rewrite folder project. Be smart about feature conformance, interfaces, and ux. You may use as many subagents as you need to be efficient, but dont use them if they dont make your work smarter or faster.
+
+/goal completed implementation that is as good as it can possibly be, based on only the `cleanroom-rewrite-spec`, that is fully done and verified to be good
 ```
 
 ### Variant B) mandated rewrite
