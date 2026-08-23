@@ -16,6 +16,7 @@ import { Headline } from "../components/molecules/panels/headline.tsx"
 import { Onward } from "../components/molecules/onward.tsx"
 import { toast } from "../components/atoms/toast.tsx"
 import { TestsCard } from "../components/molecules/panels/tests-card.tsx"
+import { whereIs } from "../lib/app/hash.ts"
 import { Commits } from "./commits.tsx"
 import { Explorer } from "./explorer.tsx"
 import { OverTime } from "./over-time.tsx"
@@ -156,13 +157,10 @@ export function Overview({
     go({ lang: picked, kind: "", path: [], pick: "", tab: "Overview", panel: "tree_files" })
     toast(`Showing ${picked}`, "Each row is shaded by its share of that language")
   }
-  // a panel here, so Files means scroll to it
+  // every card names a place, and the places they name are panels here now, not tabs
   const onCard = (next: string, shade?: string) => {
-    go(
-      next === "Files"
-        ? { tab: "Overview", panel: "tree_files", kind: shade ?? "", lang: "" }
-        : { tab: next, panel: "" },
-    )
+    const [where, panel] = whereIs(next) ?? [next, ""]
+    go({ tab: where, panel, kind: shade ?? "", lang: "" })
     if (shade) toast(`Showing ${shade.toLowerCase()}`, "Each row is shaded by its share of them")
   }
   const onCommits = (from: string, to: string) => {

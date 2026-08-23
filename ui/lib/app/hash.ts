@@ -22,6 +22,14 @@ const MOVED: Record<string, [string, string]> = {
   Execution: ["Graph", "table_declarations"],
 }
 
+/** the tab and panel a name that used to be a tab of its own means now, for a link that
+ *  still calls it by that name. Sending somebody to `tab=History` sends them nowhere */
+export const whereIs = (name: string): [string, string] | undefined => MOVED[name]
+
+// every move counts, the ones landing where you already stand included: a card that says
+// it opens a panel has to take you there again, however many times you ask it to
+let moves = 0
+
 const read = (fallback: View): View => {
   const q = new URLSearchParams(location.hash.slice(1))
   const asked = q.get("tab") || fallback.tab
@@ -56,15 +64,17 @@ const write = (view: View): string => {
 // the entry behind this one, so back can name where it goes
 const behind = (): View | null => (history.state as { from?: View } | null)?.from ?? null
 
-export function useView(initial: View): [View, (next: Partial<View>) => void, View | null] {
+export function useView(initial: View): [View, (next: Partial<View>) => void, View | null, number] {
   const [view, setView] = useState(() => read(initial))
   const [was, setWas] = useState<View | null>(behind)
+  const [went, setWent] = useState(0)
 
   useEffect(() => {
     // fires after popstate, so history.state is already the entry landed on
     const onPop = () => {
       setView(read(initial))
       setWas(behind())
+      setWent(++moves)
     }
     addEventListener("hashchange", onPop)
     return () => removeEventListener("hashchange", onPop)
@@ -75,7 +85,9 @@ export function useView(initial: View): [View, (next: Partial<View>) => void, Vi
     setView(merged)
     setWas(view)
     history.pushState({ from: view }, "", write(merged))
+    // asking for a panel is a move to it, whether or not it is the one already named
+    if (next.panel !== undefined) setWent(++moves)
   }
 
-  return [view, go, was]
+  return [view, go, was, went]
 }

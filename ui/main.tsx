@@ -113,7 +113,7 @@ function App({
   onRepo?: (name: string) => void
 }) {
   // view state lives in the url, so back works and a link carries the place
-  const [at, go, was] = useView(START)
+  const [at, go, was, went] = useView(START)
   const { tab, panel, pick } = at
   const said = useHunt()
   const found = useShownCount()
@@ -207,7 +207,8 @@ function App({
       clearInterval(settle)
       clearTimeout(give)
     }
-  }, [tab, panel, pick])
+    // went, not the panel alone: asking for the panel you are already on is still a move
+  }, [tab, panel, pick, went])
   const [faces, setFaces] = useState<Record<string, string>>({})
   useEffect(() => {
     void loadFaces(stats).then(setFaces)
