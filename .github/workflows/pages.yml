@@ -29,15 +29,16 @@ jobs:
       - run: pnpm install
       - run: pnpm build # dist/index.html is the shell the static export writes into
 
-      # the repos the other two demos are of. Depth, never --filter=blob:none: a blobless
-      # clone sends git off to refetch every blob for the line counts and never finishes
+      # the repos the other two demos are of. Whole, never --filter=blob:none and never
+      # shallow: half the report is the history, and a blobless clone sends git off to
+      # refetch every blob for the line counts and never finishes
       - run: |
-          git clone --depth 200 -q https://github.com/microsoft/vscode.git demos/vscode
+          git clone -q https://github.com/microsoft/vscode.git demos/vscode
           for one in \
             gothinkster/node-express-realworld-example-app:backend \
             gothinkster/react-redux-realworld-example-app:react \
             gothinkster/vue-realworld-example-app:vue; do
-            git clone --depth 50 -q "https://github.com/${one%%:*}.git" "demos/realworld/${one##*:}"
+            git clone -q "https://github.com/${one%%:*}.git" "demos/realworld/${one##*:}"
           done
 
       # --anon drops every commit address, and the faces with it, since an avatar and a

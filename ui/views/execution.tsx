@@ -14,7 +14,7 @@ import { Input } from "../components/atoms/input.tsx"
 import { Loading } from "../components/molecules/onward.tsx"
 import { Tabs } from "../components/atoms/tabs.tsx"
 import { Path, Tip } from "../components/atoms/tip.tsx"
-import { callGraph } from "../lib/app/live.ts"
+import { callGraph, isLive } from "../lib/app/live.ts"
 import { symbol, useGoing } from "../lib/app/going.tsx"
 import { useKept } from "../lib/app/kept.ts"
 import { Button } from "../components/atoms/button.tsx"
@@ -49,6 +49,20 @@ export function Execution({ stats }: { stats: Stats }) {
   const repeated = useMemo(() => (calls ? twins(calls) : []), [calls])
   const loops = useMemo(() => (calls ? rings(calls) : []), [calls])
 
+  // a saved page carries what it was published with, and nothing arrives later
+  if (!calls && !isLive())
+    return (
+      <div className="flex flex-col gap-4">
+        <Back />
+        <Card>
+          <CardContent className="text-muted-foreground p-6 text-sm">
+            This page was published without its call graph: {num(stats.files)} files is more than
+            one file can carry. <code className="bg-muted rounded px-1.5 py-0.5">npx desprawl</code>{" "}
+            reads it where the code is.
+          </CardContent>
+        </Card>
+      </div>
+    )
   if (!calls)
     return <Loading stats={stats} current="Graph" what="Reading every call," onward={false} />
 

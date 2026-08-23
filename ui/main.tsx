@@ -365,7 +365,10 @@ function Root() {
   const [only, setOnly] = useState("")
   const [picked, setPicked] = useState(false)
   useEffect(() => {
+    // a published page carries the folder it was read from: without this it draws a folder
+    // of repos as one lane, which is the one thing the picture is there to tell apart
     if (live) void allRepos().then(setRepos)
+    else setRepos(window.__DESPRAWL_GRAPH__?.repos ?? [])
   }, [live])
 
   // here, not in App: a slow read should not spend it in the wrong theme
@@ -482,11 +485,16 @@ function Root() {
         reload={live ? () => load() : undefined}
         repos={repos}
         only={only}
-        onRepo={(name) => {
-          readRepo(name)
-          setOnly(name)
-          load(name)
-        }}
+        // picking one asks the server to read it, which a saved page has no way to do
+        onRepo={
+          live
+            ? (name) => {
+                readRepo(name)
+                setOnly(name)
+                load(name)
+              }
+            : undefined
+        }
       />
       <Toaster />
     </>
