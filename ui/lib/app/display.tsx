@@ -3,10 +3,12 @@
 
 import { createContext, useContext } from "react"
 import type { Curve } from "../text/format.ts"
+// the windows are the trend's own vocabulary, and this only holds which one is picked
+import type { Compare } from "../text/trend.ts"
 
 /** simple abbreviates, repo divides by the column total, row by the row's own lines */
 export type Scale = "simple" | "abs" | "repo" | "row"
-export type { Curve }
+export type { Curve, Compare }
 
 export const SCALES: Scale[] = ["simple", "abs", "repo", "row"]
 export const CURVES: Curve[] = ["linear", "log"]
@@ -21,8 +23,6 @@ export const EXPLAIN: Record<Scale, string> = {
 export type Brands = "focus" | "flashy" | "off"
 export const BRANDINGS: Brands[] = ["focus", "flashy", "off"]
 
-/** what a kpi holds its number against: a rolling window, or the year so far */
-export type Compare = "none" | "24h" | "7d" | "mo" | "yr" | "ytd"
 export const COMPARES: Compare[] = ["none", "24h", "7d", "mo", "yr", "ytd"]
 
 export const SINCE: Record<Compare, string> = {

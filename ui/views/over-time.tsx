@@ -38,11 +38,50 @@ import {
 } from "../lib/text/format.ts"
 
 import { hourCurve, isLive, sizeCurve, type Sample } from "../lib/app/live.ts"
-import { GROUPS, SERIES, expand, peakOf, rows } from "../lib/draw/series.ts"
+import { GROUPS, SERIES, axes, expand, rows } from "../lib/draw/series.ts"
 import { cn } from "../lib/app/ui.ts"
 import type { Grain } from "../lib/text/format.ts"
 import type { Hours, Timeline } from "../../src/facts/samples.ts"
 import type { Stats } from "../../src/read/model.ts"
+
+/** moved lines as bars, a headcount as a bare line, the rest as areas */
+const drawn = (series: string[], sparse: boolean) =>
+  series.map((key) =>
+    SERIES[key].heads && !sparse ? (
+      <Line
+        key={key}
+        dataKey={key}
+        type="monotone"
+        stroke={SERIES[key].color}
+        strokeWidth={2}
+        strokeDasharray="3 3"
+        dot={false}
+        activeDot={{ r: 3, strokeWidth: 0 }}
+        isAnimationActive={false}
+      />
+    ) : SERIES[key].group === "changes" || sparse ? (
+      <Bar
+        key={key}
+        dataKey={key}
+        stackId="a"
+        fill={SERIES[key].color}
+        radius={2}
+        isAnimationActive={false}
+      />
+    ) : (
+      <Area
+        key={key}
+        dataKey={key}
+        type="monotone"
+        stroke={SERIES[key].color}
+        fill={SERIES[key].color}
+        fillOpacity={0.12}
+        strokeWidth={2}
+        activeDot={{ r: 3, strokeWidth: 0 }}
+        isAnimationActive={false}
+      />
+    ),
+  )
 
 export function OverTime({
   stats,
@@ -179,31 +218,11 @@ export function OverTime({
   const share = picked.length > 1
   // a share says how a shape moved and nothing about its size, so where one of the series
   // counts lines the right hand axis reads that share back as the lines it stands for
-  const loc = useMemo(() => {
-    // the size curve first, since that is the one a reader means by lines of code
-    const held = share ? series.filter((one) => SERIES[one].unit === "lines") : []
-    const key = held.find((one) => SERIES[one].group === "lines") ?? held[0]
-    const peak = key ? peakOf(days, series, SERIES[key].group) : 0
-    return key && peak ? { key, peak } : null
-  }, [share, series, days])
-  // both axes have to stand on one scale, or the right one reads off the wrong height
-  const [scale, marks] = useMemo(() => {
-    let low = 0
-    let high = 0
-    for (const row of shown)
-      for (const key of series) {
-        low = Math.min(low, Number(row[key] ?? 0))
-        high = Math.max(high, Number(row[key] ?? 0))
-      }
-    // a tick lands on a number somebody would have chosen, and the ends move out to meet it
-    const wide = (high - low) / 4 || 1
-    const power = 10 ** Math.floor(Math.log10(wide))
-    const step = [1, 2, 2.5, 5, 10].map((one) => one * power).find((one) => one >= wide) ?? wide
-    const [from, to] = [Math.floor(low / step) * step, Math.ceil(high / step) * step || step]
-    const at: number[] = []
-    for (let mark = from; mark <= to + step / 100; mark += step) at.push(Math.round(mark))
-    return [[from, to] as [number, number], at]
-  }, [shown, series])
+  // the scale both axes stand on, and the series the right hand one can be read in
+  const { loc, scale, marks } = useMemo(
+    () => axes(days, shown, series, share),
+    [days, shown, series, share],
+  )
   // a line needs two points, below that a bar is the only honest shape
   const sparse = shown.length < 2
 
@@ -299,43 +318,7 @@ export function OverTime({
                 cursor={CURSOR}
                 content={<ChartTooltipContent config={config} curve={curve} />}
               />
-              {/* moved lines as bars, a headcount as a bare line, the rest as areas */}
-              {series.map((key) =>
-                SERIES[key].heads && !sparse ? (
-                  <Line
-                    key={key}
-                    dataKey={key}
-                    type="monotone"
-                    stroke={SERIES[key].color}
-                    strokeWidth={2}
-                    strokeDasharray="3 3"
-                    dot={false}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
-                ) : SERIES[key].group === "changes" || sparse ? (
-                  <Bar
-                    key={key}
-                    dataKey={key}
-                    stackId="a"
-                    fill={SERIES[key].color}
-                    radius={2}
-                    isAnimationActive={false}
-                  />
-                ) : (
-                  <Area
-                    key={key}
-                    dataKey={key}
-                    type="monotone"
-                    stroke={SERIES[key].color}
-                    fill={SERIES[key].color}
-                    fillOpacity={0.12}
-                    strokeWidth={2}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
-                ),
-              )}
+              {drawn(series, sparse)}
               {drag && (
                 <ReferenceArea
                   x1={drag[0]}

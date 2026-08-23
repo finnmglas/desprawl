@@ -9,7 +9,7 @@ import { place } from "../ui/lib/draw/lanes.ts"
 import { effective, shares } from "../ui/lib/draw/scale.ts"
 import { asMatrix, type Column } from "../ui/lib/text/columns.ts"
 import { bucket, defaultGrain, grainsFor, nearestGrain } from "../ui/lib/text/format.ts"
-import { expand, peakOf, rows } from "../ui/lib/draw/series.ts"
+import { axes, expand, peakOf, rows } from "../ui/lib/draw/series.ts"
 import { daysBack, moved } from "../ui/lib/text/trend.ts"
 import { isId, nameOf, namesOf } from "../src/read/naming.ts"
 import { FORMATS } from "../ui/lib/text/formats.ts"
@@ -95,6 +95,17 @@ test("a share can be read back as the thing it is a share of", () => {
     // what the right hand axis does at every tick, against the number it was drawn from
     assert.equal(Math.round((row.lines / 100) * peak), row.lines_raw, `${row.day} reads back`)
   }
+
+  const { loc, scale, marks } = axes(out, out, keys, true)
+  assert.equal(loc?.key, "lines", "the size curve is what a right hand axis is read in")
+  assert.equal(loc?.peak, peak)
+  for (const row of out)
+    for (const key of keys) {
+      const value = Number(row[key] ?? 0)
+      assert.ok(value >= scale[0] && value <= scale[1], `${value} fell outside the scale`)
+    }
+  assert.deepEqual(marks[0], scale[0], "the ticks the two axes share end where the scale does")
+  assert.deepEqual(marks.at(-1), scale[1])
 })
 
 test("days become weeks and months as a repo ages", () => {

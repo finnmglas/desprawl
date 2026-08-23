@@ -235,6 +235,37 @@ export function peakOf(rows: Row[], keys: string[], group: string): number {
   return peak
 }
 
+/**
+ * what both axes stand on: one scale, so a height means the same on either side, ticks a
+ * person would have chosen, and the series the right hand one can be read in
+ */
+export function axes(
+  all: Row[],
+  shown: Row[],
+  keys: string[],
+  share: boolean,
+): { loc: { key: string; peak: number } | null; scale: [number, number]; marks: number[] } {
+  // the size curve first, since that is the one a reader means by lines of code
+  const held = share ? keys.filter((one) => SERIES[one].unit === "lines") : []
+  const key = held.find((one) => SERIES[one].group === "lines") ?? held[0]
+  const peak = key ? peakOf(all, keys, SERIES[key].group) : 0
+  let low = 0
+  let high = 0
+  for (const row of shown)
+    for (const one of keys) {
+      low = Math.min(low, Number(row[one] ?? 0))
+      high = Math.max(high, Number(row[one] ?? 0))
+    }
+  // a tick lands on a number somebody would have chosen, and the ends move out to meet it
+  const wide = (high - low) / 4 || 1
+  const power = 10 ** Math.floor(Math.log10(wide))
+  const step = [1, 2, 2.5, 5, 10].map((one) => one * power).find((one) => one >= wide) ?? wide
+  const [from, to] = [Math.floor(low / step) * step, Math.ceil(high / step) * step || step]
+  const marks: number[] = []
+  for (let mark = from; mark <= to + step / 100; mark += step) marks.push(Math.round(mark))
+  return { loc: key && peak ? { key, peak } : null, scale: [from, to], marks }
+}
+
 // magnitudes differ across groups, so each is drawn against its own peak
 function finish(built: Built, picked: string[], curve: Curve, share: boolean): Row[] {
   const { groups, raw } = built

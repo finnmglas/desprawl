@@ -2,9 +2,11 @@
 // goal: which way a number went
 
 import type { Series } from "../../../src/read/model.ts"
-import type { Compare } from "../app/display.tsx"
 
 const DAY = 86_400_000
+
+/** what a kpi holds its number against: a rolling window, or the year so far */
+export type Compare = "none" | "24h" | "7d" | "mo" | "yr" | "ytd"
 
 export interface Moved {
   /** what the metric did over the window, signed */
