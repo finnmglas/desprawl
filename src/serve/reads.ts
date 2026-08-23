@@ -187,6 +187,7 @@ export function reads(one: Asked): boolean {
       root: at(url) || repo,
       graph: kept.graph(url.searchParams.get("repo")),
       called: kept.read.calls,
+      routes: kept.api(url.searchParams.get("repo")),
       deps: kept.read.deps,
       suite: kept.tests(url.searchParams.get("repo")),
       viewer: html,

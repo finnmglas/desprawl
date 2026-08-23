@@ -13,6 +13,7 @@ import { build } from "../read/graph.ts"
 import { everyApi, everyCall, fleet, graphs } from "../facts/many.ts"
 import { api as apiOf } from "../read/routes.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
+import type { Api } from "../read/specs.ts"
 import type { Graph } from "../read/graph.ts"
 import { made } from "../read/model.ts"
 import type { Contributor, Stats } from "../read/model.ts"
@@ -48,6 +49,8 @@ export function page(
   held?: {
     graph?: Graph
     called?: Calls | null
+    /** the endpoints and call sites, when the caller has already read them */
+    routes?: Api | null
     deps?: Deps | null
     suite?: Suite | null
     viewer?: string
@@ -65,7 +68,7 @@ export function page(
   const said = held?.called ?? (heavy ? null : some ? everyCall(root) : calls(root, graph))
   // the api view is the one thing a folder of repos is read for, and a page without it
   // had nothing to draw the red edges from
-  const wired = some ? everyApi(root) : apiOf(root, graph, said ?? undefined)
+  const wired = held?.routes ?? (some ? everyApi(root) : apiOf(root, graph, said ?? undefined))
   const paths = Object.keys(graph.modules)
   const loose = {
     ...made(root),
