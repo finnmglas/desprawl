@@ -193,10 +193,15 @@ export const dragOver = (before: string, after: boolean) => {
 
 const hiddenStore = fieldStore("hidden")
 const orderStore = fieldStore("order")
+const arrangeStore = fieldStore("arrange")
 
-/** a fresh disk pull can carry hidden ids or an order from another device */
+/** a fresh disk pull can carry hidden ids, an order, or the choice from another device */
 export const syncHidden = hiddenStore.sync
 export const syncOrder = orderStore.sync
+export const syncArrange = arrangeStore.sync
+
+/** whether a panel offers its move, hide and drag controls, which it does not until asked */
+export const useArranging = (): [boolean, (on: boolean) => void] => arrangeStore.use()
 
 /** every tab back to its default panels, in their default order, in one go */
 export function resetSections(): void {

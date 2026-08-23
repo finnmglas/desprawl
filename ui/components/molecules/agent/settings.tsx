@@ -8,7 +8,7 @@ import { Exports } from "../exports.tsx"
 import { Tabs } from "../../atoms/tabs.tsx"
 import { toast } from "../../atoms/toast.tsx"
 import { copy } from "../../../lib/app/export.ts"
-import { resetSections, useCustomized } from "../../../lib/app/sections.ts"
+import { resetSections, useArranging, useCustomized } from "../../../lib/app/sections.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../../../lib/text/locale.ts"
 import {
   BRANDINGS,
@@ -77,6 +77,7 @@ export function Settings({
 }) {
   const { scale, curve, region, brands, rows, compare } = prefs
   const customized = useCustomized()
+  const [arranging, setArranging] = useArranging()
   const [exporting, setExporting] = useState(false)
 
   const share = async () =>
@@ -120,6 +121,17 @@ export function Settings({
           </MenuItem>
         )}
         <div className="bg-border my-1 h-px" />
+        <Choice
+          label="Arrange panels"
+          hint={
+            arranging
+              ? "each panel offers move, hide and drag on hover"
+              : "panels stay where they are"
+          }
+          tabs={["off", "on"]}
+          value={arranging ? "on" : "off"}
+          onChange={(next) => setArranging(next === "on")}
+        />
         <Choice
           label="Theme"
           hint={

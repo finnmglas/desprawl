@@ -23,6 +23,7 @@ import {
   hunt,
   land,
   onTab,
+  syncArrange,
   syncHidden,
   syncOrder,
   useHunt,
@@ -380,6 +381,7 @@ function Root() {
       setLocale(saved.region)
       syncHidden(saved.hidden)
       syncOrder(saved.order)
+      syncArrange(saved.arrange)
     })
   }, [])
   const themed = useTheme(prefs.theme, (theme) => change({ theme }))

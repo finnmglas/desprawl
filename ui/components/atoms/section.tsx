@@ -14,6 +14,7 @@ import {
   useHunt,
   useLanded,
   showing,
+  useArranging,
   useHidden,
   useOrder,
 } from "../../lib/app/sections.ts"
@@ -32,6 +33,7 @@ export function Section({
   children: React.ReactNode
 }) {
   const said = useHunt()
+  const [arranging] = useArranging()
   const [hidden, setHidden] = useHidden()
   const { list: order, move, drop } = useOrder(tabOf(id), hidden)
   const dragging = useDragging()
@@ -73,8 +75,9 @@ export function Section({
           )}
         />
       )}
-      {/* reordering a tab you cannot see is not a move anyone can follow */}
-      {!said && (
+      {/* reordering a tab you cannot see is not a move anyone can follow, and a reader who
+          never asked to arrange anything is not offered the handles at all */}
+      {!said && arranging && (
         <div className="group/hide absolute -top-3 -right-3 z-10 flex h-9 w-36 items-start justify-end p-1.5">
           <div className="bg-card flex items-center gap-0.5 rounded-full border px-1 py-1 opacity-0 shadow-sm transition-opacity group-hover/hide:opacity-100 has-[:focus-visible]:opacity-100">
             <button
