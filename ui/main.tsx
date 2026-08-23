@@ -80,6 +80,7 @@ const START = {
   to: "",
   pick: "",
   panel: "",
+  dialog: "",
 }
 
 /** past this many repos, the page asks which one before reading them all */

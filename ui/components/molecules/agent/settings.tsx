@@ -1,12 +1,14 @@
 // owner: finn
-// goal: everything the header menu offers
+// goal: the header menu, and the settings it opens
 
-import { useState } from "react"
-import { Copy, Download, Refresh } from "../../atoms/icons.tsx"
+import { Copy, Download, Refresh, Sliders } from "../../atoms/icons.tsx"
 import { Menu, MenuItem, MenuSection } from "../menu.tsx"
+import { Dialog } from "../../atoms/dialog.tsx"
+import { Note } from "../../atoms/card.tsx"
 import { Exports } from "../exports.tsx"
 import { Tabs } from "../../atoms/tabs.tsx"
 import { toast } from "../../atoms/toast.tsx"
+import { useGoing } from "../../../lib/app/going.tsx"
 import { copy } from "../../../lib/app/export.ts"
 import { resetSections, useArranging, useCustomized } from "../../../lib/app/sections.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../../../lib/text/locale.ts"
@@ -78,7 +80,10 @@ export function Settings({
   const { scale, curve, region, brands, rows, compare } = prefs
   const customized = useCustomized()
   const [arranging, setArranging] = useArranging()
-  const [exporting, setExporting] = useState(false)
+  // which one is open lives in the url beside the tab, so it is linkable and survives a reload
+  const { at, go } = useGoing()
+  const show = (which: string) => go({ dialog: which })
+  const close = () => go({ dialog: "" })
 
   const share = async () =>
     toast(
@@ -88,39 +93,17 @@ export function Settings({
 
   return (
     <>
-      <Exports
-        open={exporting}
-        onClose={() => setExporting(false)}
-        stats={stats}
-        onPaper={onPaper}
-      />
-      <Menu>
-        {reload && (
-          <MenuItem onClick={reload}>
-            <Refresh />
-            refresh contents
-          </MenuItem>
-        )}
-        <MenuItem onClick={share}>
-          <Copy />
-          copy link to this page
-        </MenuItem>
-        <MenuItem onClick={() => setExporting(true)}>
-          <Download />
-          export data
-        </MenuItem>
-        {customized && (
-          <MenuItem
-            onClick={() => {
-              resetSections()
-              toast("Panels reset", "every tab back to its default panels, in order")
-            }}
-          >
-            <Refresh />
-            reset panel layout
-          </MenuItem>
-        )}
-        <div className="bg-border my-1 h-px" />
+      <Exports open={at.dialog === "export"} onClose={close} stats={stats} onPaper={onPaper} />
+      <Dialog
+        open={at.dialog === "settings"}
+        onClose={close}
+        title={
+          <>
+            <div className="text-base font-semibold">Settings</div>
+            <Note>Kept as you pick them, on every tab and the next time you open this</Note>
+          </>
+        }
+      >
         <Choice
           label="Arrange panels"
           hint={
@@ -202,6 +185,37 @@ export function Settings({
             change({ region: found })
           }}
         />
+      </Dialog>
+      <Menu>
+        {reload && (
+          <MenuItem onClick={reload}>
+            <Refresh />
+            refresh contents
+          </MenuItem>
+        )}
+        <MenuItem onClick={share}>
+          <Copy />
+          copy link to this page
+        </MenuItem>
+        <MenuItem onClick={() => show("export")}>
+          <Download />
+          export data
+        </MenuItem>
+        <MenuItem onClick={() => show("settings")}>
+          <Sliders />
+          settings
+        </MenuItem>
+        {customized && (
+          <MenuItem
+            onClick={() => {
+              resetSections()
+              toast("Panels reset", "every tab back to its default panels, in order")
+            }}
+          >
+            <Refresh />
+            reset panel layout
+          </MenuItem>
+        )}
       </Menu>
     </>
   )

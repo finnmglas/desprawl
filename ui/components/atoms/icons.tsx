@@ -103,6 +103,12 @@ export const Refresh = ({ className }: { className?: string }) => (
     d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16M21 21v-5h-5"
   />
 )
+export const Sliders = ({ className }: { className?: string }) => (
+  <Line
+    className={className}
+    d="M4 7h6M14 7h6M4 12h10M18 12h2M4 17h4M12 17h8M12 5v4M16 10v4M8 15v4"
+  />
+)
 export const Download = ({ className }: { className?: string }) => (
   <Line className={className} d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
 )

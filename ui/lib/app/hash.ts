@@ -12,6 +12,7 @@ export type View = {
   to: string
   pick: string // file, folder, group or file#name
   panel: string // section to land on
+  dialog: string // the one opened over the page, so it can be linked to and reloaded into
 }
 
 const MOVED: Record<string, [string, string]> = {
@@ -34,6 +35,7 @@ const read = (fallback: View): View => {
     to: q.get("to") || "",
     pick: q.get("pick") || "",
     panel: q.get("panel") || (moved ? moved[1] : ""),
+    dialog: q.get("dialog") || "",
   }
 }
 
@@ -47,6 +49,7 @@ const write = (view: View): string => {
   if (view.to) q.set("to", view.to)
   if (view.pick) q.set("pick", view.pick)
   if (view.panel) q.set("panel", view.panel)
+  if (view.dialog) q.set("dialog", view.dialog)
   return `#${q}`
 }
 

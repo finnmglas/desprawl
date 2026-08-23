@@ -27,6 +27,8 @@ Notable changes per release. Dates are the day the tag shipped.
 
 - **A graphql request is named by its operation.** A collection of them used to read as N copies of `POST /*`, since graphql puts nothing in its url. A `{{Host}}` variable now names a host rather than folding into the path as a phantom first segment.
 
+- **Settings are a dialog, and the url says which dialog is open.** Every setting moved out of the ellipsis menu into a panel of its own, the way exports already had one, and `#dialog=settings` or `#dialog=export` opens it: a link to the settings is a link somebody can send, back closes it, and a reload lands where it left off. The menu keeps what it was always for, the four things you do rather than set.
+
 - **Moving, hiding and dragging a panel is a setting now**, off until somebody turns it on in the ellipsis menu. A reader is here to read, and the handles that reorder a tab were one stray click away from a layout nobody asked for. What was already hidden or reordered stays that way, and the reveal chips under a tab still hand a hidden panel back.
 
 - **The two halves of the ui lib stopped importing each other.** `ui/lib/text` read a window type back out of `ui/lib/app`, which made a ring between the two folders: type only, so nothing looped at runtime, and invisible in the file graph because no file loops either. The windows are the trend's own word, so they are declared there and the display context imports them like it already imports the number curve.
