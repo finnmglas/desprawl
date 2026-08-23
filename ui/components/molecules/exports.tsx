@@ -11,7 +11,7 @@ import { download, named } from "../../lib/app/export.ts"
 import { num } from "../../lib/text/format.ts"
 import { knowledge } from "../../../src/facts/knowledge.ts"
 import { balanced, fold } from "../../../src/read/layers.ts"
-import { callGraph, importGraph, isLive, staticPage } from "../../lib/app/live.ts"
+import { apiGraph, callGraph, importGraph, isLive, staticPage } from "../../lib/app/live.ts"
 import { notes } from "../../lib/app/paper.ts"
 import { slides } from "../../lib/app/slides.ts"
 import type { Stats } from "../../../src/read/model.ts"
@@ -73,6 +73,7 @@ export function Exports({
   // a static page carries both graphs
   const heldGraph = window.__DESPRAWL_GRAPH__
   const heldCalls = window.__DESPRAWL_CALLS__
+  const heldRoutes = window.__DESPRAWL_ROUTES__
 
   const paper = (kind: "pdf" | "pptx") => {
     onClose()
@@ -146,6 +147,22 @@ export function Exports({
             toast(
               file,
               `${num(got.stats.symbols)} declarations, ${num(got.stats.edges)} calls between them`,
+            )
+          }}
+        />
+      )}
+      {(live || heldRoutes) && (
+        <Row
+          label="api-graph (json)"
+          what="every endpoint served here, every call site, and which of them reach each other"
+          run={async () => {
+            const got = await apiGraph()
+            if (!got) return
+            const file = named("api.json")
+            download(file, JSON.stringify(got, null, 2), "application/json")
+            toast(
+              file,
+              `${num(got.stats.endpoints)} endpoints, ${num(got.stats.clients)} call sites, ${num(got.stats.linked)} of them landing here`,
             )
           }}
         />
