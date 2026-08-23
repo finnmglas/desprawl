@@ -71,9 +71,14 @@ const COPIES =
 // prettier-ignore
 const OUTPUT =
   /^(?:[^/]+\/){0,2}(dist|build|out|target|coverage|\.next|\.nuxt|\.output|\.svelte-kit)\//
+// a .net project builds into its own folder wherever in a solution it sits, and restores
+// into a versioned folder of its own: both are output at any depth, so place says nothing
+// prettier-ignore
+const BUILT =
+  /(^|\/)(bin|obj)\/(Debug|Release|x64|x86|AnyCPU|net[\w.-]+)\/|(^|\/)(TestResults|BenchmarkDotNet\.Artifacts|AppPackages|\.vs)\/|(^|\/)packages\/[\w.+-]*\d[\w.+-]*\//i
 
 export const VENDORED = {
-  test: (path: string) => COPIES.test(path) || OUTPUT.test(path),
+  test: (path: string) => COPIES.test(path) || OUTPUT.test(path) || BUILT.test(path),
 }
 
 /** a line of .desprawlignore as a pattern: `theme/`, `*.min.js`, `docs/**\/gen` */
@@ -253,6 +258,28 @@ function onDisk(candidate: string): string | null {
   return null
 }
 
+/** the type a file is named for: markup and the half behind it are one name */
+const typeOf = (path: string): string =>
+  (path.split("/").pop() ?? "")
+    .replace(/\.(cs|fs|vb|xaml|axaml|java|kt|kts|scala|groovy)$/i, "")
+    .replace(/\.(xaml|axaml|g|designer|generated)$/i, "")
+
+/** of the files that could answer, the one sharing the most path with the asker, and where
+ *  they share the same the shallowest, since that is the copy everything else links to */
+function nearest(from: string, held: string[]): string {
+  const mine = from.split("/")
+  const shared = (path: string) => {
+    const parts = path.split("/")
+    let at = 0
+    while (at < parts.length - 1 && at < mine.length - 1 && parts[at] === mine[at]) at++
+    return at
+  }
+  return [...held].sort(
+    (a, b) =>
+      shared(b) - shared(a) || a.split("/").length - b.split("/").length || (a < b ? -1 : 1),
+  )[0]
+}
+
 /** the package a bare specifier installs as */
 export function packageOf(specifier: string): string {
   if (specifier.startsWith("node:")) return specifier
@@ -319,7 +346,33 @@ function naming(root: string, tracked: Set<string>): Map<string, string> {
   }
   for (const [name, dir] of held) if (!twice.has(name) && !named.has(name)) named.set(name, dir)
 
+  // a .net project declares the namespace its folder is the root of, and names it after
+  // itself when it does not. Every namespace under that one is a folder under this one
+  for (const path of tracked) {
+    if (!/\.(cs|fs|vb)proj$/.test(path)) continue
+    const name =
+      said(path, /<RootNamespace>\s*([^<\s]+)\s*<\/RootNamespace>/) ||
+      (path.split("/").pop() ?? "").replace(/\.\w+proj$/, "")
+    if (name && !named.has(name)) named.set(name, home(path))
+  }
+
   return named
+}
+
+/**
+ * every file declaring a namespace, by the name a using would write. Several folders fill
+ * one namespace and one folder can hold several, so no path rule answers this: only the
+ * files that declare it do
+ */
+function namespaces(root: string, sources: string[]): Map<string, string[]> {
+  const found = new Map<string, string[]>()
+  for (const path of sources) {
+    if (!/\.(cs|vb|fs)$/.test(path)) continue
+    const { code } = scrubbed(join(root, path), "c")
+    for (const m of code.matchAll(/^[^\S\n]*namespace\s+([\w.]+)/gm))
+      found.set(m[1], [...(found.get(m[1]) ?? []), path])
+  }
+  return found
 }
 
 export function build(repo: string): Graph {
@@ -340,6 +393,7 @@ export function build(repo: string): Graph {
   )
 
   const named = naming(root, tracked)
+  const spaces = namespaces(root, sources)
 
   // resolves to its own folder, not node_modules
   const workspaces = new Map<string, string>()
@@ -365,6 +419,14 @@ export function build(repo: string): Graph {
       },
     ]),
   )
+  // what each folder holds directly, since a namespace import asks that of every folder
+  const byFolder = new Map<string, string[]>()
+  for (const path of sources) {
+    const at = path.lastIndexOf("/")
+    const dir = at === -1 ? "" : path.slice(0, at + 1)
+    byFolder.set(dir, [...(byFolder.get(dir) ?? []), path])
+  }
+
   const packages: Record<string, string[]> = {}
   const missing: Missing[] = []
   const configs = new Map<string, any>()
@@ -386,8 +448,38 @@ export function build(repo: string): Graph {
     if (dialect && dialect.id !== "ts") {
       const done = scrubbed(full, dialect.flavour)
       modules[from].symbols = counted(done.code, dialect)
+      // read once, and only where a namespace hands out more than this file names. Markup
+      // keeps half its names in attribute values, which is exactly what the scrub took out
+      let mentioned: Set<string> | null = null
+      const names = () =>
+        (mentioned ??= new Set(
+          (dialect.flavour === "xml" ? `${done.code} ${done.strings.join(" ")}` : done.code).match(
+            /[A-Za-z_]\w*/g,
+          ) ?? [],
+        ))
       for (const spec of foreign(source, dialect, done)) {
         if (!spec.guess) seen++
+        // a namespace hands out every type in it, wherever the files declaring it sit, and
+        // this file reaches the ones it names
+        const declaring = dialect.used ? spaces.get(spec.text) : undefined
+        if (declaring) {
+          // one type name that several files answer to is a source file linked into another
+          // project as well, and the nearest of them is the one this file means
+          const byName = new Map<string, string[]>()
+          for (const one of declaring) {
+            const name = typeOf(one)
+            if (one === from || !names().has(name)) continue
+            byName.set(name, [...(byName.get(name) ?? []), one])
+          }
+          for (const held of byName.values()) {
+            const one = held.length === 1 ? held[0] : nearest(from, held)
+            if (modules[from].out.some((edge) => edge.to === one)) continue
+            modules[from].imports[spec.text] = one
+            modules[from].out.push({ to: one, type: false, lazy: false, via: false })
+            modules[one].in.push(from)
+          }
+          continue
+        }
         // the repo says whether an angled include is its own
         const tried = candidates(dialect, spec.text, from, named)
         const held = tried.find((one) => modules[one])
@@ -395,9 +487,9 @@ export function build(repo: string): Graph {
         let inside: string[] = []
         if (!held)
           for (const folder of tried.filter((one) => one.endsWith("/"))) {
-            inside = Object.keys(modules).filter(
-              (one) => one.startsWith(folder) && !one.slice(folder.length).includes("/"),
-            )
+            inside = byFolder.get(folder) ?? []
+            // a namespace hands out every type in it, so only the ones written here are edges
+            if (dialect.used) inside = inside.filter((one) => names().has(typeOf(one)))
             if (inside.length) break
           }
         if (!held && inside.length) {
@@ -540,7 +632,7 @@ export function build(repo: string): Graph {
   }
 
   // counted after, or the edges a sibling implies are drawn and never counted
-  siblings(modules, root)
+  siblings(modules, root, spaces)
   const edges = Object.values(modules).reduce((sum, m) => sum + m.out.length, 0)
 
   return {
@@ -586,36 +678,31 @@ function outsideOf(dialect: Dialect, text: string): string {
   if (dialect.id === "dart")
     return text.startsWith("dart:") ? text : (/^package:([^/]+)/.exec(text)?.[1] ?? "")
   if (dialect.id === "jvm") return text.split(".").slice(0, 2).join(".")
+  // a namespace is not a package, and the package it comes in shares its first words
+  if (dialect.id === "csharp" || dialect.id === "xaml") return text.split(".").slice(0, 2).join(".")
   return text.split("/").pop() ?? text
 }
 
-/** the jvm needs no import for a sibling class, so a used name is an edge */
-function siblings(modules: Record<string, Module>, root: string): void {
-  const byFolder = new Map<string, string[]>()
-  for (const [path, one] of Object.entries(modules))
-    if (one.lang === "jvm") {
-      const dir = path.split("/").slice(0, -1).join("/")
-      byFolder.set(dir, [...(byFolder.get(dir) ?? []), path])
-    }
-  for (const held of byFolder.values()) {
+/** the jvm needs no import for a sibling class, and c# none for a type in the namespace it
+ *  is written in, so a used name is an edge */
+function siblings(
+  modules: Record<string, Module>,
+  root: string,
+  spaces: Map<string, string[]>,
+): void {
+  const groups = new Map<string, string[]>()
+  for (const [path, one] of Object.entries(modules)) {
+    if (one.lang !== "jvm") continue
+    const dir = path.split("/").slice(0, -1).join("/")
+    groups.set(dir, [...(groups.get(dir) ?? []), path])
+  }
+  // what c# shares is a namespace rather than a folder, and the files say which they are in
+  for (const [name, held] of spaces) groups.set(`namespace ${name}`, held)
+  for (const held of groups.values()) {
     if (held.length < 2) continue
-    const names = new Map(
-      held.map((path) => [
-        path
-          .split("/")
-          .pop()!
-          .replace(/\.\w+$/, ""),
-        path,
-      ]),
-    )
+    const names = new Map(held.map((path) => [typeOf(path), path]))
     for (const path of held) {
-      let code = ""
-      try {
-        code = scrub(readFileSync(join(root, path), "utf8"), "c").code
-      } catch {
-        continue
-      }
-      const words = new Set(code.match(/[A-Za-z_]\w*/g) ?? [])
+      const words = new Set(scrubbed(join(root, path), "c").code.match(/[A-Za-z_]\w*/g) ?? [])
       for (const [name, other] of names) {
         if (other === path || !words.has(name)) continue
         if (modules[path].out.some((edge) => edge.to === other)) continue

@@ -2,7 +2,8 @@
 // goal: what each dependency is licensed as, and what is filed against it
 
 import { readFileSync, readdirSync, realpathSync, statSync, type Dirent } from "node:fs"
-import { join } from "node:path"
+import { homedir } from "node:os"
+import { dirname, join } from "node:path"
 import { made, git, type Made } from "../read/model.ts"
 export { familyOf, type Family } from "./licence.ts"
 import { reading } from "../read/graph.ts"
@@ -263,6 +264,51 @@ function pythons(root: string): Map<string, Held> {
   return found
 }
 
+/** nuget unpacks what it restores once for the whole machine, never into the repo */
+const store = (): string => process.env.NUGET_PACKAGES || join(homedir(), ".nuget", "packages")
+
+/** what a restore resolved, off the assets file or the lock each project writes beside it */
+function nugets(root: string, tracked: string[]): Map<string, Held> {
+  const versions = new Map<string, string>()
+  for (const path of tracked.filter((one) => /\.(cs|fs|vb)proj$/.test(one))) {
+    const home = join(root, dirname(path))
+    // the assets file is written by every restore, the lock only where one is kept
+    const assets = reading(join(home, "obj", "project.assets.json"))
+    for (const [key, one] of Object.entries((assets?.libraries ?? {}) as Record<string, any>)) {
+      const [name, version] = key.split("/")
+      if (one?.type === "package" && name && version) versions.set(name, version)
+    }
+    const lock = reading(join(home, "packages.lock.json"))
+    for (const group of Object.values((lock?.dependencies ?? {}) as Record<string, any>))
+      for (const [name, one] of Object.entries((group ?? {}) as Record<string, any>))
+        if (one?.resolved) versions.set(name, one.resolved as string)
+  }
+
+  const found = new Map<string, Held>()
+  for (const [name, version] of versions) {
+    const at = join(store(), name.toLowerCase(), version.toLowerCase())
+    const spec = read(join(at, `${name.toLowerCase()}.nuspec`))
+    // the expression, then the file it names, then the url every old package licensed by
+    const licence =
+      /<license\s+type="expression"[^>]*>\s*([^<]+)/i.exec(spec)?.[1]?.trim() ||
+      (/<licenseUrl>[^<]*\/(MIT|Apache-2\.0|BSD-3-Clause|MS-PL|GPL-3\.0)[^<]*<\/licenseUrl>/i.exec(
+        spec,
+      )?.[1] ??
+        "")
+    found.set(`${same(name)}@${version}`, {
+      ecosystem: "NuGet",
+      name,
+      version,
+      license: licence,
+      needs: [...spec.matchAll(/<dependency\s+id="([^"]+)"/gi)].map((one) => same(one[1])),
+      // nothing unpacked is nothing to weigh, and the version is still worth reporting
+      bytes: spec ? weigh(at) : 0,
+      top: true,
+    })
+  }
+  return found
+}
+
 /** a lock pins what no venv can be asked: `[[package]]` per package */
 function locked(root: string, tracked: string[]): Map<string, string> {
   const found = new Map<string, string>()
@@ -444,8 +490,14 @@ export async function deps(repo: string): Promise<Deps> {
   const own = new Set(found.map((one) => one.name).filter(Boolean) as string[])
   // what a venv holds is the python half of what node_modules holds
   const asked = new Map<string, boolean>()
+  const named = new Map<string, boolean>()
   for (const one of found)
-    for (const dep of one.asked) if (one.kind === "python") asked.set(same(dep.name), dep.dev)
+    for (const dep of one.asked) {
+      if (one.kind === "python") asked.set(same(dep.name), dep.dev)
+      // a package two projects ask for ships wherever either of them ships it
+      if (one.kind === "dotnet")
+        named.set(same(dep.name), (named.get(same(dep.name)) ?? true) && dep.dev)
+    }
   const pinned_ = locked(root, tracked)
   const site = pythons(root)
   const shipped = new Set<string>()
@@ -466,12 +518,43 @@ export async function deps(repo: string): Promise<Deps> {
       advisories: [],
     })
 
+  // what a restore unpacked, which is the .net half of what a venv holds
+  const nuget = nugets(root, tracked)
+  const runs = new Set<string>()
+  for (const one of nuget.values())
+    if (named.get(same(one.name)) === false) runs.add(same(one.name))
+  for (const one of nuget.values())
+    if (runs.has(same(one.name))) for (const next of one.needs) runs.add(next)
+  for (const one of nuget.values())
+    list.push({
+      ...one,
+      range: "",
+      dev: !runs.has(same(one.name)),
+      direct: named.has(same(one.name)),
+      released: "",
+      used: "",
+      latest: "",
+      advisories: [],
+    })
+
+  // central package management keeps every version in one props file, and the project that
+  // asks for the package names no version at all
+  const central = new Map<string, string>()
+  for (const one of found)
+    for (const dep of one.asked)
+      if (dep.ecosystem === "NuGet" && dep.range) central.set(same(dep.name), dep.range)
+
   // nothing on disk, so a lockfile, and then the range, is all there is
   for (const one of found)
     for (const dep of one.asked) {
       const key = same(dep.name)
       if (own.has(dep.name) || list.some((held) => same(held.name) === key)) continue
-      const held = blank(dep.name, dep.range, dep.dev, dep.ecosystem)
+      const held = blank(
+        dep.name,
+        dep.range || (dep.ecosystem === "NuGet" ? (central.get(key) ?? "") : ""),
+        dep.dev,
+        dep.ecosystem,
+      )
       // a lock pins exactly what a venv would have installed, which osv can be asked about
       if (dep.ecosystem === "PyPI") held.version = pinned_.get(key) ?? ""
       list.push(held)

@@ -33,6 +33,7 @@ const DOCS: Record<string, string> = {
   psd: "Design", ai: "Design", sketch: "Design", fig: "Design", xd: "Design",
   exe: "Binary", dll: "Binary", so: "Binary", dylib: "Binary", bin: "Binary", o: "Binary",
   class: "Binary", jar: "Binary", pyc: "Binary", wasm: "WebAssembly",
+  pdb: "Binary", snk: "Binary", pfx: "Binary", nupkg: "Archive", vsix: "Archive",
   db: "Database", sqlite: "Database", sqlite3: "Database", mdb: "Database",
 }
 

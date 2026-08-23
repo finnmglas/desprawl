@@ -16,7 +16,7 @@ export interface Asked {
 export interface Read {
   /** the manifest itself, so a claim can be followed */
   path: string
-  kind: "npm" | "cargo" | "python" | "gradle" | "cmake" | "go" | "pub"
+  kind: "npm" | "cargo" | "python" | "gradle" | "cmake" | "go" | "pub" | "dotnet"
   /** what the project calls itself */
   name?: string
   version?: string
@@ -278,6 +278,70 @@ function pub(root: string, path: string): Read {
   }
 }
 
+// a package a build asks for and nothing that ships ever reaches
+const TOOLING =
+  /^(xunit|nunit|MSTest|Moq|FluentAssertions|NSubstitute|AutoFixture|Shouldly|coverlet|SpecFlow|Verify|FakeItEasy|Bogus|Testcontainers|BenchmarkDotNet|StyleCop|SonarAnalyzer|Roslynator|ReportGenerator|Microsoft\.NET\.Test\.Sdk|Microsoft\.CodeAnalysis\.Analyzers|Microsoft\.SourceLink)/i
+
+/**
+ * msbuild keeps them in xml: a version sits in an attribute or in a child element, central
+ * management moves it to a props file the projects share, and the old form is its own file
+ */
+function dotnet(root: string, path: string): Read {
+  const source = text(root, path)
+  const asked: Asked[] = []
+  const attr = (held: string, name: string): string =>
+    new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"`, "i").exec(held)?.[1]?.trim() ?? ""
+  const tag = (name: string): string =>
+    new RegExp(`<${name}>\\s*([^<]+?)\\s*</${name}>`, "i").exec(source)?.[1]?.trim() ?? ""
+  // a version is often an msbuild property, and the file using it is usually the one setting it
+  const props = new Map(
+    [...source.matchAll(/<(\w+)>\s*([^<\s][^<]*?)\s*<\/\1>/g)].map((m) => [m[1], m[2]]),
+  )
+  const said = (value: string): string => {
+    const held = value.replace(/\$\(([\w.]+)\)/g, (one, name: string) => props.get(name) ?? one)
+    // a property nothing here sets is not a version anybody can read
+    return held.includes("$(") ? "" : held
+  }
+
+  for (const m of source.matchAll(
+    /<(PackageReference|PackageVersion|GlobalPackageReference|dependency|package)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/\1>)/gi,
+  )) {
+    const head = m[2] ?? ""
+    const body = m[3] ?? ""
+    // a props file updates a version rather than including the package
+    const name = attr(head, "Include") || attr(head, "Update") || attr(head, "id")
+    if (!name) continue
+    const held = `${head} ${body}`
+    asked.push({
+      name,
+      range: said(attr(head, "Version") || (/<Version>\s*([^<]+)/i.exec(body)?.[1]?.trim() ?? "")),
+      // an analyser or a test only package is asked for by the build, never by the program
+      dev:
+        /PrivateAssets\s*=\s*"[^"]*(all|compile)/i.test(held) ||
+        /developmentDependency\s*=\s*"true"/i.test(held) ||
+        TOOLING.test(name),
+      ecosystem: "NuGet",
+    })
+  }
+  // a props file and a packages.config describe no project of their own
+  const project = /\.(cs|fs|vb)proj$/.test(path)
+  const output = tag("OutputType")
+  return {
+    path,
+    kind: "dotnet",
+    name: project
+      ? tag("AssemblyName") ||
+        tag("RootNamespace") ||
+        (path.split("/").pop() ?? "").replace(/\.\w+proj$/, "")
+      : undefined,
+    version: project ? tag("Version") || tag("VersionPrefix") : undefined,
+    license: project ? tag("PackageLicenseExpression") : undefined,
+    asked,
+    // WinExe is a window, not something anybody runs from a shell
+    bins: /^Exe$/i.test(output) ? ["dotnet executable"] : [],
+  }
+}
+
 function golang(root: string, path: string): Read {
   const source = text(root, path)
   const asked: Asked[] = []
@@ -330,6 +394,10 @@ const READERS: [RegExp, (root: string, path: string) => Read][] = [
   [/(^|\/)CMakeLists\.txt$/, cmake],
   [/(^|\/)go\.mod$/, golang],
   [/(^|\/)pubspec\.ya?ml$/, pub],
+  [/\.(cs|fs|vb)proj$/, dotnet],
+  [/(^|\/)Directory\.(Packages|Build)\.props$/, dotnet],
+  [/(^|\/)packages\.config$/, dotnet],
+  [/\.nuspec$/, dotnet],
 ]
 
 /** every manifest a repo holds that is not package.json, read by whichever rule fits */

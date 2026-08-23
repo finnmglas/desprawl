@@ -70,3 +70,28 @@ test("a repo with two languages counts both suites", () => {
   assert.equal(suite.cases, 3)
   assert.equal(suite.script, "test", "the manifest script still wins where there is one")
 })
+
+test("a .net suite is counted by the attribute each runner declares a case with", () => {
+  const suite = tests(
+    repo({
+      "src/App/App.csproj": '<Project Sdk="Microsoft.NET.Sdk" />\n',
+      "src/App/Loader.cs":
+        "namespace App;\n\npublic class Loader\n{\n    public int Go() => 1;\n}\n",
+      "test/App.Tests/LoaderTests.cs":
+        "using Xunit;\n\nnamespace App.Tests;\n\npublic class LoaderTests\n{\n" +
+        "    [Fact]\n    public void Goes()\n    {\n        Assert.Equal(1, new Loader().Go());\n    }\n\n" +
+        "    [Theory]\n    [InlineData(2)]\n    public void GoesTwice(int n) { }\n}\n",
+      "test/App.Tests/CacheTests.cs":
+        "using NUnit.Framework;\n\nnamespace App.Tests;\n\n[TestFixture]\npublic class CacheTests\n{\n" +
+        "    [Test]\n    public void Holds() { }\n}\n",
+      "test/App.Tests/Helpers.cs":
+        "namespace App.Tests;\n\ninternal static class Helpers\n{\n" +
+        "    internal static int Two() => 2;\n}\n",
+    }),
+  )
+  assert.deepEqual(suite.runners, ["dotnet test"])
+  assert.equal(suite.files, 2, "a file holding no case is a helper, whatever folder it sits in")
+  assert.equal(suite.cases, 3)
+  assert.equal(suite.command, "dotnet test")
+  assert.match(suite.measured, /^dotnet test --collect/)
+})

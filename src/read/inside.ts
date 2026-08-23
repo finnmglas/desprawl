@@ -70,6 +70,23 @@ export interface Found {
   unread: number
 }
 
+/**
+ * `[controller]` and `[action]` are not holes in a path: asp.net fills them with the names
+ * of the class and the method the attribute sits on, minus the word Controller
+ */
+function tokened(raw: string, after: string): string {
+  if (!/\[(controller|action)\]/i.test(raw)) return raw
+  const klass = (/(?:^|[\s;}])(?:class|record)\s+(\w+)/.exec(after)?.[1] ?? "").replace(
+    /Controller$/,
+    "",
+  )
+  const method = /\b[\w.<>\[\],?]+\s+(\w+)\s*\(/.exec(after)?.[1] ?? ""
+  // a name nothing here says is left as it was written, so it reads as a hole and not as ""
+  return raw
+    .replace(/\[controller\]/gi, (one) => klass || one)
+    .replace(/\[action\]/gi, (one) => method || one)
+}
+
 const empty = (): Found => ({
   endpoints: [],
   clients: [],
@@ -205,7 +222,8 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
       for (const m of code.matchAll(rule.exp)) {
         const groups = m.groups ?? {}
         const held = said(groups.p) || (groups.v ? (consts.get(groups.v) ?? "") : "")
-        const after = code.slice(m.index + m[0].length, m.index + m[0].length + 120)
+        const end = m.index + m[0].length
+        const after = code.slice(end, end + 120)
         const raw = filled(held && groups.p ? held + stretch(after, strings) : held, consts)
         if (!raw ? !rule.bare : !(rule.side === "server" ? soft(raw) : pathy(raw))) {
           // a call written like a request, holding a path this file never spells out
@@ -240,8 +258,10 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
         if (side === "server" && rule.side === "guess" && !raw.startsWith("/")) continue
         // a mount is not a route, and an annotation over a class is a prefix
         if (side === "server" && /^\s*,\s*include\s*\(/.test(after)) continue
-        if (rule.onClass && CLASSY.test(after)) continue
-        const { path: said_, host } = normal(raw || "/")
+        // a class can carry four attributes before it, so this window is the longer one
+        if (rule.onClass && CLASSY.test(code.slice(end, end + 300))) continue
+        // and what asp.net fills in for itself is read off the class under the attribute
+        const { path: said_, host } = normal(tokened(raw, code.slice(end, end + 400)) || "/")
         // a channels router holds sockets, whatever verb the pattern that found it implies
         if (/websocket_urlpatterns/.test(code) && /^\/ws(\/|$)/.test(said_)) method = "WS"
         // a group it was hung on, and whatever it is nested inside
@@ -266,7 +286,7 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
               )
             : []
           // both rules stop just past the path they read, so that offset is the one span
-          served.add(m.index + m[0].length)
+          served.add(end)
           for (const verb of listed.length ? listed : keys.length ? keys : [method])
             all.endpoints.push({
               id: `${path}:${line}:${verb}:${clean}`,
@@ -279,7 +299,7 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
               handler: handlerOf(after, path, holds),
             })
         } else {
-          if (served.has(m.index + m[0].length)) continue
+          if (served.has(end)) continue
           all.clients.push({
             id: `${path}:${line}:${method}:${clean}`,
             file: path,
@@ -324,15 +344,12 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
       [PREFIX, "file"],
     ] as const) {
       for (const m of code.matchAll(exp)) {
-        const raw = said(m[1])
+        const under_ = code.slice(m.index + m[0].length, m.index + m[0].length + 300)
+        const raw = tokened(said(m[1]), under_)
         // a prefix is a path, so it holds a word: "-" and "" are something else entirely
         if (!raw || /[\s\\]/.test(raw) || URL.test(raw) || !/[A-Za-z]/.test(raw)) continue
         // and only a prefix when a class stands under it
-        if (
-          kind === "class" &&
-          !CLASSY.test(code.slice(m.index + m[0].length, m.index + m[0].length + 200))
-        )
-          continue
+        if (kind === "class" && !CLASSY.test(under_)) continue
         all.prefixes.push({ file: path, line: kind === "file" ? 0 : at(m.index), path: raw })
       }
     }

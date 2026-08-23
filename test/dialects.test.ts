@@ -6,7 +6,7 @@ import { test } from "node:test"
 import { build } from "../src/read/graph.ts"
 import { calls } from "../src/read/calls.ts"
 import { candidates, dialectOf } from "../src/read/dialects.ts"
-import { foreign, scrub } from "../src/read/specifiers.ts"
+import { declared, foreign, scrub } from "../src/read/specifiers.ts"
 import { repo } from "./repo.ts"
 
 test("a comment, a string and a char are read the way each language writes them", () => {
@@ -159,4 +159,120 @@ test("an angled include is the toolchain's unless the repo holds it", () => {
     "the one it holds is an edge",
   )
   assert.ok(graph.modules["src/main.c"].packages.includes("stdio.h"), "the one it does not is not")
+})
+
+test("c# names a namespace however the using is written", () => {
+  const said = (source: string) =>
+    foreign(source, dialectOf("a.cs")!)
+      .map((one) => one.text)
+      .sort()
+  assert.deepEqual(
+    said(
+      "global using System.Linq;\nusing static System.Math;\n" +
+        "using Json = Newtonsoft.Json;\nusing System.IO;\n\n" +
+        "namespace App;\n\npublic class A\n{\n" +
+        "    public void Go()\n    {\n        using (var x = File.Open(p)) { }\n" +
+        "        using var y = File.Open(p);\n    }\n}\n",
+    ),
+    ["Newtonsoft.Json", "System.IO", "System.Linq", "System.Math"],
+    "an alias names what it aliases, and a using statement names no namespace at all",
+  )
+})
+
+test("a c# member is told from the statement written the same way", () => {
+  const names = (source: string) =>
+    declared(scrub(source, "c").code, dialectOf("a.cs")!).map((one) => one.name)
+  assert.deepEqual(
+    names(
+      "public partial class Window : Base\n{\n" +
+        "    public Window(ILogger log) : base(log)\n    {\n" +
+        "        InitializeComponent();\n    }\n" +
+        "    public async Task<List<Thing>> LoadAsync(int id) => await _repo.Get(id);\n" +
+        "    private static Dictionary<string, int> Count<T>(IEnumerable<T> all)\n    {\n" +
+        "        return new Dictionary<string, int>();\n    }\n" +
+        "    public string Name { get; set; }\n" +
+        "    public event EventHandler Changed;\n}\n",
+    ),
+    ["Window", "Window", "LoadAsync", "Count"],
+    "a constructor, an arrow body and a generic method declare; a property and an event do not",
+  )
+  assert.deepEqual(
+    names(
+      "public interface IStore\n{\n    Task<int> Save(Item one);\n    void Clear();\n}\n" +
+        "public delegate void Changed(object sender);\n" +
+        "public record Person(string Name);\n",
+    ),
+    ["IStore", "Save", "Clear", "Changed", "Person"],
+    "an interface declares without a body, and a delegate names its type before its name",
+  )
+  assert.deepEqual(
+    names(
+      "public void Go()\n{\n    return Compute(1);\n    await Client.GetAsync(url);\n" +
+        "    var held = Build(x);\n    new Thread(Work).Start();\n    Debug.Assert(ok);\n}\n",
+    ),
+    ["Go"],
+    "every line of that body is a call, and none of them declares anything",
+  )
+})
+
+test("c# holds a string three ways, and the two it added are not escaped the way c is", () => {
+  const one = scrub('var p = @"C:\\temp\\";\nvar q = Go();\n', "c")
+  assert.deepEqual(one.strings, ["C:\\temp\\"], "a backslash is a backslash in a verbatim string")
+  assert.match(one.code, /var q = /, "and the line after it is still code")
+  assert.deepEqual(scrub('var s = @"a""b";', "c").strings, ['a""b'], "a doubled quote is one quote")
+
+  const raw = scrub(
+    'var sql = """\n  select * from t where x = Go()\n  """;\nvar q = Real();\n',
+    "c",
+  )
+  assert.equal(raw.strings.length, 1, "a raw string is one string, lines and all")
+  assert.doesNotMatch(raw.code, /select/, "what it holds is never read as code")
+  assert.equal(raw.code.split("\n").length, 5, "and every line survives it")
+})
+
+test("markup comments with an angle bracket, so a slash in it opens nothing", () => {
+  const done = scrub(
+    "<Page x:Class=\"A.B\" xmlns:d='clr-namespace:A.C'>\n" +
+      '  <!-- <Thing Source="gone.xaml" /> -->\n' +
+      '  <Web Url="https://example.com/x" />\n</Page>\n',
+    "xml",
+  )
+  assert.doesNotMatch(done.code, /gone/, "a commented element is not markup")
+  assert.ok(done.strings.includes("https://example.com/x"), "a url is one string, slashes and all")
+  assert.ok(done.strings.includes("clr-namespace:A.C"), "and a single quote holds one too")
+  assert.equal(done.code.split("\n").length, 5, "every line survives")
+
+  const said = foreign(
+    '<Page x:Class="A.B" xmlns:local="clr-namespace:A.Views;assembly=A">\n' +
+      '  <ResourceDictionary Source="Themes/Dark.xaml" />\n' +
+      '  <Image Source="/Assets/logo.png" />\n</Page>\n',
+    dialectOf("a.xaml")!,
+  ).map((one) => one.text)
+  assert.deepEqual(
+    said.sort(),
+    ["A.B", "A.Views", "Themes/Dark.xaml"],
+    "a picture is not a module, and the assembly a namespace names is not part of it",
+  )
+})
+
+test("a .net specifier lands under the project that declares its namespace", () => {
+  const parts = new Map([
+    ["App", "src/App"],
+    ["Fix.Core", "src/Core"],
+  ])
+  const at = (from: string, text: string) => candidates(dialectOf(from)!, text, from, parts)
+  assert.ok(at("src/App/Main.cs", "App.Services").includes("src/App/Services/"))
+  assert.ok(at("src/App/Main.cs", "Fix.Core.Models").includes("src/Core/Models/"))
+  // nothing here declares that root, so the repo's own folders are all there is to try
+  assert.ok(at("src/App/Main.cs", "Other.Thing").includes("Other/Thing.cs"))
+  assert.ok(
+    at("src/App/MainWindow.xaml", "App.MainWindow").includes("src/App/MainWindow.xaml.cs"),
+    "x:Class is the file behind this one",
+  )
+  assert.ok(
+    at("src/App/MainWindow.xaml", "pack://application:,,,/App;component/Themes/Dark.xaml").includes(
+      "src/App/Themes/Dark.xaml",
+    ),
+    "a pack uri is a path with an assembly in front of it",
+  )
 })

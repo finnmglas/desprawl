@@ -68,6 +68,8 @@ export function scrub(
   const py = flavour === "py"
   // both quote styles hold a string, and a hash opens a comment
   const php = flavour === "php"
+  // markup: both quote styles hold a string too, and a slash opens nothing at all
+  const xml = flavour === "xml"
   // rust nests its block comments, c and the jvm close on the first */
   const nests = flavour === "rs"
 
@@ -131,10 +133,15 @@ export function scrub(
       // a docstring spans lines, and every one of them has to survive it
       code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(held, /\n/g))}`
       i = end === -1 ? source.length : end + 3
-    } else if (!py && ch === "/" && next === "/") {
+    } else if (xml && ch === "<" && source.startsWith("<!--", i)) {
+      const end = source.indexOf("-->", i + 4)
+      const at = end === -1 ? source.length : end + 3
+      code += source.slice(i, at).replace(/[^\n]/g, " ")
+      i = at
+    } else if (!py && !xml && ch === "/" && next === "/") {
       const end = source.indexOf("\n", i)
       i = end === -1 ? source.length : end
-    } else if (!py && ch === "/" && next === "*") {
+    } else if (!py && !xml && ch === "/" && next === "*") {
       let at = i + 2
       let depth = 1
       while (at < source.length && depth) {
@@ -144,7 +151,7 @@ export function scrub(
       }
       code += source.slice(i, at).replace(/[^\n]/g, " ")
       i = at
-    } else if (!py && /^[rR]#*"/.test(source.slice(i)) && !WORD.test(code.at(-1) ?? " ")) {
+    } else if (!py && !xml && /^[rR]#*"/.test(source.slice(i)) && !WORD.test(code.at(-1) ?? " ")) {
       // a raw string: rust writes r#"..."#, c++ writes R"delim(...)delim"
       const rust = source[i] === "r"
       const hashes = /^[rR](#*)"/.exec(source.slice(i))![1]
@@ -156,11 +163,34 @@ export function scrub(
       strings.push(source.slice(at, to))
       code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(source.slice(i, to), /\n/g))}`
       i = to + fence.length
-    } else if (!js && !py && !php && ch === "'" && /^'(\\.|[^'\\])'/.test(source.slice(i))) {
+    } else if (!js && !py && !php && !xml && source.slice(i, i + 3) === '"""') {
+      // a raw string in c#, a text block on the jvm: three quotes or more, closed by as many
+      const fence = /^"{3,}/.exec(source.slice(i))![0]
+      const end = source.indexOf(fence, i + fence.length)
+      const to = end === -1 ? source.length : end
+      strings.push(source.slice(i + fence.length, to))
+      code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(source.slice(i, to), /\n/g))}`
+      i = to + fence.length
+    } else if (!js && !py && !php && !xml && ch === "@" && next === '"') {
+      // a verbatim string: a backslash is a backslash there, and a doubled quote is one quote
+      let at = i + 2
+      while (at < source.length && !(source[at] === '"' && source[at + 1] !== '"'))
+        at += source[at] === '"' ? 2 : 1
+      strings.push(source.slice(i + 2, at))
+      code += `${MARK}${strings.length - 1}${MARK}${"\n".repeat(count(source.slice(i, at), /\n/g))}`
+      i = at + 1
+    } else if (
+      !js &&
+      !py &&
+      !php &&
+      !xml &&
+      ch === "'" &&
+      /^'(\\.|[^'\\])'/.test(source.slice(i))
+    ) {
       // a char literal, and its neighbour 'a in &'a str, which opens nothing
       code += " "
       i += /^'\\/.test(source.slice(i)) ? 4 : 3
-    } else if (!js && !py && !php && ch === "'") {
+    } else if (!js && !py && !php && !xml && ch === "'") {
       code += " "
       i++
     } else if (ch === '"' || ch === "'") {
@@ -325,7 +355,17 @@ export function declared(code: string, dialect: Dialect) {
   const found: { name: string; at: number; kind: "function" | "class" }[] = []
   for (const { kind, re } of dialect.decls)
     for (const m of code.matchAll(re)) found.push({ name: m[1], at: m.index + m[0].length, kind })
-  return found.sort((a, b) => a.at - b.at)
+  // two patterns reading one declaration is still one declaration, and counting it twice
+  // is invisible: a constructor is both a member and the one shape a member never has
+  const seen = new Set<string>()
+  return found
+    .sort((a, b) => a.at - b.at)
+    .filter((one) => {
+      const key = `${one.at}#${one.name}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
 }
 
 /** where every line starts, counted once per file rather than once per declaration */

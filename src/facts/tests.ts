@@ -2,7 +2,7 @@
 // goal: what tests exist and what they cover, without running anything
 
 import { execFile } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { VENDORED, reading } from "../read/graph.ts"
 import { dialectOf } from "../read/dialects.ts"
@@ -98,17 +98,21 @@ const MEASURE: Record<string, string> = {
     "node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info",
   mocha: "npx c8 --reporter=lcov npm test",
   ava: "npx c8 --reporter=lcov npm test",
+  "dotnet test": 'dotnet test --collect:"XPlat Code Coverage"',
 }
 
 // what declares a test, whichever runner is underneath
 const CASE = /(^|[\s;{}])(test|it)(\.\w+)?\s*\(/g
 
-// a suite no package.json describes: its files, what declares a case, what runs them
+// a suite no package.json describes: its files, what declares a case, what runs them, and
+// whether a file of that language is a test file only where it holds one
 // prettier-ignore
-const SUITES: [runner: string, named: RegExp, one: RegExp, ran: string][] = [
+const SUITES: [runner: string, named: RegExp, one: RegExp, ran: string, holds?: boolean][] = [
   ["pytest", /(^|\/)(test_[^/]+|[^/]+_test)\.py$/, /^[^\S\n]*(?:async\s+)?def\s+test\w*\s*\(/gm, "pytest"],
   ["go test", /_test\.go$/, /^func\s+(?:Test|Fuzz|Example)\w*\s*\(/gm, "go test ./..."],
-  ["cargo test", /\.rs$/, /#\[(?:\w+::)?test\]/g, "cargo test"],
+  ["cargo test", /\.rs$/, /#\[(?:\w+::)?test\]/g, "cargo test", true],
+  // every .net runner writes its cases as an attribute, and one project holds them all
+  ["dotnet test", /\.(cs|fs|vb)$/, /\[(?:Fact|Theory|Test|TestMethod|TestCase|DataTestMethod|Property)\b/g, "dotnet test", true],
 ]
 const RUNNERS: [string, RegExp][] = [
   ["vitest", /^vitest$/],
@@ -147,6 +151,36 @@ function coverage(root: string): { made: Suite["coverage"]; from: string } {
       },
       from: "coverage.json",
     }
+
+  // what a .net run collects, under a folder per run
+  const cobertura = [
+    join(root, "coverage.cobertura.xml"),
+    join(root, "coverage", "coverage.cobertura.xml"),
+    ...(() => {
+      try {
+        return readdirSync(join(root, "TestResults")).map((one) =>
+          join(root, "TestResults", one, "coverage.cobertura.xml"),
+        )
+      } catch {
+        return []
+      }
+    })(),
+  ].find((one) => existsSync(one))
+  if (cobertura) {
+    const text = readFileSync(cobertura, "utf8").slice(0, 4096)
+    const rate = (key: string) =>
+      Math.round(Number(new RegExp(`${key}="([\\d.]+)"`).exec(text)?.[1] ?? 0) * 1000) / 10
+    return {
+      made: {
+        lines: rate("line-rate"),
+        statements: rate("line-rate"),
+        branches: rate("branch-rate"),
+        // cobertura counts complexity where lcov counts functions, so neither says this
+        functions: 0,
+      },
+      from: cobertura.slice(root.length + 1),
+    }
+  }
 
   const lcov = [join(root, "coverage", "lcov.info"), join(root, "coverage.lcov")].find((one) =>
     existsSync(one),
@@ -202,14 +236,14 @@ export function tests(repo: string): Suite {
 
   // and the suites written in every other language, which no manifest lists
   let ran = ""
-  for (const [runner, named, one, run] of SUITES) {
+  for (const [runner, named, one, run, holds] of SUITES) {
     let held = 0
     let found = 0
     for (const path of tracked) {
       if (!named.test(path) || VENDORED.test(path)) continue
       const count = (code(path).match(one) ?? []).length
-      // a rust file is a test file only where it holds one
-      if (!count && runner === "cargo test") continue
+      // a rust or c# file is a test file only where it holds a case
+      if (!count && holds) continue
       held++
       found += count
     }

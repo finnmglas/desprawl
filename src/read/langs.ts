@@ -25,4 +25,9 @@ export const LANGS: Record<string, string> = {
   txt: "Text", snap: "Snapshot", svg: "SVG", xml: "XML", csv: "CSV", tsv: "CSV", ini: "INI",
   cfg: "INI", conf: "INI", properties: "INI", plist: "XML", bzl: "Starlark", mk: "Make",
   patch: "Patch", diff: "Patch", lock: "Lockfile", ipynb: "Notebook",
+  xaml: "XAML", axaml: "XAML", razor: "Razor", cshtml: "Razor", vbhtml: "Razor",
+  fs: "F#", fsi: "F#", fsx: "F#", resx: "XML", nuspec: "XML", ruleset: "XML",
+  runsettings: "XML", dotsettings: "XML", vsixmanifest: "XML", manifest: "XML",
+  csproj: "MSBuild", fsproj: "MSBuild", vbproj: "MSBuild", props: "MSBuild",
+  targets: "MSBuild", sln: "Solution", slnx: "Solution",
 }

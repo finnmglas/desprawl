@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { VENDORED } from "../read/graph.ts"
-import { roleOf } from "../read/layers.ts"
+import { GENERATED, roleOf } from "../read/layers.ts"
 import { specifiers } from "../read/specifiers.ts"
 
 export interface Said {
@@ -33,12 +33,13 @@ const RUN = 5
 // past this a line is boilerplate rather than a place a copy begins
 const COMMON = 60
 
-const CODE = /\.(tsx?|jsx?|mts|cts)$/
+const CODE = /\.(tsx?|jsx?|mts|cts|cs)$/
 // a stub beside the thing it stands in for, which no folder name gives away
 const MOCK = /(^|\/|\.)(mock|mocks|stub|stubs|fake|fakes|fixture|fixtures)\.[cm]?[jt]sx?$/i
-// vendored code is somebody else's copy, and a minified file is one line
+// vendored code is somebody else's copy, a minified file is one line, and a generated one
+// repeats itself because a generator wrote it that way
 const ours = (path: string) =>
-  CODE.test(path) && !VENDORED.test(path) && !/\.min\.[jt]s$/.test(path)
+  CODE.test(path) && !VENDORED.test(path) && !GENERATED.test(path) && !/\.min\.[jt]s$/.test(path)
 
 // what a utility class is spelled like: a variant or two, then a property and its value
 // prettier-ignore
@@ -123,6 +124,7 @@ const skip = (line: string) =>
   line.startsWith("/*") ||
   line.startsWith("import ") ||
   line.startsWith("export ") ||
+  line.startsWith("using ") ||
   /^[)\]}>,;]+$/.test(line)
 
 /** the same lines in two files, grown as far as they match */

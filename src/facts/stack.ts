@@ -88,7 +88,8 @@ function manifest(repo: string, path: string): Manifest | null {
 
 const label = (table: Table, name: string): string =>
   table[name] ??
-  Object.entries(table).find(([key]) => key.endsWith("/") && name.startsWith(key))?.[1] ??
+  // a scope ends in a slash and a package namespace in a dot, and both are prefixes
+  Object.entries(table).find(([key]) => /[/.]$/.test(key) && name.startsWith(key))?.[1] ??
   ""
 
 /** newest commits only, a signature further back says little about the code now */
@@ -139,6 +140,7 @@ function markers(repo: string, paths: string[]) {
   const agentFiles: Record<string, number> = {}
   const hosts: string[] = []
   const apps: string[] = []
+  const frameworks: string[] = []
 
   const port = (value: number) => {
     if (value > 0 && value < 65536 && !ports.includes(value)) ports.push(value)
@@ -188,6 +190,30 @@ function markers(repo: string, paths: string[]) {
       if (/"strict"\s*:\s*true/.test(text)) strict.on++
       else if (/"compilerOptions"/.test(text)) strict.off++
     }
+    // a .net project builds against a toolkit rather than depending on a package for one,
+    // and the sdk it names is the only place an implicit framework is written down
+    if (/\.(cs|fs|vb)proj$/.test(path)) {
+      const text = read(repo, path)
+      const sdk = /<Project[^>]*\bSdk\s*=\s*"([^"]+)"/i.exec(text)?.[1] ?? ""
+      if (/Sdk\.Web$/i.test(sdk)) add(frameworks, "ASP.NET Core")
+      if (/Blazor/i.test(sdk)) add(frameworks, "Blazor")
+      if (/Razor$/i.test(sdk)) add(frameworks, "ASP.NET Core")
+      if (/<UseWPF>\s*true/i.test(text)) {
+        add((found.ui ??= []), "WPF")
+        add(apps, "Windows")
+      }
+      if (/<UseWindowsForms>\s*true/i.test(text)) {
+        add((found.ui ??= []), "WinForms")
+        add(apps, "Windows")
+      }
+      if (/<UseMaui>\s*true/i.test(text)) add(frameworks, "MAUI")
+      if (/<TargetFrameworks?>[^<]*-windows/i.test(text)) add(apps, "Windows")
+      if (/<TargetFrameworks?>[^<]*-(android|ios|maccatalyst)/i.test(text))
+        for (const one of text.matchAll(/-(android|ios|maccatalyst)/gi))
+          add(apps, one[1] === "ios" ? "iOS" : one[1] === "android" ? "Android" : "macOS")
+      for (const one of text.matchAll(/<(?:ApplicationUrl|LaunchUrl)>[^<]*:(\d{2,5})/gi))
+        port(Number(one[1]))
+    }
     if (/^(.*\/)?\.nvmrc$|^(.*\/)?\.node-version$/.test(path)) add(node, read(repo, path).trim())
     if (/^(.*\/)?\.env(\..+)?$/.test(path)) add(env, path.split("/").pop() ?? path)
     if (/^(.*\/)?[Dd]ockerfile(\..+)?$/.test(path)) {
@@ -198,7 +224,20 @@ function markers(repo: string, paths: string[]) {
         port(Number(line[1]))
     }
   }
-  return { found, counts, node, env, strict, ports, agents, agentFiles, hosts, apps, port }
+  return {
+    found,
+    counts,
+    node,
+    env,
+    strict,
+    ports,
+    agents,
+    agentFiles,
+    hosts,
+    apps,
+    frameworks,
+    port,
+  }
 }
 
 /** a licence beside the manifest speaks for the project, the rest come with vendored code */
@@ -235,9 +274,9 @@ function licences(repo: string, paths: string[]): { licenses: string[]; vendored
 }
 
 // prettier-ignore
-const SERVER = ["Express", "Fastify", "NestJS", "Koa", "Hono", "hapi", "Next.js", "Nuxt", "SvelteKit"]
+const SERVER = ["Express", "Fastify", "NestJS", "Koa", "Hono", "hapi", "Next.js", "Nuxt", "SvelteKit", "ASP.NET Core", "ASP.NET"]
 // prettier-ignore
-const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt", "Flutter"]
+const CLIENT = ["React", "Vue", "Svelte", "Angular", "Solid", "Preact", "Astro", "Next.js", "Nuxt", "Flutter", "Blazor"]
 
 /** what the repo holds, judged by what it depends on and what it ships */
 function shipped(
@@ -265,8 +304,20 @@ function shipped(
 
 export function stack(repo: string, languages: Node[] = []): Stack {
   const paths = git(repo, "ls-files", "-z").split("\0").filter(Boolean)
-  const { found, counts, node, env, strict, ports, agents, agentFiles, hosts, apps, port } =
-    markers(repo, paths)
+  const {
+    found,
+    counts,
+    node,
+    env,
+    strict,
+    ports,
+    agents,
+    agentFiles,
+    hosts,
+    apps,
+    frameworks: built,
+    port,
+  } = markers(repo, paths)
   const licenses: string[] = []
   const modules: string[] = []
 
@@ -279,7 +330,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
 
   // one bucket per table
   const dep: Record<string, string[]> = {
-    frameworks: [],
+    frameworks: [...built],
     state: [],
     ui: [...(found.ui ?? [])],
     connects: [],
@@ -453,6 +504,7 @@ export function stack(repo: string, languages: Node[] = []): Stack {
 }
 
 const MANAGERS: Record<string, string> = {
+  dotnet: "nuget",
   cargo: "cargo",
   python: "pip",
   gradle: "gradle",
@@ -472,6 +524,18 @@ const OUT_FRAMEWORKS: Table = {
   quarkus: "Quarkus", vertx: "Vert.x", gin: "Gin", echo: "Echo", fiber: "Fiber", chi: "chi",
   laravel: "Laravel", symfony: "Symfony", vapor: "Vapor", rails: "Rails", sinatra: "Sinatra",
   "aspnetcore": "ASP.NET Core", flutter: "Flutter", shelf: "shelf", "dart_frog": "Dart Frog",
+  // .net names a package for the namespace it fills, so the longer name goes first
+  "Microsoft.AspNetCore.Components": "Blazor", "Microsoft.AspNetCore.Components.": "Blazor",
+  "Microsoft.AspNetCore.": "ASP.NET Core", "Microsoft.AspNet.Mvc": "ASP.NET MVC",
+  "Microsoft.AspNet.WebApi": "ASP.NET Web API", "Microsoft.AspNet.WebApi.": "ASP.NET Web API",
+  "Microsoft.Azure.Functions.Worker": "Azure Functions", "Microsoft.NET.Sdk.Functions": "Azure Functions",
+  "Microsoft.Maui": "MAUI", "Microsoft.Maui.": "MAUI", "Microsoft.WindowsAppSDK": "WinUI",
+  Avalonia: "Avalonia", "Avalonia.": "Avalonia", "Uno.UI": "Uno", "Uno.UI.": "Uno",
+  "Xamarin.Forms": "Xamarin", "Xamarin.": "Xamarin", Prism: "Prism Library", "Prism.": "Prism Library",
+  "Caliburn.Micro": "Caliburn.Micro", "Stylet": "Stylet", MediatR: "MediatR",
+  "MassTransit": "MassTransit", "MassTransit.": "MassTransit", "Microsoft.Orleans.": "Orleans",
+  ServiceStack: "ServiceStack", "ServiceStack.": "ServiceStack", Nancy: "Nancy",
+  "Umbraco.Cms": "Umbraco",
 }
 
 // what holds the state of a running app, which is not what shapes it
@@ -480,6 +544,8 @@ const OUT_STATE: Table = {
   "flutter_bloc": "Bloc", bloc: "Bloc", provider: "Provider", riverpod: "Riverpod",
   "flutter_riverpod": "Riverpod", "get_it": "get_it", mobx: "MobX", "flutter_mobx": "MobX",
   redux: "Redux",
+  "CommunityToolkit.Mvvm": "MVVM Toolkit", ReactiveUI: "ReactiveUI", "ReactiveUI.": "ReactiveUI",
+  "MvvmLight": "MVVM Light", "MvvmLightLibs": "MVVM Light", "Microsoft.Toolkit.Mvvm": "MVVM Toolkit",
 }
 
 // an argument parser shapes a program the way a router does, and says it is a cli
@@ -489,6 +555,8 @@ const OUT_CLIS: Table = {
   argparse: "argparse", click: "Click", typer: "Typer", fire: "Fire", docopt: "docopt",
   picocli: "picocli", "commons-cli": "commons-cli", args4j: "args4j", clikt: "Clikt",
   cobra: "Cobra", urfave: "urfave/cli", kingpin: "kingpin", "swift-argument-parser": "ArgumentParser",
+  "System.CommandLine": "System.CommandLine", CommandLineParser: "CommandLineParser",
+  "McMaster.Extensions.CommandLineUtils": "CommandLineUtils",
 }
 
 // what it runs on rather than what it is: an async runtime, a thread pool, a jit
@@ -498,6 +566,12 @@ const OUT_RUNTIMES: Table = {
   "kotlinx-coroutines-core": "Coroutines", asyncio: "asyncio", uvloop: "uvloop", gevent: "gevent",
   uvicorn: "Uvicorn", gunicorn: "Gunicorn", hypercorn: "Hypercorn", wasm: "WebAssembly",
   "flutter_isolate": "Isolates",
+  "System.Reactive": "Rx.NET", "System.Reactive.": "Rx.NET", Polly: "Polly", "Polly.": "Polly",
+  "Hangfire": "Hangfire", "Hangfire.": "Hangfire", Quartz: "Quartz", "Quartz.": "Quartz",
+  Autofac: "Autofac", "Autofac.": "Autofac", DryIoc: "DryIoc", Ninject: "Ninject",
+  SimpleInjector: "Simple Injector", "Microsoft.Extensions.DependencyInjection": "MS DI",
+  "Microsoft.Extensions.Hosting": "Generic Host", "Microsoft.Extensions.Hosting.": "Generic Host",
+  "System.Threading.Tasks.Dataflow": "Dataflow",
 }
 
 // something it talks to: a database, an http client, a queue, a model
@@ -513,6 +587,19 @@ const OUT_CONNECTS: Table = {
   "aws-sdk-go": "AWS", stripe: "Stripe", sentry: "Sentry", dio: "dio", chopper: "Chopper",
   "shared_preferences": "SharedPreferences", sqflite: "SQLite", hive: "Hive",
   "firebase_core": "Firebase", "cloud_firestore": "Firebase", graphql_flutter: "GraphQL",
+  "Microsoft.EntityFrameworkCore": "EF Core", "Microsoft.EntityFrameworkCore.": "EF Core",
+  Dapper: "Dapper", "Dapper.": "Dapper", NHibernate: "NHibernate", "MongoDB.Driver": "MongoDB",
+  "StackExchange.Redis": "Redis", Npgsql: "Postgres", "Npgsql.": "Postgres",
+  "Microsoft.Data.SqlClient": "SQL Server", "System.Data.SqlClient": "SQL Server",
+  "MySql.Data": "MySQL", "Oracle.ManagedDataAccess": "Oracle", "Microsoft.Data.Sqlite": "SQLite",
+  "LiteDB": "LiteDB", "RestSharp": "RestSharp", Refit: "Refit", "Refit.": "Refit",
+  "Flurl.Http": "Flurl", "Grpc.": "gRPC", "Google.Protobuf": "Protobuf",
+  "Azure.AI.OpenAI": "OpenAI", "Azure.": "Azure SDK", "AWSSDK.": "AWS",
+  "Microsoft.Graph": "Microsoft Graph", "Microsoft.SemanticKernel": "Semantic Kernel",
+  OpenAI: "OpenAI", "Anthropic.SDK": "Anthropic", "Twilio": "Twilio", "Stripe.net": "Stripe",
+  SendGrid: "SendGrid", "RabbitMQ.Client": "RabbitMQ", "Confluent.Kafka": "Kafka",
+  "Elastic.Clients.Elasticsearch": "Elasticsearch", "NEST": "Elasticsearch",
+  "Microsoft.AspNetCore.SignalR.Client": "SignalR",
 }
 
 // how it reads and writes its own data, which is neither a framework nor a connection
@@ -521,6 +608,12 @@ const OUT_CONTENT: Table = {
   serde: "Serde", "serde_json": "Serde", prost: "Protobuf", bincode: "bincode", toml: "TOML",
   pydantic: "Pydantic", numpy: "NumPy", pandas: "pandas", polars: "Polars", "pyarrow": "Arrow",
   jackson: "Jackson", gson: "Gson", kotlinx: "kotlinx.serialization", protobuf: "Protobuf",
+  "Newtonsoft.Json": "Json.NET", "System.Text.Json": "System.Text.Json", "protobuf-net": "protobuf-net",
+  MessagePack: "MessagePack", CsvHelper: "CsvHelper", ClosedXML: "ClosedXML", EPPlus: "EPPlus",
+  AutoMapper: "AutoMapper", "AutoMapper.": "AutoMapper", Mapster: "Mapster",
+  FluentValidation: "FluentValidation", "FluentValidation.": "FluentValidation",
+  YamlDotNet: "YamlDotNet", HtmlAgilityPack: "HtmlAgilityPack", QuestPDF: "QuestPDF",
+  itext7: "iText", iTextSharp: "iText", "SixLabors.ImageSharp": "ImageSharp",
 }
 
 // prettier-ignore
@@ -529,6 +622,15 @@ const OUT_UI: Table = {
   appcompat: "AppCompat", "core-ktx": "AndroidX", material: "Material", compose: "Compose",
   swiftui: "SwiftUI", tkinter: "Tkinter", "PyQt5": "Qt", kivy: "Kivy",
   cupertino_icons: "Cupertino", "google_fonts": "Google Fonts",
+  MaterialDesignThemes: "Material Design in XAML", "MahApps.Metro": "MahApps.Metro",
+  HandyControl: "HandyControl", ModernWpfUI: "Modern WPF", "WPF-UI": "WPF UI",
+  "DevExpress.": "DevExpress", "Telerik.": "Telerik", "Syncfusion.": "Syncfusion",
+  "Infragistics.": "Infragistics", "Extended.Wpf.Toolkit": "Extended WPF Toolkit",
+  "Microsoft.Xaml.Behaviors.Wpf": "XAML Behaviors", "ICSharpCode.AvalonEdit": "AvalonEdit",
+  "Dirkster.AvalonDock": "AvalonDock", "LiveCharts": "LiveCharts", "LiveChartsCore.": "LiveCharts",
+  "OxyPlot.": "OxyPlot", ScottPlot: "ScottPlot", "Spectre.Console": "Spectre.Console",
+  "Terminal.Gui": "Terminal.Gui", "Microsoft.Toolkit.Uwp.": "Windows Community Toolkit",
+  "CommunityToolkit.WinUI.": "Windows Community Toolkit",
 }
 
 // prettier-ignore
@@ -539,11 +641,62 @@ const OUT_TESTS: Table = {
   testify: "testify", gtest: "GoogleTest", catch2: "Catch2", doctest: "doctest", rspec: "RSpec",
   phpunit: "PHPUnit", xunit: "xUnit", nunit: "NUnit", "flutter_test": "flutter_test",
   "integration_test": "integration_test", mocktail: "mocktail",
+  "xunit.": "xUnit", NUnit: "NUnit", "NUnit3TestAdapter": "NUnit", "MSTest": "MSTest",
+  "MSTest.": "MSTest", Moq: "Moq", "Moq.": "Moq", NSubstitute: "NSubstitute",
+  FluentAssertions: "FluentAssertions", Shouldly: "Shouldly", AutoFixture: "AutoFixture",
+  "AutoFixture.": "AutoFixture", Bogus: "Bogus", FakeItEasy: "FakeItEasy", "SpecFlow.": "SpecFlow",
+  "Testcontainers.": "Testcontainers", Testcontainers: "Testcontainers",
+  "coverlet.collector": "coverlet", "coverlet.msbuild": "coverlet",
+  "Microsoft.NET.Test.Sdk": "VSTest", BenchmarkDotNet: "BenchmarkDotNet",
+  "Verify.": "Verify", "Microsoft.Playwright": "Playwright", "Selenium.WebDriver": "Selenium",
+}
+
+// what it says about itself while it runs
+// prettier-ignore
+const OUT_OBSERVES: Table = {
+  Serilog: "Serilog", "Serilog.": "Serilog", NLog: "NLog", "NLog.": "NLog", log4net: "log4net",
+  "OpenTelemetry": "OpenTelemetry", "OpenTelemetry.": "OpenTelemetry",
+  "Microsoft.ApplicationInsights": "Application Insights",
+  "Microsoft.ApplicationInsights.": "Application Insights",
+  "prometheus-net": "Prometheus", "prometheus-net.": "Prometheus", "Sentry": "Sentry",
+  "Sentry.": "Sentry", "Datadog.Trace": "Datadog", "Elastic.Apm": "Elastic APM",
+}
+
+// who a caller is, and what it may do
+// prettier-ignore
+const OUT_AUTH: Table = {
+  "Microsoft.AspNetCore.Authentication.JwtBearer": "JWT",
+  "Microsoft.AspNetCore.Identity": "ASP.NET Identity",
+  "Microsoft.AspNetCore.Identity.": "ASP.NET Identity",
+  "Microsoft.Identity.Web": "Microsoft Identity", "Microsoft.Identity.Client": "MSAL",
+  "IdentityServer4": "IdentityServer", "Duende.IdentityServer": "IdentityServer",
+  "Duende.": "IdentityServer", "System.IdentityModel.Tokens.Jwt": "JWT",
+  "BCrypt.Net-Next": "BCrypt",
+}
+
+// what turns the source into something shippable
+// prettier-ignore
+const OUT_BUILD: Table = {
+  Fody: "Fody", "Costura.Fody": "Costura", "WiX": "WiX", "WixToolset.": "WiX",
+  "Squirrel.Windows": "Squirrel", Velopack: "Velopack", "Microsoft.SourceLink.": "SourceLink",
+  "Nerdbank.GitVersioning": "GitVersioning", GitVersion: "GitVersion",
+  "Microsoft.CodeAnalysis.": "Roslyn",
 }
 
 const FOREIGN: [
   Table,
-  "frameworks" | "runtimes" | "connects" | "content" | "ui" | "testing" | "state",
+  (
+    | "frameworks"
+    | "runtimes"
+    | "connects"
+    | "content"
+    | "ui"
+    | "testing"
+    | "state"
+    | "observability"
+    | "auth"
+    | "build"
+  ),
 ][] = [
   [OUT_FRAMEWORKS, "frameworks"],
   [OUT_CLIS, "frameworks"],
@@ -553,4 +706,7 @@ const FOREIGN: [
   [OUT_CONTENT, "content"],
   [OUT_UI, "ui"],
   [OUT_TESTS, "testing"],
+  [OUT_OBSERVES, "observability"],
+  [OUT_AUTH, "auth"],
+  [OUT_BUILD, "build"],
 ]

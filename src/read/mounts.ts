@@ -84,7 +84,7 @@ export const BLUEPRINT = marks(
 )
 // the same annotation names a prefix on a class and a route on a method, in four languages
 export const CONTROLLER = marks(
-  String.raw`[#@\[]\s*\[?(?:Controller|RestController|RequestMapping|ApiController|Path|Route)\s*\(\s*(?:value\s*=\s*|path\s*=\s*)?§`,
+  String.raw`[#@\[]\s*\[?(?:Controller|RestController|RequestMapping|ApiController|Path|Route|RoutePrefix)\s*\(\s*(?:value\s*=\s*|path\s*=\s*)?§`,
 )
 // the whole word, or `sort_prefix = "-"` reads as one
 export const PREFIX = marks(

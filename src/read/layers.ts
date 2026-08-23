@@ -83,11 +83,18 @@ export interface Layout {
   depth: number
 }
 
-// a python repo writes its suites as underscore compounds, and none of them is source
+// a python repo writes its suites as underscore compounds, and a .net one a project per
+// suite, named for what it tests: none of either is source
 const TEST =
-  /(^|\/)(__tests__|__mocks__|tests?|specs?|e2e|cypress|fixtures?|mocks?|stories|[\w-]*_(tests?|testing)|(e2e|integration|unit|acceptance|smoke)-tests?|test_[\w-]+)(\/|$)|\.(test|spec|stories)\.[cm]?[jt]sx?$/
-const SUPPORT =
-  /(^|\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|documentations?|archives?|notebooks?|benchmarks?|\.\w+)(\/|$)|\.config\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.(config|setup|rc)\.[cm]?[jt]sx?$/
+  /(^|\/)(__tests__|__mocks__|tests?|specs?|e2e|cypress|fixtures?|mocks?|stories|[\w-]*_(tests?|testing)|(e2e|integration|unit|acceptance|smoke)-tests?|test_[\w-]+)(\/|$)|\.(test|spec|stories)\.[cm]?[jt]sx?$|(^|\/)[\w.-]*\.([Tt]ests?|[Ss]pecs?|UnitTests|IntegrationTests|FunctionalTests|AcceptanceTests|TestCommon|TestUtilities)(\/|$)|[\w.]*(Tests?|Specs?)\.(cs|fs|vb)$/
+/** a builder wrote it beside the file that declares it, so nobody reads or edits it */
+export const GENERATED =
+  /\.([Dd]esigner|g|g\.i|generated|Generated)\.(cs|fs|vb)$|(^|\/)(AssemblyInfo|GlobalUsings|AssemblyAttributes)\.(cs|fs|vb)$/
+// and a .net project keeps its assembly attributes, its generated halves and its migrations
+// beside the code, none of which anybody wrote or would read
+const SUPPORT = new RegExp(
+  `(^|\\/)(scripts?|tools?|config|public|static|assets|examples?|docs?|documentations?|archives?|notebooks?|benchmarks?|wwwroot|Properties|Migrations|My Project|\\.\\w+)(\\/|$)|\\.config\\.[cm]?[jt]sx?$|(^|\\/)[\\w.-]*\\.(config|setup|rc)\\.[cm]?[jt]sx?$|${GENERATED.source}`,
+)
 
 /** loose at the root is config */
 const LOOSE = /^[^/]+\.[cm]?[jt]sx?$/

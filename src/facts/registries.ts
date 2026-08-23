@@ -21,7 +21,7 @@ export const REGISTRIES: Record<string, { label: string; at: (name: string) => s
 // prettier-ignore
 export const REGISTRY_BY_LANG: Record<string, string> = {
   ts: "npm", rust: "crates.io", python: "PyPI", jvm: "Maven", go: "Go",
-  csharp: "NuGet", ruby: "RubyGems", php: "Packagist", dart: "Pub",
+  csharp: "NuGet", xaml: "NuGet", ruby: "RubyGems", php: "Packagist", dart: "Pub",
 }
 
 export const REGISTRY_OF: Record<string, string> = {
@@ -31,6 +31,7 @@ export const REGISTRY_OF: Record<string, string> = {
   gradle: "Maven",
   go: "Go",
   pub: "Pub",
+  dotnet: "NuGet",
   cmake: "",
 }
 

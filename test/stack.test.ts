@@ -291,3 +291,38 @@ test("a flutter app reads as dart, not as the shell android builds it with", () 
   assert.equal(asked, 0, "a pubspec is not a package.json")
   assert.equal(s.dependencies, 4)
 })
+
+test("a .net project says what it builds against, not only what it depends on", () => {
+  const s = stack(
+    repo({
+      "src/App/App.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n' +
+        "    <OutputType>WinExe</OutputType>\n    <TargetFramework>net8.0-windows</TargetFramework>\n" +
+        "    <UseWPF>true</UseWPF>\n  </PropertyGroup>\n  <ItemGroup>\n" +
+        '    <PackageReference Include="MaterialDesignThemes" Version="5.0.0" />\n' +
+        '    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />\n' +
+        '    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />\n' +
+        '    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />\n' +
+        "  </ItemGroup>\n</Project>\n",
+      "src/Api/Api.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk.Web">\n  <PropertyGroup>\n' +
+        "    <TargetFramework>net8.0</TargetFramework>\n  </PropertyGroup>\n</Project>\n",
+      "test/Api.Tests/Api.Tests.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n' +
+        '    <PackageReference Include="xunit" Version="2.6.0" />\n' +
+        '    <PackageReference Include="coverlet.collector" Version="6.0.0" PrivateAssets="all" />\n' +
+        "  </ItemGroup>\n</Project>\n",
+      "src/App/MainWindow.xaml.cs": "namespace App;\n\npublic class MainWindow { }\n",
+    }),
+  )
+  assert.ok(s.ui.includes("WPF"), "the toolkit is a property, never a package")
+  assert.ok(s.frameworks.includes("ASP.NET Core"), "and the web sdk is the only word for that")
+  assert.ok(s.state.includes("MVVM Toolkit"))
+  assert.ok(s.ui.includes("Material Design in XAML"))
+  assert.ok(s.connects.includes("EF Core"), "a package is named for the namespace it fills")
+  assert.ok(s.observability.includes("Serilog"))
+  assert.ok(s.managers.includes("nuget"))
+  assert.deepEqual(s.parts.sort(), ["backend", "windows"])
+  assert.ok(s.testing.includes("xUnit"), "a test project is where a .net suite is declared")
+  assert.equal(s.registries["EF Core"], "dotnet")
+})

@@ -154,11 +154,27 @@ const RULES: Rule[] = [
     re: String.raw`\[Route\s*\(\s*§p` },
   { id: "aspnet", langs: ["csharp"], side: "server",
     re: String.raw`\.Map(?<m>Get|Post|Put|Patch|Delete)\s*\(\s*§p` },
+  // a hub is a socket the same framework mounts, and a group is a prefix over the rest
+  { id: "signalr", langs: ["csharp"], side: "server", method: "WS",
+    re: String.raw`\.MapHub\s*(?:<[^<>()]*>)?\s*\(\s*§p` },
+  // an attribute with no path of its own serves whatever its class is mounted under
+  { id: "aspnet", langs: ["csharp"], side: "server", bare: true,
+    re: String.raw`\[Http(?<m>Get|Post|Put|Patch|Delete|Head|Options)\s*(?:\(\s*\))?\]` },
+  // the older framework routes by convention, in a template held in one argument
+  { id: "aspnet", langs: ["csharp"], side: "server",
+    re: String.raw`routeTemplate\s*:\s*§p` },
   // refit declares a client the way retrofit does, in attributes on an interface
   { id: "refit", langs: ["csharp"], side: "client",
     re: String.raw`\[(?<m>Get|Post|Put|Patch|Delete)\s*\(\s*§p\s*\)\]` },
   { id: "http", langs: ["csharp"], side: "client",
     re: String.raw`\.(?<m>Get|Post|Put|Patch|Delete)(?:Async|StringAsync|JsonAsync|FromJsonAsync|AsJsonAsync)?\s*\(\s*§p` },
+  // a request built rather than sent, and the two clients that take the url in the constructor
+  { id: "http", langs: ["csharp"], side: "client",
+    re: String.raw`new\s+HttpRequestMessage\s*\(\s*HttpMethod\.(?<m>\w+)\s*,\s*¶` },
+  { id: "restsharp", langs: ["csharp"], side: "client",
+    re: String.raw`new\s+Rest(?:Request|Client)\s*\(\s*§p` },
+  { id: "url", langs: ["csharp"], side: "client", strict: "host",
+    re: String.raw`new\s+Uri\s*\(\s*§p` },
 
   // ---- php ----
   { id: "laravel", langs: ["php"], side: "server",
@@ -234,9 +250,10 @@ export const HOLDS =
 export const SERVES =
   /^(app|router|routers|server|route|routes|mux|srv|blueprint|bp|web|fastify|nest|r)$/i
 
-// a class under the annotation, past any other annotation on the way down
+// a class under the annotation, past any other annotation on the way down. .net writes its
+// own in brackets, and a controller carries three or four of them before the class
 export const CLASSY =
-  /^\s*\)?[^\n]*(?:\n\s*@[\w.]+(?:\([^)]*\))?[^\n]*)*\n\s*(?:(?:export|default|declare|public|private|protected|internal|open|final|abstract|sealed|data|static|partial|record)\s+)*(?:class|interface|object|enum|record)\s/
+  /^\s*\)?[^\n]*(?:\n\s*(?:@[\w.]+(?:\([^)]*\))?|\[|[\w.]+\s*[,)]|\))[^\n]*)*\n\s*(?:(?:export|default|declare|public|private|protected|internal|open|final|abstract|sealed|data|static|partial|record)\s+)*(?:class|interface|object|enum|record)\s/
 
 // a path, not a sentence, a file beside this one, or a picture
 export const ASSET =

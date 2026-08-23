@@ -128,6 +128,65 @@ const FIXTURES: Fixture[] = [
       ["lib/main.dart#main", "lib/deep/inner.dart#deeply"],
     ],
   },
+  {
+    // a solution of two projects: markup, the half behind it, and a library beside it
+    lang: "csharp",
+    files: {
+      "src/App/App.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n' +
+        "    <OutputType>WinExe</OutputType>\n    <TargetFramework>net8.0-windows</TargetFramework>\n" +
+        "    <UseWPF>true</UseWPF>\n    <RootNamespace>App</RootNamespace>\n  </PropertyGroup>\n" +
+        '  <ItemGroup>\n    <PackageReference Include="Serilog" Version="3.1.1" />\n' +
+        '    <ProjectReference Include="..\\Core\\Core.csproj" />\n  </ItemGroup>\n</Project>\n',
+      "src/App/MainWindow.xaml":
+        '<Window x:Class="App.MainWindow"\n' +
+        '        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"\n' +
+        '        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"\n' +
+        '        xmlns:local="clr-namespace:App.Controls">\n' +
+        "  <!-- <local:Missing /> is commented out -->\n" +
+        "  <Window.Resources>\n    <ResourceDictionary>\n" +
+        "      <ResourceDictionary.MergedDictionaries>\n" +
+        '        <ResourceDictionary Source="Themes/Dark.xaml" />\n' +
+        "      </ResourceDictionary.MergedDictionaries>\n" +
+        "    </ResourceDictionary>\n  </Window.Resources>\n" +
+        '  <local:Gauge Value="1" />\n</Window>\n',
+      "src/App/MainWindow.xaml.cs":
+        "using System;\nusing App.Services;\nusing Json = Newtonsoft.Json.JsonConvert;\n\n" +
+        "namespace App;\n\npublic partial class MainWindow : Window\n{\n" +
+        "    public MainWindow()\n    {\n        InitializeComponent();\n" +
+        "        Console.WriteLine(Loader.Load());\n    }\n}\n",
+      "src/App/Themes/Dark.xaml":
+        '<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" />\n',
+      "src/App/Controls/Gauge.cs":
+        "namespace App.Controls;\n\npublic class Gauge\n{\n    public int Value { get; set; }\n}\n",
+      "src/App/Services/Loader.cs":
+        "using Fix.Core.Models;\n\nnamespace App.Services;\n\npublic static class Loader\n{\n" +
+        "    public static int Load() => Cache.Get(new Item());\n}\n",
+      "src/App/Services/Cache.cs":
+        "using Fix.Core.Models;\n\nnamespace App.Services;\n\ninternal static class Cache\n{\n" +
+        "    internal static int Get(Item one)\n    {\n        return one.Id;\n    }\n}\n",
+      "src/Core/Core.csproj":
+        '<Project Sdk="Microsoft.NET.Sdk">\n  <PropertyGroup>\n' +
+        "    <TargetFramework>net8.0</TargetFramework>\n" +
+        "    <RootNamespace>Fix.Core</RootNamespace>\n  </PropertyGroup>\n</Project>\n",
+      "src/Core/Models/Item.cs":
+        "namespace Fix.Core.Models;\n\npublic class Item\n{\n    public int Id { get; set; }\n}\n",
+    },
+    edges: [
+      ["src/App/MainWindow.xaml", "src/App/MainWindow.xaml.cs"],
+      ["src/App/MainWindow.xaml", "src/App/Controls/Gauge.cs"],
+      ["src/App/MainWindow.xaml", "src/App/Themes/Dark.xaml"],
+      ["src/App/MainWindow.xaml.cs", "src/App/Services/Loader.cs"],
+      ["src/App/Services/Loader.cs", "src/Core/Models/Item.cs"],
+      // nothing imports a type in the namespace it is written in
+      ["src/App/Services/Loader.cs", "src/App/Services/Cache.cs"],
+    ],
+    declares: ["MainWindow", "Gauge", "Loader", "Load", "Cache", "Get", "Item"],
+    reaches: [
+      ["src/App/MainWindow.xaml.cs#MainWindow", "src/App/Services/Loader.cs#Load"],
+      ["src/App/Services/Loader.cs#Load", "src/App/Services/Cache.cs#Get"],
+    ],
+  },
 ]
 
 for (const one of FIXTURES)
@@ -173,6 +232,11 @@ test("a string or a comment cannot invent an import in any language", () => {
       "a.dart",
       "const s = \"import 'fake.dart';\";\n// import 'commented.dart';\nimport 'real.dart';",
     ],
+    ["a.cs", 'var s = "using Fake.Thing;";\n// using Commented.Out;\nusing Real.Thing;'],
+    [
+      "a.xaml",
+      '<!-- <Page x:Class="Commented.Out" /> -->\n<Page x:Class="Real.Thing" Tip="fake" />',
+    ],
   ]
   for (const [path, source] of cases) {
     const found = foreign(source, dialectOf(path)!).map((one) => one.text)
@@ -197,13 +261,16 @@ test("every language desprawl claims is one it can actually read", () => {
     "i.php": "<?php\nfunction go() {}",
     "j.ts": "export const go = () => 1",
     "k.dart": "void go() {}",
+    "l.xaml": '<UserControl x:Class="A.L" />',
   }
   const dir = repo(one)
   const graph = build(dir)
   const langs = new Set(Object.values(graph.modules).map((m) => m.lang))
   assert.equal(langs.size, LANGUAGES.length, `read ${[...langs].sort().join(",")}`)
   const found = calls(dir, graph)
-  for (const path of Object.keys(one))
+  // markup is read for what it reaches, never for what it declares: the class it names is
+  // declared by the file behind it
+  for (const path of Object.keys(one).filter((p) => !p.endsWith(".xaml")))
     assert.ok(
       Object.values(found.symbols).some((s) => s.file === path && s.kind !== "module"),
       `${path} declared nothing`,

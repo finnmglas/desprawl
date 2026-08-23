@@ -231,6 +231,14 @@ function span(code: string, from: number): number {
       }
       return code.length
     } else if (ch === "\n" && depth === 0) {
+      // a brace opening on the line below still opens this body, which is how c# and half
+      // the jvm are written: without this every declaration of theirs spans its own line
+      let ahead = at + 1
+      while (ahead < code.length && (code[ahead] === " " || code[ahead] === "\t")) ahead++
+      if (code[ahead] === "{") {
+        at = ahead - 1
+        continue
+      }
       if (!HANGING.test(code.slice(0, at).trimEnd())) return at
     }
   }
@@ -528,4 +536,6 @@ const outside = (lang: string, text: string): string =>
     ? text.split("::")[0]
     : lang === "jvm" || lang === "python"
       ? text.split(".").slice(0, 2).join(".")
-      : (text.split("/").pop() ?? text)
+      : lang === "csharp" || lang === "xaml"
+        ? text.split(".").slice(0, 2).join(".")
+        : (text.split("/").pop() ?? text)

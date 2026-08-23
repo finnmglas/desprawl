@@ -111,3 +111,66 @@ test("a venv is read the way node_modules is, and a lock pins what no venv holds
   assert.equal(by("httpx").direct, false)
   assert.ok(!found.list.some((one) => one.name === "dev"), "an extras group is not a package")
 })
+
+test("a restored .net package is read off the assets file and the store", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "desprawl-nuget-"))
+  const store = mkdtempSync(join(tmpdir(), "desprawl-store-"))
+  const put = (path: string, body: string) => {
+    mkdirSync(join(dir, path, ".."), { recursive: true })
+    writeFileSync(join(dir, path), body)
+  }
+  put(
+    "src/App/App.csproj",
+    '<Project Sdk="Microsoft.NET.Sdk">\n  <ItemGroup>\n' +
+      '    <PackageReference Include="Serilog" Version="3.1.1" />\n' +
+      '    <PackageReference Include="StyleCop.Analyzers" Version="1.2.0" PrivateAssets="all" />\n' +
+      '    <PackageReference Include="Newtonsoft.Json">\n      <Version>13.0.3</Version>\n' +
+      "    </PackageReference>\n  </ItemGroup>\n</Project>\n",
+  )
+  put("src/App/Program.cs", "namespace App;\n\npublic class Program { }\n")
+  // the assets file is what a restore leaves behind, and it is never checked in
+  mkdirSync(join(dir, "src/App/obj"), { recursive: true })
+  writeFileSync(
+    join(dir, "src/App/obj/project.assets.json"),
+    JSON.stringify({
+      libraries: {
+        "Serilog/3.1.1": { type: "package" },
+        "Newtonsoft.Json/13.0.3": { type: "package" },
+        "App.Core/1.0.0": { type: "project" },
+      },
+    }),
+  )
+  for (const [name, version, licence] of [
+    ["serilog", "3.1.1", '<license type="expression">Apache-2.0</license>'],
+    ["newtonsoft.json", "13.0.3", "<licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>"],
+  ]) {
+    mkdirSync(join(store, name, version), { recursive: true })
+    writeFileSync(
+      join(store, name, version, `${name}.nuspec`),
+      `<package><metadata>${licence}</metadata></package>`,
+    )
+  }
+  execFileSync("git", ["init", "-q"], { cwd: dir })
+  execFileSync("git", ["add", "-A"], { cwd: dir })
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x"], {
+    cwd: dir,
+  })
+
+  const was = process.env.NUGET_PACKAGES
+  process.env.NUGET_PACKAGES = store
+  const found = await deps(dir)
+  process.env.NUGET_PACKAGES = was
+  rmSync(dir, { recursive: true, force: true })
+  rmSync(store, { recursive: true, force: true })
+
+  const by = (name: string) => found.list.find((one) => one.name === name)!
+  assert.equal(by("Serilog").version, "3.1.1")
+  assert.equal(by("Serilog").license, "Apache-2.0")
+  assert.equal(by("Serilog").ecosystem, "NuGet")
+  assert.ok(by("Serilog").direct)
+  assert.ok(!by("Serilog").dev)
+  assert.equal(by("Newtonsoft.Json").version, "13.0.3", "a version can be an element of its own")
+  assert.equal(by("Newtonsoft.Json").license, "MIT", "and an old package licenses by url")
+  assert.ok(by("StyleCop.Analyzers").dev, "an analyser never ships")
+  assert.ok(!found.list.some((one) => one.name === "App.Core"), "a project is not a package")
+})
