@@ -54,12 +54,24 @@ export const MARK = ""
 const MARKED = new RegExp(`${MARK}(\\d+)${MARK}`, "g")
 
 /** comments and regex become spaces, strings a marker pointing at their text */
+/** everything outside a script block blanked, lines kept, so a template is not code and a
+ *  line still says where it is: a vue or svelte file is one script wrapped in markup */
+export const scripted = (source: string): string => {
+  let out = source.replace(/[^\n]/g, " ")
+  for (const m of source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)) {
+    const at = m.index + m[0].indexOf(">") + 1
+    out = out.slice(0, at) + m[1] + out.slice(at + m[1].length)
+  }
+  return out
+}
+
 export function scrub(
   source: string,
   flavour: Flavour = "js",
   /** a template keeps its written text, every hole in it a star. Off, it reads as empty */
   templates = false,
 ): { code: string; strings: string[] } {
+  if (flavour === "sfc") return scrub(scripted(source), "js", templates)
   const strings: string[] = []
   let code = ""
   let i = 0

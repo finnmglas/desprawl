@@ -3,7 +3,7 @@
 
 // php is c shaped, but a single quote opens a string there and a hash opens a comment,
 // and markup comments with an angle bracket, so a slash in an attribute opens nothing
-export type Flavour = "js" | "c" | "py" | "rs" | "php" | "xml"
+export type Flavour = "js" | "c" | "py" | "rs" | "php" | "xml" | "sfc"
 
 /** the shape onlyIn needs: enough of a module to keep its edges honest */
 interface Held {
@@ -78,7 +78,8 @@ function opened(text: string): string[] {
 // prettier-ignore
 const DIALECTS: Dialect[] = [
   {
-    id: "ts", label: "TypeScript", exts: ["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs"],
+    id: "ts", label: "TypeScript",
+    exts: ["ts", "tsx", "mts", "cts", "js", "jsx", "mjs", "cjs", "vue", "svelte"],
     flavour: "js", imports: [], decls: [],
   },
   {
@@ -228,6 +229,13 @@ const BY_EXT = new Map<string, Dialect>(
 
 export const dialectOf = (path: string): Dialect | undefined =>
   BY_EXT.get(path.split(".").pop()?.toLowerCase() ?? "")
+
+/** a single file component is javascript inside markup, and only its script is code */
+export const SFC = /\.(vue|svelte)$/i
+
+/** how this file is written, which for an sfc is not how the rest of its language is */
+export const flavourOf = (path: string): Flavour =>
+  SFC.test(path) ? "sfc" : (dialectOf(path)?.flavour ?? "js")
 
 /** every extension desprawl can read a graph out of */
 export const READS = new RegExp(`\\.(${[...BY_EXT.keys()].join("|")})$`, "i")

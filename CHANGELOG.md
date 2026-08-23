@@ -9,6 +9,7 @@ Notable changes per release. Dates are the day the tag shipped.
 ### Added
 
 - **C#, .NET and XAML.** A `using` lands on the files declaring that namespace rather than on a folder guess, markup links to the class behind it and the controls it places, `.csproj`, central package management and the nuget store give versions, licences and advisories, `dotnet test` suites are counted, and an ASP.NET route reads `[controller]` as the class it names.
+- **Vue and Svelte single file components are read**, their script only, so a template is never code and a line still says where it is: 15 files read to 35, and 51% call coverage to 92%, on a vue app. `@/x` resolves to src, since nothing installs under a bare scope, and a name a factory hands back (`export const useStore = defineStore(...)`) is a declaration other files can call, which is 33k more call edges on vscode.
 - **Dart and Flutter**, resolved through `package:` names off every `pubspec.yaml`, with pub.dev as the registry a chip links to.
 - **Every language resolves through one map from name to folder.** On ripgrep: 425 import edges to 801, and 46 "fix this import" tasks on code that compiles gone.
 - **Tests are counted in whatever language they were written in**, pytest, `go test`, `cargo test` and `dotnet test` alike, with the command that would run them.

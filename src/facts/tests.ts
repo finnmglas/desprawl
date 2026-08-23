@@ -5,7 +5,7 @@ import { execFile } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { VENDORED, reading } from "../read/graph.ts"
-import { dialectOf } from "../read/dialects.ts"
+import { flavourOf } from "../read/dialects.ts"
 import { git, made, type Made } from "../read/model.ts"
 import { roleOf } from "../read/layers.ts"
 import { scrub } from "../read/specifiers.ts"
@@ -222,7 +222,7 @@ export function tests(repo: string): Suite {
   const tracked = git(root, "ls-files", "-z").split("\0").filter(Boolean)
   const code = (path: string) => {
     try {
-      return scrub(readFileSync(join(root, path), "utf8"), dialectOf(path)?.flavour).code
+      return scrub(readFileSync(join(root, path), "utf8"), flavourOf(path)).code
     } catch {
       // unreadable is still a test file, it just contributes no cases
       return ""

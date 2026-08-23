@@ -276,3 +276,48 @@ test("a .net specifier lands under the project that declares its namespace", () 
     "a pack uri is a path with an assembly in front of it",
   )
 })
+
+test("a single file component is the script in it, and never the markup around it", () => {
+  const dir = repo({
+    "package.json": '{"name":"app"}',
+    "src/api.js": "export const load = () => 1\nexport const hidden = () => 2\n",
+    "src/Card.vue": [
+      "<template>",
+      '  <div class="card" @click="load()">{{ title }}</div>',
+      "  <img :src=\"require('./nope.png')\" />",
+      "</template>",
+      "",
+      "<script setup>",
+      'import { load } from "./api.js"',
+      "const props = defineProps({ title: String })",
+      "function open() {",
+      "  return load()",
+      "}",
+      "</script>",
+      "",
+      "<style>.card { color: red }</style>",
+      "",
+    ].join("\n"),
+  })
+  const graph = build(dir)
+  assert.ok(graph.modules["src/Card.vue"], "a component is a module")
+  assert.deepEqual(
+    graph.modules["src/Card.vue"].out.map((e) => e.to),
+    ["src/api.js"],
+    "its script imports, and nothing the template says does",
+  )
+  assert.ok(graph.modules["src/Card.vue"].symbols.declares > 0, "and it declares its own")
+  assert.equal(graph.modules["src/Card.vue"].barrel, false, "a component is not a barrel")
+
+  const found = calls(dir, graph)
+  assert.ok(
+    found.symbols["src/Card.vue#open"]?.calls.includes("src/api.js#load"),
+    `open should reach load, reaches ${JSON.stringify(found.symbols["src/Card.vue#open"]?.calls)}`,
+  )
+  assert.ok(
+    !found.unresolved.some((one) => one.name === "defineProps" || one.name === "require"),
+    "a compiler macro is the framework's own word, and a template calls nothing",
+  )
+  // the lines a panel points at have to be the lines in the file
+  assert.equal(found.symbols["src/Card.vue#open"]?.line, 9)
+})

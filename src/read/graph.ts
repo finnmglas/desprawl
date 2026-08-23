@@ -4,8 +4,16 @@
 import { existsSync, readFileSync, statSync } from "node:fs"
 import { dirname, join, relative, resolve } from "node:path"
 import { made, git, type Made } from "./model.ts"
-import { declared, foreign, scrub, specifiers, symbols, type Symbols } from "./specifiers.ts"
-import { READS, candidates, dialectOf, type Dialect } from "./dialects.ts"
+import {
+  declared,
+  foreign,
+  scripted,
+  scrub,
+  specifiers,
+  symbols,
+  type Symbols,
+} from "./specifiers.ts"
+import { READS, SFC, candidates, dialectOf, type Dialect } from "./dialects.ts"
 import { reading as text, scrubbed } from "./held.ts"
 
 export interface Edge {
@@ -120,7 +128,8 @@ export function ignored(root: string): RegExp | undefined {
 }
 
 // the order typescript probes in
-const TRIES = [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".json"]
+// prettier-ignore
+const TRIES = [".ts", ".tsx", ".mts", ".cts", ".d.ts", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".svelte", ".json"]
 const REWRITE: [RegExp, string[]][] = [
   [/\.js$/, [".ts", ".tsx", ".d.ts", ".js"]],
   [/\.jsx$/, [".tsx", ".jsx"]],
@@ -524,8 +533,13 @@ export function build(repo: string): Graph {
       continue
     }
 
-    modules[from].symbols = symbols(source)
-    for (const spec of specifiers(source)) {
+    // a single file component is a script wrapped in markup, and only the script is code
+    const read = SFC.test(from) ? scripted(source) : source
+    const own_ = symbols(read)
+    // its default export is the component, which is the one thing it declares
+    modules[from].symbols =
+      SFC.test(from) && !own_.declares && own_.exports ? { ...own_, declares: 1 } : own_
+    for (const spec of specifiers(read)) {
       seen++
       const target = locate(spec.text, full)
       if (!target) continue
@@ -609,6 +623,16 @@ export function build(repo: string): Graph {
     if (conf.baseUrl) {
       const hit = inside(join(conf.dir, conf.baseUrl, text), text)
       if (hit.kind !== "missing") return hit
+    }
+
+    // `@/x` is not a package: a scope needs a name after the at, so nothing installs under
+    // one. Every bundler that offers it points it at src, which is what vue and nuxt write
+    if (text.startsWith("@/")) {
+      const rest = text.slice(2)
+      for (const at of [join(root, "src", rest), join(root, rest)]) {
+        const hit = inside(at, text)
+        if (hit.kind !== "missing") return hit
+      }
     }
     if (aliased) return { kind: "missing", reason: "no such file" }
     return { kind: "package", name }

@@ -4,7 +4,7 @@
 import { scrubbed } from "./held.ts"
 import { join } from "node:path"
 import { build, type Graph } from "./graph.ts"
-import { candidates, dialectOf } from "./dialects.ts"
+import { candidates, dialectOf, flavourOf } from "./dialects.ts"
 import { MARK, breaks, lineAt } from "./specifiers.ts"
 import { URL, normal, under, verbOf } from "./specs.ts"
 import type { Client, Endpoint } from "./specs.ts"
@@ -151,7 +151,7 @@ export function collect(repo: string, graph: Graph = build(repo), calls?: Calls)
     const path = module.path
     const dialect = dialectOf(path)
     const lang = dialect?.id ?? ""
-    const { code, strings } = scrubbed(join(repo, path), dialect?.flavour ?? "js", true)
+    const { code, strings } = scrubbed(join(repo, path), flavourOf(path), true)
     if (!code) continue
     const starts = breaks(code)
     const at = (index: number) => lineAt(starts, index)

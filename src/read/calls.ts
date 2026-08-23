@@ -7,7 +7,7 @@ import { reading as text, scrubbed } from "./held.ts"
 import { join } from "node:path"
 import { build, packageOf, type Graph } from "./graph.ts"
 import { MARK, breaks, declared, foreign, lineAt, specifiers } from "./specifiers.ts"
-import { dialectOf, keywordsOf, runtimeOf } from "./dialects.ts"
+import { dialectOf, flavourOf, keywordsOf, runtimeOf } from "./dialects.ts"
 import { siting, type Symbol } from "./siting.ts"
 
 export type { Symbol }
@@ -159,12 +159,25 @@ const GLOBAL = new Set([
   "history",
   "location",
   "Image",
+  // what a single file component's compiler hands it, which nothing declares
+  "defineProps",
+  "defineEmits",
+  "defineExpose",
+  "defineOptions",
+  "defineModel",
+  "defineSlots",
+  "withDefaults",
 ])
 
 const DECLARED =
   /(?<![.\w$])(export\s+)?(default\s+)?(async\s+)?(function\s*\*?|class)\s+([A-Za-z_$][\w$]*)/g
 const ASSIGNED =
   /(?<![.\w$])(export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=[^\S\n]*(async[^\S\n]+)?(?:function|(?:<[^<>=]*>[^\S\n]*)?\((?:[^()]|\([^()]*\))*\)[^\S\n]*(?::[^=\n]*)?=>|[A-Za-z_$][\w$]*[^\S\n]*=>)/g
+
+// a name a factory hands back, which other files call like any other: a store, a client,
+// a hook. Exported only, or every `const held = new Map()` would read as a declaration
+const MADE =
+  /(?<![.\w$])export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*(?:await\s+)?[A-Za-z_$][\w$.]*\s*(?:<[^<>()]*>\s*)?\(/g
 
 // wrapped, not finished
 const HANGING = /[=>?:,.+\-*/&|(\[]$/
@@ -269,8 +282,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
   let builtin = 0
   // the files that were readable, not what was in them: a kernel is a gigabyte of text
   const read_: string[] = []
-  const reading = (path: string): string =>
-    scrubbed(join(repo, path), dialectOf(path)?.flavour).code
+  const reading = (path: string): string => scrubbed(join(repo, path), flavourOf(path)).code
   // file to local name, to where that name came from
   const bindings = new Map<
     string,
@@ -285,7 +297,7 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
     const source = text(join(repo, module.path))
     if (!source) continue
     const dialect = dialectOf(module.path)
-    const read = scrubbed(join(repo, module.path), dialect?.flavour)
+    const read = scrubbed(join(repo, module.path), flavourOf(module.path))
     const { code } = read
     read_.push(module.path)
     const starts = breaks(code)
@@ -373,6 +385,8 @@ export function calls(repo: string, graph: Graph = build(repo)): Calls {
         )
       for (const m of code.matchAll(ASSIGNED))
         add(m[2], m.index, !!m[1], /^[A-Z]/.test(m[2]) ? "component" : "function")
+      for (const m of code.matchAll(MADE))
+        add(m[1], m.index, true, /^[A-Z]/.test(m[1]) ? "component" : "function")
     }
   }
 
