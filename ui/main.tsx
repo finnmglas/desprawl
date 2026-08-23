@@ -65,6 +65,8 @@ declare global {
     __DESPRAWL_DEPS__?: Depended
     __DESPRAWL_TESTS__?: Suited
     __DESPRAWL_SPRAWL__?: Sprawled
+    /** the other pages published beside this one, when it was published with any */
+    __DESPRAWL_DEMOS__?: { name: string; said: string; at: string }[]
   }
 }
 

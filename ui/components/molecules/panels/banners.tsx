@@ -13,6 +13,8 @@ interface Props {
 
 export function Banners({ name, repo, online }: Props) {
   const stats = { repo }
+  // a published demo knows the ones published beside it, and nothing else does
+  const demos = window.__DESPRAWL_DEMOS__ ?? []
   return (
     <>
       {/* a saved file is read by someone who did not run it, so it says what it is */}
@@ -27,7 +29,17 @@ export function Banners({ name, repo, online }: Props) {
                 ? "A static demo of desprawl on its own source."
                 : `A static desprawl report for ${name}.`}
             </span>{" "}
-            <span className="text-muted-foreground">Run it on your own project:</span>
+            <span className="text-muted-foreground">
+              {demos.length ? "Also here:" : "Run it on your own project:"}
+            </span>{" "}
+            {demos.map((one, i) => (
+              <span key={one.at}>
+                {i > 0 && <span className="text-muted-foreground"> · </span>}
+                <a className="hover:text-foreground underline" href={one.at} title={one.said}>
+                  {one.name}
+                </a>
+              </span>
+            ))}
           </p>
           {/* the command and the button stay one row, whatever the text above them does */}
           <div className="flex shrink-0 items-center gap-2">

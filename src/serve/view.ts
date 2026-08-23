@@ -10,7 +10,8 @@ import type { Calls } from "../read/calls.ts"
 import type { Deps } from "../facts/deps.ts"
 import type { Suite } from "../facts/tests.ts"
 import { build } from "../read/graph.ts"
-import { everyCall, fleet, graphs } from "../facts/many.ts"
+import { everyApi, everyCall, fleet, graphs } from "../facts/many.ts"
+import { api as apiOf } from "../read/routes.ts"
 import { copied, repeated, talky } from "../facts/sprawl.ts"
 import type { Graph } from "../read/graph.ts"
 import { made } from "../read/model.ts"
@@ -62,6 +63,9 @@ export function page(
   const graph = held?.graph ?? (some ? graphs(root) : build(root))
   const heavy = graph.stats.files > HEAVY
   const said = held?.called ?? (heavy ? null : some ? everyCall(root) : calls(root, graph))
+  // the api view is the one thing a folder of repos is read for, and a page without it
+  // had nothing to draw the red edges from
+  const wired = some ? everyApi(root) : apiOf(root, graph, said ?? undefined)
   const paths = Object.keys(graph.modules)
   const loose = {
     ...made(root),
@@ -73,6 +77,7 @@ export function page(
   const data =
     `<script>window.__DESPRAWL__=${inline(stats)};window.__DESPRAWL_GRAPH__=${inline(graph)}` +
     `${said ? `;window.__DESPRAWL_CALLS__=${inline(said)}` : ""}` +
+    `;window.__DESPRAWL_ROUTES__=${inline(wired)}` +
     `${held?.deps ? `;window.__DESPRAWL_DEPS__=${inline(held.deps)}` : ""}` +
     `;window.__DESPRAWL_SPRAWL__=${inline(loose)}` +
     `${held?.suite ? `;window.__DESPRAWL_TESTS__=${inline(held.suite)}` : ""}</script>`

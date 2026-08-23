@@ -28,11 +28,29 @@ jobs:
           node-version: 24
       - run: pnpm install
       - run: pnpm build # dist/index.html is the shell the static export writes into
+
+      # the repos the other two demos are of. Depth, never --filter=blob:none: a blobless
+      # clone sends git off to refetch every blob for the line counts and never finishes
+      - run: |
+          git clone --depth 200 -q https://github.com/microsoft/vscode.git demos/vscode
+          for one in \
+            gothinkster/node-express-realworld-example-app:backend \
+            gothinkster/react-redux-realworld-example-app:react \
+            gothinkster/vue-realworld-example-app:vue; do
+            git clone --depth 50 -q "https://github.com/${one%%:*}.git" "demos/realworld/${one##*:}"
+          done
+
       # --anon drops every commit address, and the faces with it, since an avatar and a
       # profile link are both derived from one. --out names the file, so no stdout parsing
       - run: |
-          mkdir -p site
+          mkdir -p site/vscode site/realworld
           node src/cli.ts view . --static --anon --out site/index.html
+          node src/cli.ts view demos/realworld --static --anon --out site/realworld/index.html
+          node src/cli.ts view demos/vscode --static --anon --out site/vscode/index.html
+          node scripts/demos.ts site
+        env:
+          # twelve thousand files of typescript outgrow a default heap while it is read
+          NODE_OPTIONS: --max-old-space-size=8192
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
