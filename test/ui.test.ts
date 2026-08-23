@@ -110,7 +110,8 @@ test("a share can be read back as the thing it is a share of", () => {
 
 test("days become weeks and months as a repo ages", () => {
   // prettier-ignore
-  const spans: [string, string][] = [["2026-01-05", "day"], ["2026-06-01", "week"], ["2046-01-01", "month"]]
+  const spans: [string, string][] = [["2026-01-05", "day"], ["2026-01-25", "day"], ["2026-06-01", "week"], ["2046-01-01", "month"]]
+  // three weeks is three bars, and the same span by day is a shape
   for (const [last, grain] of spans) assert.equal(defaultGrain("2026-01-01", last), grain, last)
 })
 

@@ -118,12 +118,19 @@ function label(date: Date, grain: Grain): string {
   return monday.toISOString().slice(0, 10)
 }
 
-// days when young, months once long
+/** days to a bucket, near enough to count them with */
+const SPANS: Record<Grain, number> = { hour: 1 / 24, day: 1, week: 7, month: 30, year: 365 }
+/** under this many buckets a chart is a handful of bars, and the grain below says more */
+const ENOUGH = 8
+
+// days when young, months once long, and a grain the span cannot fill steps down
 export function defaultGrain(first: string, last: string): Grain {
   const days = (Date.parse(last.slice(0, 10)) - Date.parse(first.slice(0, 10))) / DAY_MS + 1
-  if (days < 14) return "day"
-  if (days > 5 * 365) return "month"
-  return "week"
+  const want = days > 5 * 365 ? "month" : "week"
+  // hour is never a default: it is read live, over a window somebody picked
+  for (let at = GRAINS.indexOf(want); at > 0; at--)
+    if (days / SPANS[GRAINS[at]] >= ENOUGH) return GRAINS[at]
+  return "day"
 }
 
 // the day indices per bucket, to sum, take the last or union
