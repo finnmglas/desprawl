@@ -4,7 +4,11 @@
 
 Notable changes per release. Dates are the day the tag shipped.
 
-## [Unreleased]
+## [1.0.0] - 2026-08-23
+
+Overall Polish.
+
+Twelve languages including C#, .NET and the single file components, every number saying which way it went, and a picture you can arrange by hand.
 
 ### Added
 
@@ -174,6 +178,7 @@ First release. No runtime dependencies. One `git log` and one `git ls-files` per
 - Commits and contributors merged by mailmap email, with renames followed. Commits, churn and last-touched per file and folder.
 - `desprawl` prints the report, `--json` emits the whole thing, `desprawl view` writes one self-contained html file with an overview, a folder explorer and the commit history as a branch graph.
 
+[1.0.0]: https://github.com/finnmglas/desprawl/releases/tag/v1.0.0
 [0.6.0]: https://github.com/finnmglas/desprawl/releases/tag/v0.6.0
 [0.5.0]: https://github.com/finnmglas/desprawl/releases/tag/v0.5.0
 [0.4.0]: https://github.com/finnmglas/desprawl/releases/tag/v0.4.0
