@@ -1,15 +1,15 @@
 // owner: finn
-// goal: the header menu, and the settings it opens
+// goal: the buttons the header ends with, and what each of them opens
 
-import { Copy, Download, Refresh, Sliders } from "../../atoms/icons.tsx"
-import { Menu, MenuItem, MenuSection } from "../menu.tsx"
+import { Download, Refresh, Sliders } from "../../atoms/icons.tsx"
+import { Button } from "../../atoms/button.tsx"
+import { MenuSection } from "../menu.tsx"
 import { Dialog } from "../../atoms/dialog.tsx"
 import { Note } from "../../atoms/card.tsx"
 import { Exports } from "../exports.tsx"
 import { Tabs } from "../../atoms/tabs.tsx"
 import { toast } from "../../atoms/toast.tsx"
 import { useGoing } from "../../../lib/app/going.tsx"
-import { copy } from "../../../lib/app/export.ts"
 import { resetSections, useArranging, useCustomized } from "../../../lib/app/sections.ts"
 import { CHOICES, LABELS, locale, setLocale } from "../../../lib/text/locale.ts"
 import {
@@ -85,12 +85,6 @@ export function Settings({
   const show = (which: string) => go({ dialog: which })
   const close = () => go({ dialog: "" })
 
-  const share = async () =>
-    toast(
-      (await copy(location.href)) ? "Link copied" : "Copy blocked by the browser",
-      "Opens on this exact folder and language",
-    )
-
   return (
     <>
       <Exports open={at.dialog === "export"} onClose={close} stats={stats} onPaper={onPaper} />
@@ -115,6 +109,22 @@ export function Settings({
           value={arranging ? "on" : "off"}
           onChange={(next) => setArranging(next === "on")}
         />
+        {customized && (
+          <div className="flex items-center justify-between gap-3 px-2">
+            <Note>a panel was moved or hidden on one of the tabs</Note>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                resetSections()
+                toast("Panels reset", "every tab back to its default panels, in order")
+              }}
+            >
+              <Refresh />
+              reset layout
+            </Button>
+          </div>
+        )}
         <Choice
           label="Theme"
           hint={
@@ -186,37 +196,36 @@ export function Settings({
           }}
         />
       </Dialog>
-      <Menu>
-        {reload && (
-          <MenuItem onClick={reload}>
-            <Refresh />
-            refresh contents
-          </MenuItem>
-        )}
-        <MenuItem onClick={share}>
-          <Copy />
-          copy link to this page
-        </MenuItem>
-        <MenuItem onClick={() => show("export")}>
-          <Download />
-          export data
-        </MenuItem>
-        <MenuItem onClick={() => show("settings")}>
-          <Sliders />
-          settings
-        </MenuItem>
-        {customized && (
-          <MenuItem
-            onClick={() => {
-              resetSections()
-              toast("Panels reset", "every tab back to its default panels, in order")
-            }}
-          >
-            <Refresh />
-            reset panel layout
-          </MenuItem>
-        )}
-      </Menu>
+      {/* on dark the page behind is darker, so an unfilled button reads as a hole */}
+      {reload && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="bg-card"
+          title="Refresh contents"
+          onClick={reload}
+        >
+          <Refresh className="size-4" />
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        size="icon"
+        className="bg-card"
+        title="Export data"
+        onClick={() => show("export")}
+      >
+        <Download className="size-4" />
+      </Button>
+      <Button
+        variant="outline"
+        size="icon"
+        className="bg-card"
+        title="Settings"
+        onClick={() => show("settings")}
+      >
+        <Sliders />
+      </Button>
     </>
   )
 }

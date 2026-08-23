@@ -103,11 +103,21 @@ export const Refresh = ({ className }: { className?: string }) => (
     d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16M21 21v-5h-5"
   />
 )
+// two rails and the knob on each, which reads at this size where three thin ones do not
 export const Sliders = ({ className }: { className?: string }) => (
-  <Line
-    className={className}
-    d="M4 7h6M14 7h6M4 12h10M18 12h2M4 17h4M12 17h8M12 5v4M16 10v4M8 15v4"
-  />
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2}
+    strokeLinecap="round"
+    className={cn("size-4 shrink-0", className)}
+  >
+    <path d="M3 8h9M18 8h3M3 16h5M14 16h7" />
+    <circle cx="15" cy="8" r="2.6" />
+    <circle cx="11" cy="16" r="2.6" />
+  </svg>
 )
 export const Download = ({ className }: { className?: string }) => (
   <Line className={className} d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
