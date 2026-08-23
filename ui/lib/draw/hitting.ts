@@ -2,6 +2,7 @@
 // goal: what sits under a point on the drawing
 
 import { spotAt, wireAt, type Held, type Seat } from "./wires.ts"
+import { grabbing, type Grab } from "./moving.ts"
 import type { Box, Grain, Net, Spot } from "./network.ts"
 
 // the writing on a module card, which is where a reader aims for the card itself
@@ -62,5 +63,22 @@ export function hitting({ drawn, grain, view, shown, sits, bows }: What) {
     return box ? (drawn.spots.find((one) => one.id === box.id) ?? null) : null
   }
 
-  return { boxUnder, dotAt, lineAt, boxSpot }
+  /**
+   * what a drag here takes hold of: the dot under it, else the card, else the lane the
+   * repo is drawn in. Nothing means the background, which is what panning moves
+   */
+  const grabAt = (px: number, py: number): Grab | null => {
+    if (!drawn) return null
+    const spot = dotAt(px, py)
+    if (spot) return grabbing(drawn, { spot })
+    const card = boxUnder(px, py)
+    if (card) return grabbing(drawn, { box: card })
+    const { gx, gy } = inPicture(px, py)
+    const lane = drawn.boxes.find(
+      (b) => b.depth < 0 && gx >= b.x && gx <= b.x + b.w && gy >= b.y && gy <= b.y + b.h,
+    )
+    return lane ? grabbing(drawn, { box: lane }) : null
+  }
+
+  return { boxUnder, dotAt, lineAt, boxSpot, grabAt }
 }

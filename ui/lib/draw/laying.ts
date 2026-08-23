@@ -186,7 +186,14 @@ export function placing(laid: Lane[], lanes: number, width: number, tall: number
   for (const held of [...rows].reverse()) {
     let left = 0
     for (const one of held) {
-      for (const box of one.boxes) boxes.push({ ...box, x: box.x + left, y: box.y + top })
+      // a band belongs to the lane it was placed in, so what holds a module is followable
+      for (const box of one.boxes)
+        boxes.push({
+          ...box,
+          parent: box.depth === 0 && lanes > 1 ? `repo:${one.column}` : box.parent,
+          x: box.x + left,
+          y: box.y + top,
+        })
       // the lane itself, drawn as a border so two repos never read as one picture
       if (lanes > 1)
         boxes.push({

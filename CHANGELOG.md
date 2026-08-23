@@ -15,6 +15,7 @@ Notable changes per release. Dates are the day the tag shipped.
 - **A python dependency knows its version, licence and size**, off the venv and the lockfiles, advisories included.
 - **Every KPI says which way it went** over a window you pick. The log answers lines and commits; the other twenty are read off a throwaway checkout of the commit that window opens on.
 - **Settings are a dialog the url can name.** `#dialog=settings` and `#dialog=export` are linkable and survive a reload, the ellipsis menu is three buttons in the header, and the api graph is one more file the export panel hands you.
+- **The picture can be arranged by hand.** Drag a dot and it moves inside the module holding it, drag a module and its dots go with it, drag a repo and everything in it keeps its arrangement and travels. Panning is what the background does, so a gesture over a thing moves the thing.
 - **Panels only move when asked**: dragging, reordering and hiding are off until the settings turn them on.
 - **`.desprawlignore`**, one exclude a reader can write down for the folder no heuristic will ever know about.
 - The timeline reads its shares back as lines on a second axis, and a graphql request is named by its operation rather than as another `POST /*`.

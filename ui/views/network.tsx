@@ -181,7 +181,8 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     },
   })
 
-  const { boxUnder, dotAt, lineAt, boxSpot } = hitting({ drawn, grain, view, shown, sits, bows })
+  // what sits under a point, and what a drag from it takes hold of
+  const hits = hitting({ drawn, grain, view, shown, sits, bows })
 
   // the click says which, rather than picking
   const walk = (spot: Spot) =>
@@ -203,10 +204,7 @@ export function Network({ stats, repos = [] }: { stats: Stats; repos?: string[] 
     board,
     view,
     rushed,
-    boxUnder,
-    boxSpot,
-    dotAt,
-    lineAt,
+    ...hits,
     near,
     edge,
     setNear,

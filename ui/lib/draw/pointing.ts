@@ -3,6 +3,7 @@
 
 import { useRef, type RefObject, type MouseEvent, type TouchEvent } from "react"
 import { STRIP } from "./paint.ts"
+import { shift, type Grab } from "./moving.ts"
 import type { Box, Net, Spot } from "./network.ts"
 import type { Held } from "./wires.ts"
 
@@ -21,6 +22,8 @@ interface What {
   /** a module draws no dot, so its box stands for it */
   boxSpot: (px: number, py: number, said?: boolean) => Spot | null
   dotAt: (px: number, py: number) => Spot | null
+  /** what a drag from here moves, and nothing where it moves the picture instead */
+  grabAt: (px: number, py: number) => Grab | null
   lineAt: (px: number, py: number) => (Held & { held: number }) | null
   near: Spot | null
   edge: (Held & { held: number }) | null
@@ -35,9 +38,21 @@ interface What {
 export function pointing(what: What) {
   const drag = useRef<{ x: number; y: number } | null>(null)
   const moved = useRef(false)
+  // what the drag is carrying, since a gesture over a thing moves the thing and not the view
+  const held = useRef<Grab | null>(null)
   // one finger drags, two pinch
   const fingers = useRef<{ x: number; y: number; away: number } | null>(null)
-  const { board, view, rushed, dotAt, lineAt, boxSpot, boxUnder, near, edge } = what
+  const { board, view, rushed, dotAt, lineAt, boxSpot, boxUnder, grabAt, near, edge } = what
+
+  /** the picture moves under the cursor by what the cursor did, in the picture's own units */
+  const carry = (dx: number, dy: number) => {
+    if (held.current) shift(held.current, dx / view.current.scale, dy / view.current.scale)
+    else {
+      view.current.x += dx
+      view.current.y += dy
+    }
+    rushed()
+  }
 
   /** the midpoint of whatever is touching, and how far apart two fingers are */
   const touching = (event: TouchEvent) => {
@@ -59,14 +74,18 @@ export function pointing(what: What) {
 
   return {
     onMouseDown: (event: MouseEvent) => {
+      const [px, py] = inside(event)
+      held.current = grabAt(px, py)
       drag.current = { x: event.clientX, y: event.clientY }
       moved.current = false
     },
     onMouseUp: () => {
       drag.current = null
+      held.current = null
     },
     onMouseLeave: () => {
       drag.current = null
+      held.current = null
       what.setNear(null)
       what.setEdge(null)
     },
@@ -75,7 +94,10 @@ export function pointing(what: What) {
       fingers.current = now
       moved.current = false
       // a tap has no hover before it
-      if (now && event.touches.length === 1) what.setNear(dotAt(now.x, now.y))
+      if (now && event.touches.length === 1) {
+        what.setNear(dotAt(now.x, now.y))
+        held.current = grabAt(now.x, now.y)
+      }
     },
     onTouchMove: (event: TouchEvent) => {
       const now = touching(event)
@@ -83,8 +105,9 @@ export function pointing(what: What) {
       fingers.current = now
       if (!now || !was) return
       if (Math.abs(now.x - was.x) + Math.abs(now.y - was.y) > SLIP) moved.current = true
-      // the gap is the zoom, the midpoint stays put
+      // the gap is the zoom, the midpoint stays put, and two fingers never carry a thing
       if (now.away && was.away) {
+        held.current = null
         const next = Math.min(8, Math.max(0.2, (view.current.scale * now.away) / was.away))
         const ratio = next / view.current.scale
         view.current = {
@@ -93,23 +116,20 @@ export function pointing(what: What) {
           y: now.y - (now.y - view.current.y) * ratio,
         }
       }
-      view.current.x += now.x - was.x
-      view.current.y += now.y - was.y
-      rushed()
+      carry(now.x - was.x, now.y - was.y)
     },
     onTouchEnd: (event: TouchEvent) => {
       // lifting one of two leaves the other mid gesture, so it starts again
       fingers.current = event.touches.length ? touching(event) : null
+      if (!event.touches.length) held.current = null
     },
     onMouseMove: (event: MouseEvent) => {
       if (drag.current) {
         const dx = event.clientX - drag.current.x
         const dy = event.clientY - drag.current.y
         if (Math.abs(dx) + Math.abs(dy) > SLIP) moved.current = true
-        view.current.x += dx
-        view.current.y += dy
         drag.current = { x: event.clientX, y: event.clientY }
-        return rushed()
+        return carry(dx, dy)
       }
       const [px, py] = inside(event)
       // a dot first, since it is the smallest target, then the writing on a module
