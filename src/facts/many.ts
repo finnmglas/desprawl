@@ -2,7 +2,7 @@
 // goal: a folder of repos read as one, and each of them still read on its own
 
 import { existsSync, readdirSync, statSync } from "node:fs"
-import { join } from "node:path"
+import { join, sep } from "node:path"
 import { analyze } from "./analyze.ts"
 import { build } from "../read/graph.ts"
 import { forget } from "../read/held.ts"
@@ -18,7 +18,10 @@ import type { Commit, Contributor, Node, Series, Stack, Stats } from "../read/mo
 /** a folder is a fleet when it is not a repo itself and holds more than one */
 /** the repos a reader is about: the ones it named, or the whole folder */
 const held = (path: string, only?: string[]): string[] =>
-  only?.length ? fleet(path).filter((one) => only.includes(one)) : fleet(path)
+  only?.length ? fleet(path).filter((one) => only.map(slashed).includes(one)) : fleet(path)
+
+/** forward slashed, as git names a root: every reader matches a repo by `/${name}` */
+const slashed = (path: string): string => path.split(sep).join("/")
 
 export function fleet(path: string): string[] {
   if (existsSync(join(path, ".git"))) return []
@@ -30,7 +33,7 @@ export function fleet(path: string): string[] {
   }
   const found = names
     .filter((name) => !name.startsWith("."))
-    .map((name) => join(path, name))
+    .map((name) => slashed(join(path, name)))
     .filter((one) => {
       try {
         return statSync(one).isDirectory() && existsSync(join(one, ".git"))

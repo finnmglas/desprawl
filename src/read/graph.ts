@@ -2,7 +2,7 @@
 // goal: which file imports which, resolved not guessed
 
 import { existsSync, readFileSync, statSync } from "node:fs"
-import { dirname, join, relative, resolve } from "node:path"
+import { dirname, isAbsolute, join, relative, resolve, sep, type PlatformPath } from "node:path"
 import { made, git, type Made } from "./model.ts"
 import {
   declared,
@@ -205,12 +205,26 @@ function config(path: string): Record<string, any> | null {
   }
 }
 
+/** a file's key in the graph: relative to the repo and forward slashed on every OS, since git
+ *  lists the modules that way and a windows path matches none of them. null when outside */
+export function keyOf(
+  root: string,
+  file: string,
+  paths: Pick<PlatformPath, "relative" | "sep" | "isAbsolute"> = { relative, sep, isAbsolute },
+): string | null {
+  const rel = paths.relative(root, file)
+  if (rel === ".." || rel.startsWith(`..${paths.sep}`) || paths.isAbsolute(rel)) return null
+  return rel.split(paths.sep).join("/")
+}
+
 /** nearest config to a file, extends followed */
 function options(repo: string, dir: string, cache: Map<string, any>): any {
   if (cache.has(dir)) return cache.get(dir)
   let at = dir
   let found: any = null
-  while (at.startsWith(repo)) {
+  // git names the root with forward slashes and join hands back the OS's own, so a prefix
+  // test on the strings never matched on windows and no tsconfig was ever read there
+  while (keyOf(repo, at) !== null) {
     for (const name of ["tsconfig.json", "jsconfig.json"]) {
       const path = join(at, name)
       if (!existsSync(path)) continue
@@ -648,8 +662,8 @@ export function build(repo: string): Graph {
     | { kind: "missing"; reason: Missing["reason"] } {
     const hit = onDisk(candidate)
     if (!hit) return { kind: "missing", reason: "no such file" }
-    const rel = relative(root, hit)
-    if (rel.startsWith("..")) return { kind: "missing", reason: "outside the repo" }
+    const rel = keyOf(root, hit)
+    if (rel === null) return { kind: "missing", reason: "outside the repo" }
     if (modules[rel]) return { kind: "file", path: rel }
     // there, not a module: a stylesheet, or code git never sees
     return tracked.has(rel) ? { kind: "asset" } : { kind: "generated" }
