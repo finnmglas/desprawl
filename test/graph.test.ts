@@ -2,8 +2,9 @@
 // goal: an edge exists because it resolved, never because it was guessed
 
 import assert from "node:assert/strict"
+import { posix, win32 } from "node:path"
 import { test } from "node:test"
-import { build, jsonc, packageOf } from "../src/read/graph.ts"
+import { build, jsonc, keyOf, packageOf } from "../src/read/graph.ts"
 import { scrub, specifiers, symbols } from "../src/read/specifiers.ts"
 import { repo } from "./repo.ts"
 
@@ -142,6 +143,37 @@ test("an alias that resolves to nothing is a miss, never a package", () => {
   assert.deepEqual(Object.keys(g.packages), [], "a broken alias must not become a package")
   assert.equal(g.missing.length, 1)
   assert.ok(g.stats.coverage < 1, "coverage has to fall when something is unresolved")
+})
+
+test("a resolved file is keyed with forward slashes whatever the OS joins with", () => {
+  // on windows every relative and alias import resolved to `src\lib\thing.ts`, which no
+  // git listed module is called: 9 import edges of 5128 on a next app. CI runs linux,
+  // so the windows separators are simulated here
+  const root = "C:/work/app" // how git rev-parse names a windows root
+  // what locate() joins for `@/lib/thing` under "@/*": ["./src/*"], and for `../lib/thing`
+  const alias = win32.join("C:\\work\\app", ".", "./src/lib/thing") + ".ts"
+  const near =
+    win32.join(win32.dirname("C:\\work\\app\\src\\app\\page.tsx"), "../lib/thing") + ".ts"
+  assert.equal(keyOf(root, alias, win32), "src/lib/thing.ts", "a tsconfig paths alias")
+  assert.equal(keyOf(root, near, win32), "src/lib/thing.ts", "a relative import")
+  assert.equal(keyOf(root, "C:\\work\\app\\src", win32), "src", "a tsconfig search stays inside")
+  assert.equal(keyOf(root, "C:\\work\\other\\x.ts", win32), null, "a sibling repo is outside")
+  assert.equal(keyOf(root, "D:\\app\\x.ts", win32), null, "another drive is outside")
+  assert.equal(keyOf("/work/app", "/work/app/src/a.ts", posix), "src/a.ts")
+
+  // and end to end on whatever OS runs this: both kinds land on git's own names
+  const dir = repo({
+    // `~`, not `@`: a bare `@/` falls back to src and would hide a tsconfig never read
+    "tsconfig.json": '{"compilerOptions":{"paths":{"~/*":["./src/*"]}}}',
+    "src/app/page.ts": 'import "~/lib/thing"\nimport "../lib/other"\n',
+    "src/lib/thing.ts": "export const thing = 1\n",
+    "src/lib/other.ts": "export const other = 1\n",
+  })
+  const g = build(dir)
+  assert.deepEqual(to(g, "src/app/page.ts"), ["src/lib/other.ts", "src/lib/thing.ts"])
+  assert.equal(g.stats.edges, 2)
+  const named = [...Object.keys(g.modules), ...Object.values(g.modules).flatMap((m) => m.in)]
+  assert.ok(!named.some((key) => key.includes("\\")), "no backslash reaches the output")
 })
 
 test("extends is followed to the config that holds the paths", () => {

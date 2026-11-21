@@ -4,6 +4,12 @@
 
 Notable changes per release. Dates are the day the tag shipped.
 
+## [Unreleased]
+
+### Fixed
+
+- **On windows nearly every import was dropped.** A resolved file was keyed with backslashes and git names every module with forward slashes, so relative and alias imports matched nothing: 9 import edges to 5,403 on a next app. The tsconfig search never started there either, and a folder of repos could not be read one repo at a time.
+
 ## [1.0.0] - 2026-08-23
 
 Overall Polish.
